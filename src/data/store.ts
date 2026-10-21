@@ -2,18 +2,36 @@ import { create } from 'zustand';
 import { DEFAULT_CATEGORIES } from '../domain/categories';
 import { categorise, normalizeMerchantKey } from '../domain/categoriser';
 import type { SavedView } from '../domain/filters';
-import { hashPin, verifyPin } from '../domain/pin';
+import { hashPin, resetDue, verifyPin } from '../domain/pin';
 import { setPrivacy } from '../domain/money';
 import type { ParsedEntry } from '../domain/parser';
 import {
-  DEFAULT_SETTINGS, type Category, type CategoryId, type ISODate, type LockConfig,
-  type PaymentMethod, type Settings, type Transaction, type TrashItem,
+  DEFAULT_SETTINGS,
+  type Category,
+  type CategoryId,
+  type ISODate,
+  type LockConfig,
+  type PaymentMethod,
+  type Settings,
+  type Transaction,
+  type TrashItem,
 } from '../domain/types';
 import { loadSettings, type BackupFile } from './backup';
 import { CommandBus, purgeTrash } from './bus';
 import {
-  addTransaction, composite, deleteForever, deleteRule, deleteTransaction, importTransactions,
-  restoreFromTrash, setReceipt, setRule, setViews, updateTransaction, VIEWS_KEY, type Command,
+  addTransaction,
+  composite,
+  deleteForever,
+  deleteRule,
+  deleteTransaction,
+  importTransactions,
+  restoreFromTrash,
+  setReceipt,
+  setRule,
+  setViews,
+  updateTransaction,
+  VIEWS_KEY,
+  type Command,
 } from './commands';
 import { DB_NAME, openLedgerDB, type Db } from './db';
 
@@ -32,6 +50,8 @@ export interface EntryDraft {
 export type ReceiptChange = Blob | null | undefined;
 
 export const LOCK_KEY = 'lock';
+/** When "Forgot PIN?" was pressed (epoch ms). Cleared by the right PIN, a new PIN or the reset itself. */
+export const LOCK_RESET_KEY = 'lockReset';
 
 export interface LedgerState {
   ready: boolean;
@@ -73,6 +93,11 @@ export interface LedgerState {
   removePin: (pin: string) => Promise<boolean>;
   unlock: (pin: string) => Promise<boolean>;
   lockNow: () => void;
+  /** Epoch ms when a forgotten-PIN reset was requested, or null. */
+  lockReset: number | null;
+  requestPinReset: () => Promise<void>;
+  /** Removes the PIN if a requested reset has waited 24 hours. Returns true when it did. */
+  applyPinResetIfDue: () => Promise<boolean>;
   /** Merges a Ledger backup: adds entries, categories and rules this device lacks. Undoable. */
   importFromBackup: (file: BackupFile) => Promise<number>;
   undo: () => Promise<void>;
@@ -146,6 +171,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
+      lockReset: null,
       canUndo: false,
       canRedo: false,
       undoLabel: null,
@@ -164,9 +190,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             await purgeTrash(db);
             const settings = await loadSettings(db);
             const lock = ((await db.get('settings', LOCK_KEY)) as LockConfig | undefined) ?? null;
+            const reset = await db.get('settings', LOCK_RESET_KEY);
             applyBoot(settings);
             await refresh();
-            set({ settings, lock, locked: lock !== null, ready: true, error: null });
+            set({
+              settings,
+              lock,
+              locked: lock !== null,
+              lockReset: typeof reset === 'number' ? reset : null,
+              ready: true,
+              error: null,
+            });
+            await get().applyPinResetIfDue();
           } catch (e) {
             set({ error: e instanceof Error ? e.message : 'Could not open local storage.' });
           }
@@ -244,7 +279,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         }
         const label = `Added ${tx.merchant}`;
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
-        if (draft.method !== settings.lastMethod) await get().setSetting('lastMethod', draft.method);
+        if (draft.method !== settings.lastMethod)
+          await get().setSetting('lastMethod', draft.method);
       },
 
       editTransaction: async (id, draft, receipt) => {
@@ -282,19 +318,29 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const list = get().transactions.filter((t) => ids.includes(t.id));
         if (list.length === 0) return;
         const label = `Deleted ${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
-        await get().run(composite(label, list.map((t) => deleteTransaction(t))), label);
+        await get().run(
+          composite(
+            label,
+            list.map((t) => deleteTransaction(t)),
+          ),
+          label,
+        );
       },
 
       bulkSetCategory: async (ids, categoryId) => {
         const now = Date.now();
-        const list = get().transactions.filter((t) => ids.includes(t.id) && t.categoryId !== categoryId);
+        const list = get().transactions.filter(
+          (t) => ids.includes(t.id) && t.categoryId !== categoryId,
+        );
         if (list.length === 0) return;
         const name = get().categories.find((c) => c.id === categoryId)?.name ?? 'Other';
         const label = `Moved ${list.length} to ${name}`;
         await get().run(
           composite(
             label,
-            list.map((t) => updateTransaction(t, { ...t, categoryId, unsure: false, updatedAt: now })),
+            list.map((t) =>
+              updateTransaction(t, { ...t, categoryId, unsure: false, updatedAt: now }),
+            ),
           ),
           label,
         );
@@ -355,14 +401,16 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       setPin: async (pin) => {
         const lock = await hashPin(pin);
         await requireDb().put('settings', lock, LOCK_KEY);
-        set({ lock, notice: 'Screen lock is on' });
+        await requireDb().delete('settings', LOCK_RESET_KEY);
+        set({ lock, lockReset: null, notice: 'Screen lock is on' });
       },
 
       removePin: async (pin) => {
         const { lock } = get();
         if (!lock || !(await verifyPin(pin, lock))) return false;
         await requireDb().delete('settings', LOCK_KEY);
-        set({ lock: null, locked: false, notice: 'Screen lock is off' });
+        await requireDb().delete('settings', LOCK_RESET_KEY);
+        set({ lock: null, lockReset: null, locked: false, notice: 'Screen lock is off' });
         return true;
       },
 
@@ -373,8 +421,43 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           return true;
         }
         const ok = await verifyPin(pin, lock);
-        if (ok) set({ locked: false });
+        if (ok) {
+          // Remembering the PIN cancels a pending "Forgot PIN?" reset.
+          if (get().lockReset !== null) {
+            await requireDb().delete('settings', LOCK_RESET_KEY);
+            set({ lockReset: null, notice: 'PIN reset cancelled' });
+          }
+          set({ locked: false });
+        }
         return ok;
+      },
+
+      requestPinReset: async () => {
+        if (!get().lock || get().lockReset !== null) return;
+        const at = Date.now();
+        await requireDb().put('settings', at, LOCK_RESET_KEY);
+        set({ lockReset: at });
+      },
+
+      applyPinResetIfDue: async () => {
+        const { lock, lockReset } = get();
+        if (lockReset === null) return false;
+        if (!lock) {
+          await requireDb().delete('settings', LOCK_RESET_KEY);
+          set({ lockReset: null });
+          return false;
+        }
+        if (!resetDue(lockReset, Date.now())) return false;
+        const d = requireDb();
+        await d.delete('settings', LOCK_KEY);
+        await d.delete('settings', LOCK_RESET_KEY);
+        set({
+          lock: null,
+          lockReset: null,
+          locked: false,
+          notice: 'Your PIN was removed after the 24-hour wait. All your entries are here.',
+        });
+        return true;
       },
 
       lockNow: () => {
@@ -398,7 +481,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           return 0;
         }
         const label = `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`;
-        const steps: Command[] = [importTransactions(newTx, newCats, label), ...newRules.map((r) => setRule(r))];
+        const steps: Command[] = [
+          importTransactions(newTx, newCats, label),
+          ...newRules.map((r) => setRule(r)),
+        ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;
       },

@@ -179,3 +179,18 @@ describe('pin', () => {
     expect(await verifyPin('2469', a)).toBe(false);
   });
 });
+
+describe('forgotten PIN reset', () => {
+  it('waits exactly 24 hours and words the time left plainly', async () => {
+    const { RESET_WAIT_MS, fmtWait, resetDue, resetRemaining } = await import('./pin');
+    const at = 1_000_000;
+    expect(resetDue(at, at + RESET_WAIT_MS - 1)).toBe(false);
+    expect(resetDue(at, at + RESET_WAIT_MS)).toBe(true);
+    // A clock moved backwards never shortens or lengthens the wait past 24 hours.
+    expect(resetRemaining(at, at - 5_000)).toBe(RESET_WAIT_MS);
+    expect(fmtWait(RESET_WAIT_MS)).toBe('about 24 hours');
+    expect(fmtWait(90 * 60_000)).toBe('about 2 hours');
+    expect(fmtWait(40 * 60_000)).toBe('about 40 minutes');
+    expect(fmtWait(20_000)).toBe('less than a minute');
+  });
+});

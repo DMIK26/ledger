@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { purgeTrash } from './bus';
 import { createLedgerStore, type EntryDraft } from './store';
 import { EMPTY_FILTERS, DEFAULT_SORT } from '../domain/filters';
@@ -174,5 +174,78 @@ describe('screen lock', () => {
     expect(await b.getState().removePin('0000')).toBe(false);
     expect(await b.getState().removePin('2468')).toBe(true);
     expect(b.getState().locked).toBe(false);
+  }, 20_000);
+});
+
+describe('forgotten PIN', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  it('removes the PIN only after 24 hours and keeps every entry', async () => {
+    const name = `reset-${Math.random().toString(36).slice(2)}`;
+    const t0 = Date.UTC(2026, 9, 19, 6);
+    vi.useFakeTimers({ toFake: ['Date'], now: t0 });
+    try {
+      const a = createLedgerStore(name);
+      await a.getState().init();
+      await a.getState().addEntry(draft(), receipt());
+      await a.getState().setPin('2468');
+      a.getState().lockNow();
+      await a.getState().requestPinReset();
+      expect(a.getState().lockReset).toBe(t0);
+
+      // Reopened 23 hours later: still locked, reset still pending.
+      vi.setSystemTime(t0 + 23 * 60 * 60 * 1000);
+      const b = createLedgerStore(name);
+      await b.getState().init();
+      expect(b.getState().locked).toBe(true);
+      expect(b.getState().lockReset).toBe(t0);
+
+      // Reopened after 24 hours: unlocked, PIN gone, data intact.
+      vi.setSystemTime(t0 + DAY);
+      const c = createLedgerStore(name);
+      await c.getState().init();
+      expect(c.getState().locked).toBe(false);
+      expect(c.getState().lock).toBeNull();
+      expect(c.getState().lockReset).toBeNull();
+      expect(c.getState().transactions).toHaveLength(1);
+      expect(await c.getState().getReceipt(c.getState().transactions[0]!.id)).toBeDefined();
+      expect(await c.getState().getDb().get('settings', 'lock')).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20_000);
+
+  it('the right PIN cancels a pending reset; a wrong one does not', async () => {
+    const name = `cancel-${Math.random().toString(36).slice(2)}`;
+    const t0 = Date.UTC(2026, 9, 19, 6);
+    vi.useFakeTimers({ toFake: ['Date'], now: t0 });
+    try {
+      const a = createLedgerStore(name);
+      await a.getState().init();
+      await a.getState().setPin('2468');
+      a.getState().lockNow();
+      await a.getState().requestPinReset();
+      expect(await a.getState().unlock('1111')).toBe(false);
+      expect(a.getState().lockReset).toBe(t0);
+      expect(await a.getState().unlock('2468')).toBe(true);
+      expect(a.getState().lockReset).toBeNull();
+
+      vi.setSystemTime(t0 + 2 * DAY);
+      const b = createLedgerStore(name);
+      await b.getState().init();
+      expect(b.getState().locked).toBe(true);
+      expect(b.getState().lock).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  }, 20_000);
+
+  it('setting a new PIN clears a pending reset', async () => {
+    const s = await fresh();
+    await s.getState().setPin('2468');
+    await s.getState().requestPinReset();
+    await s.getState().setPin('1357');
+    expect(s.getState().lockReset).toBeNull();
+    expect(await s.getState().getDb().get('settings', 'lockReset')).toBeUndefined();
   }, 20_000);
 });

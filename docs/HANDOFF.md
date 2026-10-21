@@ -6,10 +6,11 @@ Updated 21 Oct 2026. **Drops 1 and 2 are complete** and waiting to be committed 
 
 ## Verified
 
-`npm run lint`, `npm run typecheck`, `npm test` (100 tests, 10 files) and `npm run build` pass.
-`npm run e2e` passes on desktop Chrome and Pixel 7 (14 tests): add through the sheet with a receipt, inline
+`npm run lint`, `npm run typecheck`, `npm test` (105 tests, 10 files) and `npm run build` pass.
+`npm run e2e` passes on desktop Chrome and Pixel 7 (16 tests): add through the sheet with a receipt, inline
 edit, delete, undo from the toast, reload, filters with No matches and Clear, privacy on every page
-(including Trash and the open Add sheet and inline editor), screen lock on reopen, manifest and CSP.
+(including Trash and the open Add sheet and inline editor), screen lock on reopen, Forgot PIN after
+24 hours with data kept, manifest and CSP.
 
 ## Drop 2: what was added
 
@@ -41,6 +42,10 @@ edit, delete, undo from the toast, reload, filters with No matches and Clear, pr
 - Quick add stays inline; the Add sheet is the detailed form. `?action=add` now opens the sheet.
 - A duplicate is warned about, never blocked: Enter (or Save) a second time keeps both.
 - Choosing a category for an unknown or unsure merchant (quick add, Add sheet or edit) saves a rule.
+- Forgot PIN (added at the owner's request): the lock screen's "Forgot PIN?" stores the request time in
+  `settings` under `lockReset`; after 24 hours (`RESET_WAIT_MS` in `pin.ts`) the PIN is removed on the next
+  open, return to the foreground or minute tick, and nothing else changes. The right PIN, or setting a new
+  PIN, cancels it. Moving the phone's clock forward can shorten the wait; acceptable for a casual-viewer lock.
 - Setting or removing the PIN is not an undoable command (it is a security setting, not ledger data).
 - Receipt previews use data: URLs (already allowed by the CSP).
 - Left for later drops as planned: CSV export (Drop 4), marquee select and pins (Drop 5), voice quick add

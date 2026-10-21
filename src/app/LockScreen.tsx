@@ -1,5 +1,70 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useLedger } from '../data/store';
+import { fmtWait, resetRemaining } from '../domain/pin';
+
+/** "Forgot PIN?": after a 24-hour wait the PIN is removed and every entry is kept. */
+function ForgotPin() {
+  const lockReset = useLedger((s) => s.lockReset);
+  const requestPinReset = useLedger((s) => s.requestPinReset);
+  const applyPinResetIfDue = useLedger((s) => s.applyPinResetIfDue);
+  const [asking, setAsking] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (lockReset === null) return;
+    const tick = () => {
+      setNow(Date.now());
+      void applyPinResetIfDue();
+    };
+    const timer = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(timer);
+  }, [lockReset, applyPinResetIfDue]);
+
+  if (lockReset !== null) {
+    return (
+      <div className="preview" role="status" data-testid="pin-reset-pending">
+        <p>
+          PIN reset requested. Ledger will open without a PIN in{' '}
+          {fmtWait(resetRemaining(lockReset, now))}, with all your entries kept.
+        </p>
+        <p className="muted small">Entering the right PIN before then cancels the reset.</p>
+      </div>
+    );
+  }
+
+  if (asking) {
+    return (
+      <div className="preview">
+        <p>
+          Ledger will remove your PIN in 24 hours. Your entries, receipts and settings stay exactly
+          as they are. Open Ledger after that and it will let you in.
+        </p>
+        <p className="muted small">Entering the right PIN before then cancels the reset.</p>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setNow(Date.now());
+              void requestPinReset();
+            }}
+          >
+            Start the 24-hour wait
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setAsking(false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button type="button" className="btn btn-ghost" onClick={() => setAsking(true)}>
+      Forgot PIN?
+    </button>
+  );
+}
 
 /** Shown instead of the app while locked, so no entry or amount is in the page at all. */
 export function LockScreen() {
@@ -27,7 +92,7 @@ export function LockScreen() {
   };
 
   return (
-    <main className="state" id="main">
+    <main className="state lock-screen" id="main">
       <form className="lock-form" onSubmit={(e) => void submit(e)}>
         <h1>Ledger is locked</h1>
         <label htmlFor="unlock-pin">Enter your PIN</label>
@@ -59,6 +124,7 @@ export function LockScreen() {
           The lock keeps casual viewers out. It does not encrypt your data.
         </p>
       </form>
+      <ForgotPin />
     </main>
   );
 }

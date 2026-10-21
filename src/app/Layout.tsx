@@ -63,6 +63,7 @@ function useUndoShortcuts(): void {
 function useAutoLock(): void {
   const hasLock = useLedger((s) => s.lock !== null);
   const lockNow = useLedger((s) => s.lockNow);
+  const applyPinResetIfDue = useLedger((s) => s.applyPinResetIfDue);
   useEffect(() => {
     if (!hasLock) return;
     let hiddenAt: number | null = null;
@@ -73,6 +74,7 @@ function useAutoLock(): void {
         root.classList.add('ledger-covered');
       } else {
         if (hiddenAt !== null && Date.now() - hiddenAt >= AUTO_LOCK_MS) lockNow();
+        void applyPinResetIfDue();
         hiddenAt = null;
         root.classList.remove('ledger-covered');
       }
@@ -85,7 +87,7 @@ function useAutoLock(): void {
       window.removeEventListener('pagehide', onPageHide);
       root.classList.remove('ledger-covered');
     };
-  }, [hasLock, lockNow]);
+  }, [hasLock, lockNow, applyPinResetIfDue]);
 }
 
 function TopBar({ title }: { title: string }) {

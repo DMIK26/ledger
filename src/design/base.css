@@ -332,6 +332,16 @@ svg {
   max-width: 420px;
 }
 
+.lock-screen {
+  align-content: center;
+  gap: var(--s4);
+}
+
+.lock-screen > .preview {
+  width: min(100%, 320px);
+  text-align: left;
+}
+
 .state h1 {
   font-size: 36px;
 }

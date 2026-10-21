@@ -102,6 +102,8 @@ compact axis labels (₹10k, never "₹40,000.00"), plots fill their card, both 
   string appears in `document.body.innerText`, any attribute, or the title.
 - Optional screen lock (4-8 digit PIN, salted PBKDF2 via WebCrypto), auto-lock after 30s in the background,
   neutral cover in the app switcher. Copy must say plainly it keeps casual viewers out and does not encrypt data.
+  "Forgot PIN?" on the lock screen removes the PIN after a 24-hour wait and keeps all data; entering the
+  right PIN during the wait cancels it (owner decision, 21 Oct 2026).
 - Global undo/redo (Ctrl/Cmd+Z, Shift+Z when no input is focused) over the last 20 changes; audit log of the
   last 500 events; trash for 30 days. Backup reminder every 7 days on mobile.
 

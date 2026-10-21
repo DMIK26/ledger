@@ -46,3 +46,23 @@ export async function verifyPin(pin: string, lock: LockConfig): Promise<boolean>
   for (let i = 0; i < hash.length; i += 1) diff |= hash.charCodeAt(i) ^ lock.hash.charCodeAt(i);
   return diff === 0;
 }
+
+/** "Forgot PIN?" removes the PIN after this wait; the data is never touched. */
+export const RESET_WAIT_MS = 24 * 60 * 60 * 1000;
+
+/** Milliseconds left before a reset requested at `requestedAt` takes effect (0 when due). */
+export function resetRemaining(requestedAt: number, now: number): number {
+  return Math.max(0, Math.min(RESET_WAIT_MS, requestedAt + RESET_WAIT_MS - now));
+}
+
+export const resetDue = (requestedAt: number, now: number): boolean =>
+  resetRemaining(requestedAt, now) === 0;
+
+/** Plain wording for the time left: "about 23 hours", "about 40 minutes", "less than a minute". */
+export function fmtWait(ms: number): string {
+  const minutes = Math.ceil(ms / 60_000);
+  if (minutes <= 1) return ms <= 0 ? 'no time' : 'less than a minute';
+  if (minutes < 60) return `about ${minutes} minutes`;
+  const hours = Math.round(minutes / 60);
+  return hours === 1 ? 'about 1 hour' : `about ${hours} hours`;
+}

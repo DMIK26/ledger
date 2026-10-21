@@ -280,6 +280,29 @@ describe('screen lock and shortcuts', () => {
     });
   }, 20_000);
 
+  it('Forgot PIN starts a 24-hour wait without unlocking', async () => {
+    await seed([{}]);
+    await act(async () => {
+      await useLedger.getState().setPin('2468');
+      useLedger.getState().lockNow();
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'Forgot PIN?' }));
+    expect(screen.getByText(/Your entries, receipts and settings stay/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Start the 24-hour wait' }));
+    expect(await screen.findByTestId('pin-reset-pending')).toHaveTextContent('about 24 hours');
+    expect(screen.getByRole('heading', { name: 'Ledger is locked' })).toBeInTheDocument();
+    expect(useLedger.getState().lockReset).toBe(NOW.getTime());
+    // The right PIN cancels the reset.
+    await user.type(screen.getByLabelText('Enter your PIN'), '2468{Enter}');
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(useLedger.getState().lockReset).toBeNull();
+    await act(async () => {
+      await useLedger.getState().removePin('2468');
+    });
+  }, 20_000);
+
   it('undoes with Ctrl+Z when no field has focus', async () => {
     await seed([{}]);
     const user = userEvent.setup();

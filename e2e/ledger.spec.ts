@@ -141,3 +141,34 @@ test('screen lock asks for the PIN on the next open', async ({ page }) => {
   await page.getByRole('button', { name: 'Unlock' }).click();
   await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 });
+
+test('Forgot PIN removes the PIN after 24 hours and keeps the data', async ({ page }) => {
+  await page.goto('./#/transactions');
+  await quickAdd(page, 'shawarma 500 on 18th oct upi');
+  await page.goto('./#/settings');
+  await page.getByRole('button', { name: 'Set a PIN' }).click();
+  await page.getByLabel('New PIN').fill('2468');
+  await page.getByLabel('Repeat the PIN').fill('2468');
+  await page.getByRole('button', { name: 'Turn on lock' }).click();
+  await expect(page.getByRole('button', { name: 'Lock now' })).toBeVisible();
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Forgot PIN?' }).click();
+  await page.getByRole('button', { name: 'Start the 24-hour wait' }).click();
+  await expect(page.getByTestId('pin-reset-pending')).toContainText('about 24 hours');
+
+  // 23 hours later: still locked.
+  await page.clock.setFixedTime(new Date(TODAY.getTime() + 23 * 3_600_000));
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Ledger is locked' })).toBeVisible();
+  await expect(page.getByTestId('pin-reset-pending')).toContainText('about 1 hour');
+
+  // 24 hours later: open, PIN gone, entry kept.
+  await page.clock.setFixedTime(new Date(TODAY.getTime() + 24 * 3_600_000));
+  await page.goto('./#/transactions');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
+  await expect(page.getByTestId('tx-row').filter({ hasText: 'Shawarma' })).toContainText('₹500.00');
+  await page.goto('./#/settings');
+  await expect(page.getByRole('button', { name: 'Set a PIN' })).toBeVisible();
+});

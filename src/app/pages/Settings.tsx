@@ -293,6 +293,10 @@ function ScreenLock() {
         A 4 to 8 digit PIN, asked when Ledger opens and after 30 seconds in the background. It keeps
         casual viewers out. It does not encrypt your data.
       </p>
+      <p className="muted small">
+        Forgot it? Tap Forgot PIN on the lock screen. Ledger removes the PIN after 24 hours and
+        keeps every entry. Entering the right PIN before then cancels it.
+      </p>
       {mode === 'idle' && (
         <div className="btn-row">
           {hasLock ? (
