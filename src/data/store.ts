@@ -3,6 +3,11 @@ import { DEFAULT_CATEGORIES } from '../domain/categories';
 import { categorise, normalizeMerchantKey } from '../domain/categoriser';
 import type { SavedView } from '../domain/filters';
 import { budgetsForMonth, toBudgetRows, type MonthBudgets } from '../domain/budgets';
+import { addDays } from '../domain/dates';
+import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
+import type { ImportPlan } from '../domain/csvImport';
+import type { RecurringItem } from '../domain/recurring';
+import type { AuditEvent } from '../domain/types';
 import { hashPin, resetDue, verifyPin } from '../domain/pin';
 import { setPrivacy } from '../domain/money';
 import type { ParsedEntry } from '../domain/parser';
@@ -29,6 +34,14 @@ import {
   importTransactions,
   restoreFromTrash,
   setMonthBudgets as setMonthBudgetsCommand,
+  putCategories,
+  removeCategoryRow,
+  putTrashItem,
+  putRecurring,
+  removeRecurring,
+  setIgnoredRecurring,
+  IGNORED_RECURRING_KEY,
+  replaceEverything,
   setReceipt,
   setRule,
   setViews,
@@ -65,6 +78,9 @@ export interface LedgerState {
   trash: TrashItem[];
   /** Every month's budgets. Read them with budgetsForMonth(). */
   budgets: Budget[];
+  recurring: RecurringItem[];
+  /** Merchant keys the user said are not recurring. */
+  recurringIgnored: string[];
   views: SavedView[];
   settings: Settings;
   lock: LockConfig | null;
@@ -100,6 +116,22 @@ export interface LedgerState {
   lockNow: () => void;
   /** Replaces a month's budgets in one undoable step. Zero amounts are removed. */
   setMonthBudgets: (month: string, next: MonthBudgets, label?: string) => Promise<void>;
+  addCategory: (name: string) => Promise<string>;
+  renameCategory: (id: string, name: string) => Promise<void>;
+  recolorCategory: (id: string, color: string) => Promise<void>;
+  moveCategory: (id: string, toIndex: number) => Promise<void>;
+  /** Moves every entry, rule, trash item and budget to `moveTo`, then deletes the category. */
+  deleteCategory: (id: string, moveTo: string) => Promise<void>;
+  saveRecurring: (item: RecurringItem, label?: string) => Promise<void>;
+  deleteRecurring: (id: string) => Promise<void>;
+  /** Moves a recurring payment's dates by whole days (dragging a pill on the timeline). */
+  shiftRecurring: (id: string, days: number) => Promise<void>;
+  ignoreRecurring: (key: string) => Promise<void>;
+  /** Adds a planned CSV import as one undoable step. */
+  importCsv: (plan: ImportPlan) => Promise<void>;
+  /** Makes the device match a backup exactly, as one undoable step. */
+  restoreBackup: (file: BackupFile) => Promise<void>;
+  getActivity: () => Promise<AuditEvent[]>;
   /** Epoch ms when a forgotten-PIN reset was requested, or null. */
   lockReset: number | null;
   requestPinReset: () => Promise<void>;
@@ -145,14 +177,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
     const refresh = async (): Promise<void> => {
       const d = requireDb();
-      const [transactions, categories, rules, trash, views, budgets] = await Promise.all([
-        d.getAll('transactions'),
-        d.getAll('categories'),
-        d.getAll('rules'),
-        d.getAll('trash'),
-        d.get('settings', VIEWS_KEY),
-        d.getAll('budgets'),
-      ]);
+      const [transactions, categories, rules, trash, views, budgets, recurring, ignored] =
+        await Promise.all([
+          d.getAll('transactions'),
+          d.getAll('categories'),
+          d.getAll('rules'),
+          d.getAll('trash'),
+          d.get('settings', VIEWS_KEY),
+          d.getAll('budgets'),
+          d.getAll('recurring'),
+          d.get('settings', IGNORED_RECURRING_KEY),
+        ]);
+      recurring.sort((a, b) => a.merchant.localeCompare(b.merchant));
       trash.sort((a, b) => b.deletedAt - a.deletedAt);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
       categories.sort((a, b) => a.order - b.order);
@@ -162,6 +198,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         rules: Object.fromEntries(rules.map((r) => [r.key, r.categoryId])),
         trash,
         budgets,
+        recurring,
+        recurringIgnored: Array.isArray(ignored) ? (ignored as string[]) : [],
         views: Array.isArray(views) ? (views as SavedView[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
@@ -177,6 +215,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       rules: {},
       trash: [],
       budgets: [],
+      recurring: [],
+      recurringIgnored: [],
       views: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
@@ -489,6 +529,142 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         await get().run(setMonthBudgetsCommand(previous, rows, label));
       },
 
+      addCategory: async (name) => {
+        const c = makeCategory(name, get().categories);
+        await get().run(putCategories([], [c], `Added category ${c.name}`));
+        return c.id;
+      },
+
+      renameCategory: async (id, name) => {
+        const before = get().categories.find((c) => c.id === id);
+        if (!before || isDefaultCategory(id) || before.name === name.trim()) return;
+        await get().run(
+          putCategories([before], [{ ...before, name: name.trim() }], `Renamed ${before.name}`),
+        );
+      },
+
+      recolorCategory: async (id, color) => {
+        const before = get().categories;
+        const after = recolor(before, id, color);
+        const changed = after.filter((c, i) => c.color !== before[i]?.color);
+        if (changed.length === 0) return;
+        const old = before.filter((c) => changed.some((x) => x.id === c.id));
+        await get().run(putCategories(old, changed, 'Changed a category colour'));
+      },
+
+      moveCategory: async (id, toIndex) => {
+        const before = get().categories;
+        const after = reorder(before, id, toIndex);
+        const changed = after.filter((c) => before.find((b) => b.id === c.id)?.order !== c.order);
+        if (changed.length === 0) return;
+        const old = before.filter((c) => changed.some((x) => x.id === c.id));
+        await get().run(putCategories(old, changed, 'Reordered categories'));
+      },
+
+      deleteCategory: async (id, moveTo) => {
+        const { categories, transactions, trash, rules, budgets } = get();
+        const cat = categories.find((c) => c.id === id);
+        if (!cat || id === OTHER_ID || isDefaultCategory(id) || id === moveTo) return;
+        if (!categories.some((c) => c.id === moveTo)) return;
+        const now = Date.now();
+        const steps: Command[] = [];
+        for (const t of transactions.filter((x) => x.categoryId === id))
+          steps.push(
+            updateTransaction(t, { ...t, categoryId: moveTo, unsure: false, updatedAt: now }),
+          );
+        for (const item of trash.filter((x) => x.tx.categoryId === id))
+          steps.push(putTrashItem(item, { ...item, tx: { ...item.tx, categoryId: moveTo } }));
+        for (const [key, categoryId] of Object.entries(rules)) {
+          if (categoryId === id)
+            steps.push(
+              setRule(
+                { key, categoryId: moveTo, updatedAt: now },
+                { key, categoryId, updatedAt: now },
+              ),
+            );
+        }
+        // A deleted category's budget is added to the destination's for the same month.
+        for (const month of new Set(budgets.filter((b) => b.scope === id).map((b) => b.month))) {
+          const mb = budgetsForMonth(budgets, month);
+          const moved = mb.categories[id] ?? 0;
+          const next = { ...mb.categories, [moveTo]: (mb.categories[moveTo] ?? 0) + moved };
+          delete next[id];
+          steps.push(
+            setMonthBudgetsCommand(
+              budgets.filter((b) => b.month === month),
+              toBudgetRows(month, { overall: mb.overall, categories: next }),
+              'Moved budget',
+            ),
+          );
+        }
+        steps.push(removeCategoryRow(cat));
+        const target = categories.find((c) => c.id === moveTo)!;
+        const label = `Deleted ${cat.name}, moved its entries to ${target.name}`;
+        await get().run(composite(label, steps), label);
+      },
+
+      saveRecurring: async (item, label) => {
+        const previous = get().recurring.find((r) => r.id === item.id);
+        if (!item.createdAt) item = { ...item, createdAt: Date.now() };
+        await get().run(
+          putRecurring(
+            item,
+            previous,
+            label ??
+              (previous ? `Updated ${item.merchant}` : `Added ${item.merchant} to recurring`),
+          ),
+        );
+      },
+
+      deleteRecurring: async (id) => {
+        const item = get().recurring.find((r) => r.id === id);
+        if (item) await get().run(removeRecurring(item));
+      },
+
+      shiftRecurring: async (id, days) => {
+        const item = get().recurring.find((r) => r.id === id);
+        if (!item || days === 0) return;
+        const anchor = addDays(item.anchor, days);
+        await get().run(putRecurring({ ...item, anchor }, item, `Moved ${item.merchant}`));
+      },
+
+      ignoreRecurring: async (key) => {
+        const previous = get().recurringIgnored;
+        if (previous.includes(key)) return;
+        await get().run(setIgnoredRecurring([...previous, key], previous, `Not recurring: ${key}`));
+      },
+
+      importCsv: async (plan) => {
+        if (plan.transactions.length === 0) return;
+        const n = plan.transactions.length;
+        const label = `Imported ${n} ${n === 1 ? 'entry' : 'entries'} from CSV`;
+        await get().run(importTransactions(plan.transactions, plan.newCategories, label), label);
+      },
+
+      restoreBackup: async (file) => {
+        const d = requireDb();
+        const before = {
+          transactions: await d.getAll('transactions'),
+          categories: await d.getAll('categories'),
+          rules: await d.getAll('rules'),
+          budgets: await d.getAll('budgets'),
+          recurring: await d.getAll('recurring'),
+        };
+        const after = {
+          transactions: file.data.transactions,
+          categories: file.data.categories.length > 0 ? file.data.categories : DEFAULT_CATEGORIES,
+          rules: file.data.rules,
+          budgets: file.data.budgets ?? [],
+          recurring: file.data.recurring ?? [],
+        };
+        await get().run(replaceEverything(before, after));
+      },
+
+      getActivity: async () => {
+        const events = await requireDb().getAll('audit');
+        return events.sort((a, b) => b.at - a.at || (b.id ?? 0) - (a.id ?? 0));
+      },
+
       importFromBackup: async (file) => {
         const { transactions, categories, rules, budgets } = get();
         const haveTx = new Set(transactions.map((t) => t.id));
@@ -498,11 +674,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const newRules = file.data.rules.filter((r) => !(r.key in rules));
         const haveBudget = new Set(budgets.map((b) => b.id));
         const newBudgets = (file.data.budgets ?? []).filter((b) => !haveBudget.has(b.id));
+        const haveRecurring = new Set(get().recurring.map((r) => r.id));
+        const newRecurring = (file.data.recurring ?? []).filter((r) => !haveRecurring.has(r.id));
         if (
           newTx.length === 0 &&
           newCats.length === 0 &&
           newRules.length === 0 &&
-          newBudgets.length === 0
+          newBudgets.length === 0 &&
+          newRecurring.length === 0
         ) {
           set({ notice: 'Nothing new in that backup' });
           return 0;
@@ -510,11 +689,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const label =
           newTx.length > 0
             ? `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`
-            : 'Imported categories, rules and budgets';
+            : 'Imported categories, rules, budgets and recurring payments';
         const steps: Command[] = [
           importTransactions(newTx, newCats, label),
           ...newRules.map((r) => setRule(r)),
           ...(newBudgets.length > 0 ? [setMonthBudgetsCommand([], newBudgets, label)] : []),
+          ...newRecurring.map((r) => putRecurring(r, undefined, label)),
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;

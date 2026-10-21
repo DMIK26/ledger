@@ -1,21 +1,68 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **Drops 1, 2 and 3 are complete.** Drops 1 and 2 (with Forgot PIN) are committed;
-Drop 3 is waiting to be committed and published (see `docs/PUBLISHING.md`). Read `CLAUDE.md`, then
-`docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
+Updated 21 Oct 2026. **Drops 1, 2 and 3 are published** at https://dmik26.github.io/ledger/. **Drop 4 is
+complete** and waiting to be committed and published. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
+`docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
 
-`npm run lint`, `npm run typecheck`, `npm test` (133 tests, 13 files) and `npm run build` pass.
-`npm run e2e` passes on desktop Chrome and Pixel 7 (26 tests), also with `CI=1` as GitHub runs it. Drop 3
-adds: donut slice opens Transactions with the same category total; the budget line drags in ₹500 steps,
-saves and undoes; an allocation divider drags budget between neighbours with the total fixed; suggested
-budgets show as ghosts until accepted; the bar chart switches between Total and By category.
+`npm run lint`, `npm run typecheck`, `npm test` (168 tests, 16 files) and `npm run build` pass.
+`npm run e2e` passes on desktop Chrome and Pixel 7 (34 tests, also with `CI=1`). Drop 4 adds: reports
+split the financial year at 1 April; a CSV export from Reports has the BOM and `Amount (₹)` header and,
+imported again, adds nothing (every row skipped as a duplicate); a found subscription goes on the timeline
+and its pill drags by days; the what-if yearly saving; categories reorder by dragging; no page scrolls
+sideways at phone width (that test caught and fixed an overflowing Reports header).
 
-CI (`.github/workflows/ci.yml`) now has two jobs on every push to `main` and every pull request: `check`
-(lint, typecheck, unit tests, build) and `e2e` (installs Chromium with `npx playwright install --with-deps
-chromium`, runs `npm run e2e`, uploads `test-results/` traces when a test fails). The Pages deploy
-(`deploy.yml`) still runs on its own and does not wait for CI.
+CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
+(`deploy.yml`) runs on its own and does not wait for CI.
+
+## Drop 4: what was added
+
+- Domain (pure, tested): `periods.ts` (month, financial-year quarter, financial year, custom; previous
+  period; same period last year; like-for-like days while a period is running), `reports.ts` (totals,
+  change, category rows with six-month sparkline series, top merchants, method split, Monday-first
+  weekday averages, every day for the heatmap), `csv.ts` (reader for quotes, CRLF, BOM, `;` and tab;
+  writer with BOM and CRLF; formula-injection guard), `csvImport.ts` (header guessing, Indian and other
+  date formats with day/month detection, amounts like `₹1,200.50`, `(500)`, `250 Cr`; methods from
+  words like GPay; duplicate skipping on same date, amount and merchant; money-in rows skipped; unknown
+  category names become new categories; `exportRows`), `recurring.ts` (weekly, monthly, yearly
+  detection; occurrences with the 31st clamped; yearly cost), `insights.ts` (up to four: budget pace,
+  biggest category rise, payments due this week, biggest expense, biggest fall, days with nothing spent),
+  category rules in `categories.ts` (defaults keep names, colour swap keeps colours unique, reorder),
+  `minorToPlain` in `money.ts`, `fmtTime` in `dates.ts`.
+- Data: `RecurringItem` in the existing `recurring` store; `recurringIgnored` and `lastBackupAt` in
+  settings (no migration). Commands `putCategories`, `removeCategoryRow`, `putTrashItem`,
+  `putRecurring`, `removeRecurring`, `setIgnoredRecurring`, `replaceEverything`. Store actions for the
+  category manager (deleting moves entries, trash items, rules and budgets to the chosen category first,
+  one undo step), recurring, `importCsv`, `restoreBackup` (replace, undoable) and `getActivity`.
+  Backups now include recurring payments; older backups still import.
+- Pages: Reports (period switcher, compare toggle, summary, category table with sparklines, top
+  merchants, paid by, weekday averages, day-by-day heatmap, Export CSV, Print or save as PDF with an A4
+  print stylesheet), Recurring (30-day timeline with draggable pills and arrow keys, list with
+  switch-off what-if and yearly saving, found subscriptions with Add / Not recurring, add form).
+- Dashboard: "Worth knowing" insights card; a weekly backup reminder on phones.
+- Settings: Categories manager (drag or arrow-key reorder, recolour from the palette, add, rename and
+  delete your own), Backup (export records the date; restore offers "Add what is missing" or "Replace
+  everything"), Import from CSV (column matching, date order, preview, skips), History (Activity log at
+  `#/settings?view=activity`, Trash link).
+- Transactions: Export CSV of the filtered list.
+- `src/app/files.tsx` (`shareOrDownload`, `ExportButton` with the privacy confirm), `src/app/settings/`.
+  `pages/Soon.tsx` is no longer used.
+
+## Decisions taken in Drop 4
+
+- Quarters follow the financial year (April start: Q1 is April to June); a January start gives calendar
+  quarters and plain year labels.
+- While a period is running, it is compared with the same number of days of the other period.
+- CSV export writes ISO dates, plain amounts with two decimals, `Amount (₹)` in the header, a BOM and
+  CRLF, and prefixes text that starts with `=`, `+`, `-` or `@` with an apostrophe (removed on import).
+- CSV import adds expenses only; negative or credit rows are counted and skipped. Duplicate means the
+  same date, amount and merchant as an entry already in Ledger; repeats inside one file are kept.
+- The ten default categories keep their names (they can be recoloured and reordered). Your own can be
+  renamed and deleted; deleting always asks where entries go, and Other cannot be deleted.
+- A full restore replaces entries, categories, rules, budgets and recurring payments but keeps device
+  settings (theme, privacy, PIN); it is one undoable step.
+- Recurring payments are planning only: nothing is logged automatically.
 
 ## Drop 3: what was added
 
@@ -96,9 +143,10 @@ chromium`, runs `npm run e2e`, uploads `test-results/` traces when a test fails)
 
 ## Next
 
-1. Commit and publish Drop 3 with GitHub Desktop, then check the Actions tab: both CI jobs should be green.
-2. Drop 4 (`docs/PLAN.md`): Reports, Recurring, insights, category manager, CSV import with mapping,
-   backup and restore polish, activity and trash screens.
+1. Commit and publish Drop 4 with GitHub Desktop; check both CI jobs in the Actions tab.
+2. Drop 5 (`docs/PLAN.md`): the interaction kit everywhere (EntityBus, pins and filter bar, HoverCard,
+   Breadcrumb, drag and brushes, month strip, nav peeks, linked highlighting, global undo UI, keyboard
+   model).
 
 ## Notes
 

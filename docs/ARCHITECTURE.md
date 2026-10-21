@@ -26,7 +26,8 @@ src/
   data/     IndexedDB (db, migrations), commands, bus (undo/redo/audit/trash), store (Zustand),
             backup, legacyImport
   design/   tokens.css (themes), base.css (layout and components)
-  app/      shell: router, Layout, pages, Money component, QuickAdd, Toast, icons
+  app/      shell: router, Layout, pages, Money component, QuickAdd, Toast, icons, files (export),
+            settings/ (category manager, CSV import, activity)
   kit/      EntityBus, Pins, HoverCard, Drag, Breadcrumb, shortcuts   (Drop 5)
   charts/   donut, bars, heatmap, sparkline, waterfall, brush        (Drop 3 onward)
   doodle/   art, companion, sketch, anchors, notes                   (Drop 6)

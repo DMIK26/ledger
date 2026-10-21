@@ -102,3 +102,9 @@ export function fyOf(iso: ISODate, startMonth = 4): FinancialYear {
     startMonth === 1 ? String(startYear) : `FY ${startYear}-${pad2((startYear + 1) % 100)}`;
   return { label, startYear, start, end };
 }
+
+/** Local wall-clock time as 24-hour "HH:MM", for the activity log. */
+export function fmtTime(epochMs: number): string {
+  const d = new Date(epochMs);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
-import { fmtDate, parseISO } from '../../domain/dates';
+import { fmtDate, parseISO, todayISO } from '../../domain/dates';
+import { safeText, toCsv } from '../../domain/csv';
+import { exportRows } from '../../domain/csvImport';
 import {
   allTags,
   applyFilters,
@@ -17,9 +19,10 @@ import {
   type GroupBy,
   type Sort,
 } from '../../domain/filters';
-import { parseAmountToMinor } from '../../domain/money';
+import { CURRENCIES, parseAmountToMinor } from '../../domain/money';
 import { normalizeTag } from '../../domain/tags';
 import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { csvFile, ExportButton } from '../files';
 import { Icon } from '../icons';
 import { Money } from '../Money';
 import { QuickAdd } from '../QuickAdd';
@@ -517,6 +520,24 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
             setGroupBy(v.groupBy);
             setPanelKey((k) => k + 1);
           }}
+        />
+        <ExportButton
+          label="Export CSV"
+          className="btn btn-ghost"
+          disabled={filtered.length === 0}
+          build={() =>
+            csvFile(
+              `ledger-transactions-${todayISO()}.csv`,
+              toCsv(
+                exportRows(
+                  filtered,
+                  categories,
+                  safeText,
+                  (CURRENCIES[currency] ?? CURRENCIES.INR!).symbol,
+                ),
+              ),
+            )
+          }
         />
         <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
           {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}

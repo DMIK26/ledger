@@ -1,4 +1,5 @@
 import type { SavedView } from '../domain/filters';
+import type { RecurringItem } from '../domain/recurring';
 import type { Budget, Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
 import type { Db } from './db';
 
@@ -172,4 +173,113 @@ export const setMonthBudgets = (previous: Budget[], next: Budget[], label: strin
     for (const b of previous) void t.store.put(b);
     await t.done;
   },
+});
+
+/** Writes changed category rows (add, rename, recolour, reorder). `before` holds the old versions. */
+export const putCategories = (before: Category[], after: Category[], label: string): Command => ({
+  label,
+  apply: async (db) => {
+    const t = db.transaction('categories', 'readwrite');
+    for (const c of after) void t.store.put(c);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction('categories', 'readwrite');
+    const old = new Set(before.map((c) => c.id));
+    for (const c of after) if (!old.has(c.id)) void t.store.delete(c.id);
+    for (const c of before) void t.store.put(c);
+    await t.done;
+  },
+});
+
+export const removeCategoryRow = (category: Category): Command => ({
+  label: `Deleted ${category.name}`,
+  apply: async (db) => {
+    await db.delete('categories', category.id);
+  },
+  revert: async (db) => {
+    await db.put('categories', category);
+  },
+});
+
+export const putTrashItem = (before: TrashItem, after: TrashItem): Command => ({
+  label: 'Updated trash',
+  apply: async (db) => {
+    await db.put('trash', after);
+  },
+  revert: async (db) => {
+    await db.put('trash', before);
+  },
+});
+
+/** Adds or changes a recurring payment. */
+export const putRecurring = (
+  next: RecurringItem,
+  previous: RecurringItem | undefined,
+  label: string,
+): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put('recurring', next);
+  },
+  revert: async (db) => {
+    if (previous) await db.put('recurring', previous);
+    else await db.delete('recurring', next.id);
+  },
+});
+
+export const removeRecurring = (item: RecurringItem): Command => ({
+  label: `Removed ${item.merchant} from recurring`,
+  apply: async (db) => {
+    await db.delete('recurring', item.id);
+  },
+  revert: async (db) => {
+    await db.put('recurring', item);
+  },
+});
+
+export const IGNORED_RECURRING_KEY = 'recurringIgnored';
+
+/** Merchants the user said are not recurring, so detection stops suggesting them. */
+export const setIgnoredRecurring = (
+  next: string[],
+  previous: string[],
+  label: string,
+): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put('settings', next, IGNORED_RECURRING_KEY);
+  },
+  revert: async (db) => {
+    await db.put('settings', previous, IGNORED_RECURRING_KEY);
+  },
+});
+
+/** Everything a full restore replaces. Device settings (theme, privacy, PIN) are not part of it. */
+export interface LedgerSnapshot {
+  transactions: Transaction[];
+  categories: Category[];
+  rules: MerchantRule[];
+  budgets: Budget[];
+  recurring: RecurringItem[];
+}
+
+const SNAPSHOT_STORES = ['transactions', 'categories', 'rules', 'budgets', 'recurring'] as const;
+
+async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
+  const t = db.transaction([...SNAPSHOT_STORES], 'readwrite');
+  await Promise.all(SNAPSHOT_STORES.map((name) => t.objectStore(name).clear()));
+  for (const x of s.transactions) void t.objectStore('transactions').put(x);
+  for (const x of s.categories) void t.objectStore('categories').put(x);
+  for (const x of s.rules) void t.objectStore('rules').put(x);
+  for (const x of s.budgets) void t.objectStore('budgets').put(x);
+  for (const x of s.recurring) void t.objectStore('recurring').put(x);
+  await t.done;
+}
+
+/** Makes this device match a backup exactly; undo puts back what was here before. */
+export const replaceEverything = (before: LedgerSnapshot, after: LedgerSnapshot): Command => ({
+  label: `Restored a backup (${after.transactions.length} entries)`,
+  apply: (db) => writeSnapshot(db, after),
+  revert: (db) => writeSnapshot(db, before),
 });

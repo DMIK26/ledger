@@ -24,6 +24,8 @@ import { Money, usePrivacy } from '../Money';
 import { QuickAdd } from '../QuickAdd';
 import { href, navigate } from '../router';
 import { TxList } from '../TxList';
+import { Insights } from '../Insights';
+import { BackupReminder } from '../BackupReminder';
 
 const PER_DAY_STEP = 1000; // ₹10
 
@@ -209,6 +211,7 @@ export function Dashboard() {
 
   return (
     <>
+      <BackupReminder />
       <QuickAdd />
       <section className="kpis" aria-label={`${monthLabel(month)} so far`}>
         <div className="card kpi">
@@ -254,6 +257,7 @@ export function Dashboard() {
         </div>
       </section>
       <BudgetCard key={month} spent={k.spentMinor} dailyAvg={k.dailyAvgMinor} today={today} />
+      <Insights overallBudgetMinor={mine.overall} />
       <div className="chart-row">
         <section className="card chart-card" aria-labelledby="donut-title">
           <div className="card-head">

@@ -119,3 +119,10 @@ export function minorToInput(minor: number): string {
   const cents = abs % 100;
   return cents === 0 ? `${sign}${whole}` : `${sign}${whole}.${String(cents).padStart(2, '0')}`;
 }
+
+/** Plain decimal text with two places ("500.00", "-12.30") for CSV files. No symbol, no grouping. */
+export function minorToPlain(minor: number): string {
+  const sign = minor < 0 ? '-' : '';
+  const abs = Math.abs(Math.trunc(minor));
+  return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
+}

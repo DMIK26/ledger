@@ -8,6 +8,11 @@ import { isValidPin } from '../../domain/pin';
 import type { ThemeChoice } from '../../domain/types';
 import { checkForUpdates, usePwaState } from '../../pwa/register';
 import { Money, usePrivacy } from '../Money';
+import { ExportButton } from '../files';
+import { href } from '../router';
+import { CategoryManager } from '../settings/CategoryManager';
+import { CsvImport } from '../settings/CsvImport';
+import { Activity } from '../settings/Activity';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
   { value: 'system', label: 'System' },
@@ -107,55 +112,22 @@ function MoneySettings() {
   );
 }
 
-async function shareOrDownload(file: File): Promise<void> {
-  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
-  if (nav.canShare?.({ files: [file] }) && typeof nav.share === 'function') {
-    try {
-      await nav.share({ files: [file], title: file.name });
-      return;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return;
-      /* share failed for another reason: fall back to a download */
-    }
-  }
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = file.name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 function Data() {
   const getDb = useLedger((s) => s.getDb);
   const count = useLedger((s) => s.transactions.length);
+  const lastBackupAt = useLedger((s) => s.settings.lastBackupAt);
   const importFromBackup = useLedger((s) => s.importFromBackup);
-  const privacy = usePrivacy();
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const restoreBackup = useLedger((s) => s.restoreBackup);
+  const setSetting = useLedger((s) => s.setSetting);
   const [pending, setPending] = useState<BackupFile | null>(null);
+  const [replacing, setReplacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const doExport = async () => {
-    setConfirming(false);
-    setBusy(true);
-    try {
-      const backup = await exportBackup(getDb());
-      const file = new File([JSON.stringify(backup, null, 2)], `ledger-backup-${todayISO()}.json`, {
-        type: 'application/json',
-      });
-      await shareOrDownload(file);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     setPending(null);
+    setReplacing(false);
     setError(null);
     if (!file) return;
     try {
@@ -168,25 +140,36 @@ function Data() {
   };
 
   const dates = pending?.data.transactions.map((t) => t.date).sort() ?? [];
+  const close = () => {
+    setPending(null);
+    setReplacing(false);
+  };
 
   return (
     <section className="card" aria-labelledby="data-title">
-      <h2 id="data-title">Data</h2>
+      <h2 id="data-title">Backup</h2>
       <p className="muted small">
         Everything lives on this device. A backup is a file you keep somewhere safe and can restore
-        here or on another phone.
+        here or on another phone.{' '}
+        {lastBackupAt > 0
+          ? `Last backup ${fmtDate(todayISO(new Date(lastBackupAt)))}.`
+          : 'No backup yet.'}
       </p>
       <div className="btn-row">
-        <button
-          type="button"
-          className="btn"
-          disabled={busy || count === 0}
-          onClick={() => (privacy ? setConfirming(true) : void doExport())}
-        >
-          Export backup
-        </button>
+        <ExportButton
+          label="Export backup"
+          disabled={count === 0}
+          build={async () =>
+            new File(
+              [JSON.stringify(await exportBackup(getDb()), null, 2)],
+              `ledger-backup-${todayISO()}.json`,
+              { type: 'application/json' },
+            )
+          }
+          onDone={() => void setSetting('lastBackupAt', Date.now())}
+        />
         <label className="btn">
-          Import backup
+          Restore from backup
           <input
             type="file"
             accept="application/json,.json"
@@ -195,51 +178,87 @@ function Data() {
           />
         </label>
       </div>
-      {confirming && (
-        <div className="preview" role="alert">
-          <p>The backup file contains real amounts, even with privacy mode on.</p>
-          <div className="btn-row">
-            <button type="button" className="btn btn-primary" onClick={() => void doExport()}>
-              Export anyway
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
       {error && (
         <p className="errors" role="alert">
           {error}
         </p>
       )}
       {pending && (
-        <div className="preview">
+        <div className="preview" data-testid="restore-preview">
           <p>
+            This backup has{' '}
             {pending.data.transactions.length === 1
               ? '1 entry'
               : `${pending.data.transactions.length} entries`}
             {dates.length > 0 && `, ${fmtDate(dates[0]!)} to ${fmtDate(dates[dates.length - 1]!)}`}.
-            Entries already on this device are skipped. You can undo the import.
           </p>
-          <div className="btn-row">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                const file = pending;
-                setPending(null);
-                void importFromBackup(file);
-              }}
-            >
-              Import
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={() => setPending(null)}>
-              Cancel
-            </button>
-          </div>
+          {replacing ? (
+            <>
+              <p>
+                Replace everything on this device with the backup? Entries, categories, budgets and
+                recurring payments here are swapped for the backup&rsquo;s. Theme, privacy and PIN
+                stay as they are. You can undo it straight after.
+              </p>
+              <div className="btn-row">
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const file = pending;
+                    close();
+                    void restoreBackup(file);
+                  }}
+                >
+                  Replace everything
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={close}>
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="btn-row">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  const file = pending;
+                  close();
+                  void importFromBackup(file);
+                }}
+              >
+                Add what is missing
+              </button>
+              <button type="button" className="btn" onClick={() => setReplacing(true)}>
+                Replace everything
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={close}>
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       )}
+    </section>
+  );
+}
+
+function Records() {
+  const trashCount = useLedger((s) => s.trash.length);
+  return (
+    <section className="card" aria-labelledby="records-title">
+      <h2 id="records-title">History</h2>
+      <p className="muted small">
+        Every change is logged, and deleted entries wait in Trash for 30 days.
+      </p>
+      <div className="btn-row">
+        <a className="btn" href={href('/settings?view=activity')}>
+          Activity
+        </a>
+        <a className="btn" href={href('/transactions?view=trash')}>
+          {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}
+        </a>
+      </div>
     </section>
   );
 }
@@ -483,15 +502,19 @@ function About() {
   );
 }
 
-export function Settings() {
+export function Settings({ view }: { view?: string | null }) {
+  if (view === 'activity') return <Activity />;
   return (
     <>
       <Appearance />
       <Privacy />
       <MoneySettings />
-      <Data />
-      <ScreenLock />
+      <CategoryManager />
       <LearnedRules />
+      <Data />
+      <CsvImport />
+      <Records />
+      <ScreenLock />
       <Storage />
       <About />
     </>

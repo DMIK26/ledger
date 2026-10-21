@@ -1,7 +1,8 @@
 import { Layout } from './Layout';
 import { Dashboard } from './pages/Dashboard';
 import { Settings } from './pages/Settings';
-import { Soon } from './pages/Soon';
+import { Recurring } from './pages/Recurring';
+import { Reports } from './pages/Reports';
 import { Budgets } from './pages/Budgets';
 import { filtersFromQuery, Transactions } from './pages/Transactions';
 import { useRoute, type RoutePath } from './router';
@@ -13,11 +14,11 @@ function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
     case '/budgets':
       return <Budgets />;
     case '/reports':
-      return <Soon page="Reports" />;
+      return <Reports />;
     case '/recurring':
-      return <Soon page="Recurring" />;
+      return <Recurring />;
     case '/settings':
-      return <Settings />;
+      return <Settings view={query.get('view')} />;
     default:
       return <Dashboard />;
   }

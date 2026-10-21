@@ -7,6 +7,7 @@ import {
   type Settings,
   type Transaction,
 } from '../domain/types';
+import type { RecurringItem } from '../domain/recurring';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -20,6 +21,8 @@ export interface BackupFile {
     settings: Settings;
     /** Added in Drop 3; older backups have none. */
     budgets?: Budget[];
+    /** Added in Drop 4. */
+    recurring?: RecurringItem[];
   };
 }
 
@@ -43,6 +46,7 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       rules: await db.getAll('rules'),
       settings: await loadSettings(db),
       budgets: await db.getAll('budgets'),
+      recurring: await db.getAll('recurring'),
     },
   };
 }
@@ -79,6 +83,21 @@ export function validateBackup(json: unknown): BackupFile | null {
     )
   )
     return null;
+  const { recurring } = json.data;
+  if (
+    recurring !== undefined &&
+    !(
+      Array.isArray(recurring) &&
+      recurring.every(
+        (r) =>
+          isObj(r) &&
+          typeof r.id === 'string' &&
+          Number.isInteger(r.amountMinor) &&
+          typeof r.anchor === 'string',
+      )
+    )
+  )
+    return null;
   return json as unknown as BackupFile;
 }
 
@@ -89,7 +108,7 @@ export async function importBackup(
   mode: 'merge' | 'replace',
 ): Promise<number> {
   const t = db.transaction(
-    ['transactions', 'categories', 'rules', 'settings', 'budgets'],
+    ['transactions', 'categories', 'rules', 'settings', 'budgets', 'recurring'],
     'readwrite',
   );
   if (mode === 'replace') {
@@ -98,7 +117,13 @@ export async function importBackup(
       t.objectStore('categories').clear(),
       t.objectStore('rules').clear(),
       t.objectStore('budgets').clear(),
+      t.objectStore('recurring').clear(),
     ]);
+  }
+  for (const r of file.data.recurring ?? []) {
+    if (mode === 'replace' || !(await t.objectStore('recurring').get(r.id))) {
+      await t.objectStore('recurring').put(r);
+    }
   }
   for (const b of file.data.budgets ?? []) {
     if (mode === 'replace' || !(await t.objectStore('budgets').get(b.id))) {

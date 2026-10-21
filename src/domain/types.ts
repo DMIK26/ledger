@@ -53,6 +53,8 @@ export interface Settings {
   /** Month the financial year starts in (4 = April). */
   fyStartMonth: number;
   lastMethod: PaymentMethod;
+  /** When a backup was last exported (epoch ms, 0 = never). Drives the weekly reminder on phones. */
+  lastBackupAt: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -61,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   currency: 'INR',
   fyStartMonth: 4,
   lastMethod: 'UPI',
+  lastBackupAt: 0,
 };
 
 export interface AuditEvent {
