@@ -1,3 +1,4 @@
+import { SampleCard } from '../SampleData';
 import { InstallButton, InstallText } from '../InstallBanner';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { exportBackup, validateBackup, type BackupFile } from '../../data/backup';
@@ -605,6 +606,7 @@ export function Settings({ view }: { view?: string | null }) {
       <CategoryManager />
       <LearnedRules />
       <Data />
+      <SampleCard />
       <CsvImport />
       <Records />
       <ScreenLock />

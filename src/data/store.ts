@@ -10,6 +10,8 @@ import type { RecurringItem } from '../domain/recurring';
 import type { AuditEvent } from '../domain/types';
 import { cleanNote, type Note, type StampKind } from '../domain/notes';
 import { fitCap, sketchId, type Sketch, type Stroke } from '../domain/sketch';
+import { buildSample, isSampleId } from '../domain/sample';
+import { todayISO } from '../domain/dates';
 import { hashPin, resetDue, verifyPin } from '../domain/pin';
 import { setPrivacy } from '../domain/money';
 import type { ParsedEntry } from '../domain/parser';
@@ -51,6 +53,10 @@ import {
   removeNote,
   putSketch,
   SKETCH_LABEL,
+  loadSample as loadSampleCommand,
+  removeSample as removeSampleCommand,
+  SAMPLE_KEY,
+  type SampleMarker,
   updateTransaction,
   VIEWS_KEY,
   type Command,
@@ -92,6 +98,8 @@ export interface LedgerState {
   notes: Note[];
   /** Saved drawings, one per page and month. */
   sketches: Sketch[];
+  /** What the sample data added, while it is loaded; null otherwise. */
+  sample: SampleMarker | null;
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -164,6 +172,10 @@ export interface LedgerState {
   addStroke: (page: string, month: string, stroke: Stroke) => Promise<void>;
   eraseStrokes: (page: string, month: string, ids: string[]) => Promise<void>;
   clearSketch: (page: string, month: string) => Promise<void>;
+  /** Adds about three months of sample spending, recurring payments and budgets. Undoable. */
+  loadSampleData: () => Promise<void>;
+  /** Removes exactly what the sample added (budgets you changed are kept). Undoable. */
+  removeSampleData: () => Promise<void>;
   undo: () => Promise<void>;
   /** Undoes the newest `steps` changes in order. */
   undoMany: (steps: number) => Promise<void>;
@@ -223,6 +235,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         ignored,
         notes,
         sketches,
+        sample,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -234,6 +247,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.get('settings', IGNORED_RECURRING_KEY),
         d.getAll('notes'),
         d.getAll('sketches'),
+        d.get('settings', SAMPLE_KEY),
       ]);
       notes.sort((a, b) => a.createdAt - b.createdAt);
       recurring.sort((a, b) => a.merchant.localeCompare(b.merchant));
@@ -251,6 +265,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         views: Array.isArray(views) ? (views as SavedView[]) : [],
         notes,
         sketches,
+        sample: (sample as SampleMarker | undefined) ?? null,
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -272,6 +287,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       views: [],
       notes: [],
       sketches: [],
+      sample: null,
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -821,6 +837,44 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           putSketch({ ...previous, strokes: [], updatedAt: Date.now() }, previous, 'Cleared'),
           'Cleared the drawing',
         );
+      },
+
+      loadSampleData: async () => {
+        if (get().sample || get().transactions.some((t) => isSampleId(t.id))) return;
+        const data = buildSample(todayISO(), get().budgets);
+        await get().run(
+          loadSampleCommand(data, undefined),
+          `Loaded ${data.transactions.length} sample entries. Remove them in Settings any time.`,
+        );
+      },
+
+      removeSampleData: async () => {
+        // A backup restored on another device carries the entries but not the marker; the ids tell.
+        const marker: SampleMarker | null =
+          get().sample ??
+          (get().transactions.some((t) => isSampleId(t.id))
+            ? {
+                transactionIds: get()
+                  .transactions.filter((t) => isSampleId(t.id))
+                  .map((t) => t.id),
+                recurringIds: get()
+                  .recurring.filter((r) => isSampleId(r.id))
+                  .map((r) => r.id),
+                budgets: [],
+              }
+            : null);
+        if (!marker) return;
+        const txIds = new Set(marker.transactionIds);
+        const recIds = new Set(marker.recurringIds);
+        const removed = {
+          transactions: get().transactions.filter((t) => txIds.has(t.id)),
+          recurring: get().recurring.filter((r) => recIds.has(r.id)),
+          // Budgets the user changed since are theirs now.
+          budgets: get().budgets.filter((b) =>
+            marker.budgets.some((m) => m.id === b.id && m.amountMinor === b.amountMinor),
+          ),
+        };
+        await get().run(removeSampleCommand(marker, removed), 'Removed the sample data');
       },
 
       undoMany: async (steps) => {

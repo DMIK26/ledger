@@ -36,6 +36,16 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
+## After 1.0: sample data (21 Oct 2026, awaiting publish)
+
+- "Load sample data" on the empty Dashboard and Transactions pages and in Settings > Sample data:
+  about three months of everyday Indian spending (`src/domain/sample.ts`, deterministic), five
+  recurring payments and budgets for months that had none. Every id starts with `sample-`.
+- A banner on the Dashboard while it is loaded; "Remove sample data" deletes only what the sample added
+  (budgets the user changed are kept), for good rather than to Trash, as one undoable step. Real entries
+  added meanwhile stay. A restored backup that contains sample entries can still be cleaned up by id.
+- Tests: `src/domain/sample.test.ts`, `src/data/sample.data.test.ts`, `e2e/sample.spec.ts`.
+
 ## Drop 7: what was added
 
 - Install help (`src/domain/platform.ts`, `src/pwa/install.ts`, `src/app/InstallBanner.tsx`): Chrome and

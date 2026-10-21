@@ -323,3 +323,69 @@ export const putSketch = (next: Sketch, previous: Sketch | undefined, label: str
     else await db.delete('sketches', next.id);
   },
 });
+
+export const SAMPLE_KEY = 'sampleData';
+
+/** What loading the sample added, so removing it touches nothing else. */
+export interface SampleMarker {
+  transactionIds: string[];
+  recurringIds: string[];
+  budgets: Budget[];
+}
+
+/** Adds the sample (entries, recurring payments, budgets for empty months) as one undoable step. */
+export const loadSample = (
+  data: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
+  previousMarker: SampleMarker | undefined,
+): Command => ({
+  label: 'Loaded sample data',
+  apply: async (db) => {
+    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    for (const x of data.transactions) void t.objectStore('transactions').put(x);
+    for (const x of data.recurring) void t.objectStore('recurring').put(x);
+    for (const x of data.budgets) void t.objectStore('budgets').put(x);
+    const marker: SampleMarker = {
+      transactionIds: data.transactions.map((x) => x.id),
+      recurringIds: data.recurring.map((x) => x.id),
+      budgets: data.budgets,
+    };
+    void t.objectStore('settings').put(marker, SAMPLE_KEY);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    for (const x of data.transactions) void t.objectStore('transactions').delete(x.id);
+    for (const x of data.recurring) void t.objectStore('recurring').delete(x.id);
+    for (const x of data.budgets) void t.objectStore('budgets').delete(x.id);
+    if (previousMarker) void t.objectStore('settings').put(previousMarker, SAMPLE_KEY);
+    else void t.objectStore('settings').delete(SAMPLE_KEY);
+    await t.done;
+  },
+});
+
+/**
+ * Removes the sample for good (not to Trash): its entries, recurring payments and any budgets that
+ * still have their sample amounts. Undo brings them back.
+ */
+export const removeSample = (
+  marker: SampleMarker,
+  removed: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
+): Command => ({
+  label: 'Removed sample data',
+  apply: async (db) => {
+    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    for (const x of removed.transactions) void t.objectStore('transactions').delete(x.id);
+    for (const x of removed.recurring) void t.objectStore('recurring').delete(x.id);
+    for (const x of removed.budgets) void t.objectStore('budgets').delete(x.id);
+    void t.objectStore('settings').delete(SAMPLE_KEY);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    for (const x of removed.transactions) void t.objectStore('transactions').put(x);
+    for (const x of removed.recurring) void t.objectStore('recurring').put(x);
+    for (const x of removed.budgets) void t.objectStore('budgets').put(x);
+    void t.objectStore('settings').put(marker, SAMPLE_KEY);
+    await t.done;
+  },
+});

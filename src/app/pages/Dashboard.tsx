@@ -35,6 +35,7 @@ import { TxList } from '../TxList';
 import { Insights } from '../Insights';
 import { BackupReminder } from '../BackupReminder';
 import { InstallBanner } from '../InstallBanner';
+import { LoadSampleButton, SampleBanner } from '../SampleData';
 
 const PER_DAY_STEP = 1000; // ₹10
 
@@ -311,6 +312,12 @@ export function Dashboard() {
           <EmptyDoodle art="notebook" />
           <h2>Nothing logged yet</h2>
           <p className="muted">Type your first expense above, something like “chai 20 cash”.</p>
+          <p className="muted small">
+            Or look around first with made-up entries you can remove later.
+          </p>
+          <div className="btn-row empty-actions">
+            <LoadSampleButton />
+          </div>
         </section>
       </>
     );
@@ -320,6 +327,7 @@ export function Dashboard() {
   return (
     <>
       <InstallBanner />
+      <SampleBanner />
       <BackupReminder />
       <QuickAdd followMonth />
       <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>

@@ -90,7 +90,9 @@ category table with sparklines; top merchants; method split; weekday pattern; da
 **Settings**: theme, privacy, currency, FY start, category manager (drag reorder, live recolour), CSV import
 with column mapping and duplicate skipping, backup/restore (JSON, share sheet), import from the previous
 Ledger, activity log, trash, storage (persist + usage), experience (motion Full/Reduced/Off, sounds, haptics,
-doodles), version and update check.
+doodles), version and update check, and sample data (load about three months of made-up spending,
+recurring payments and budgets to try the app; remove exactly that in one tap, undoable; owner request,
+21 Oct 2026).
 
 Legend and chart rules from the prototypes: full category names (wrap, never truncate with an ellipsis),
 compact axis labels (₹10k, never "₹40,000.00"), plots fill their card, both cards equal height.

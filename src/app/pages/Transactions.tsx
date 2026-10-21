@@ -1,3 +1,4 @@
+import { LoadSampleButton } from '../SampleData';
 import { EmptyDoodle } from '../../doodle/Studio';
 import { useMemo, useRef, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
@@ -481,6 +482,9 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
           <EmptyDoodle art="receipt" />
           <h2>Nothing logged yet</h2>
           <p className="muted">Every expense you add shows up here, newest first.</p>
+          <div className="btn-row empty-actions">
+            <LoadSampleButton />
+          </div>
         </section>
         {trashCount > 0 && (
           <p>
