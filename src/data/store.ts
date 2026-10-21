@@ -6,10 +6,10 @@ import type { ParsedEntry } from '../domain/parser';
 import {
   DEFAULT_SETTINGS, type Category, type CategoryId, type Settings, type Transaction,
 } from '../domain/types';
-import { loadSettings } from './backup';
+import { loadSettings, type BackupFile } from './backup';
 import { CommandBus, purgeTrash } from './bus';
 import {
-  addTransaction, composite, deleteTransaction, setRule, type Command,
+  addTransaction, composite, deleteTransaction, importTransactions, setRule, type Command,
 } from './commands';
 import { DB_NAME, openLedgerDB, type Db } from './db';
 
@@ -29,6 +29,8 @@ export interface LedgerState {
   run: (command: Command, notice?: string) => Promise<void>;
   addFromParsed: (parsed: ParsedEntry, categoryId?: CategoryId) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
+  /** Merges a Ledger backup: adds entries, categories and rules this device lacks. Undoable. */
+  importFromBackup: (file: BackupFile) => Promise<number>;
   undo: () => Promise<void>;
   redo: () => Promise<void>;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
@@ -170,6 +172,23 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       removeTransaction: async (id) => {
         const tx = get().transactions.find((t) => t.id === id);
         if (tx) await get().run(deleteTransaction(tx), `Deleted ${tx.merchant}`);
+      },
+
+      importFromBackup: async (file) => {
+        const { transactions, categories, rules } = get();
+        const haveTx = new Set(transactions.map((t) => t.id));
+        const haveCat = new Set(categories.map((c) => c.id));
+        const newTx = file.data.transactions.filter((t) => !haveTx.has(t.id));
+        const newCats = file.data.categories.filter((c) => !haveCat.has(c.id));
+        const newRules = file.data.rules.filter((r) => !(r.key in rules));
+        if (newTx.length === 0 && newCats.length === 0 && newRules.length === 0) {
+          set({ notice: 'Nothing new in that backup' });
+          return 0;
+        }
+        const label = `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`;
+        const steps: Command[] = [importTransactions(newTx, newCats, label), ...newRules.map((r) => setRule(r))];
+        await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+        return newTx.length;
       },
 
       undo: async () => {
