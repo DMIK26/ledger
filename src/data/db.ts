@@ -1,5 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { AuditEvent, Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
+import type {
+  AuditEvent,
+  Budget,
+  Category,
+  MerchantRule,
+  Transaction,
+  TrashItem,
+} from '../domain/types';
 import { MIGRATIONS } from './migrations';
 
 export interface LedgerDB extends DBSchema {
@@ -13,7 +20,7 @@ export interface LedgerDB extends DBSchema {
   settings: { key: string; value: unknown };
   audit: { key: number; value: AuditEvent };
   trash: { key: string; value: TrashItem; indexes: { 'by-deleted': number } };
-  budgets: { key: string; value: { id: string } };
+  budgets: { key: string; value: Budget };
   recurring: { key: string; value: { id: string } };
   notes: { key: string; value: { id: string } };
   sketches: { key: string; value: { id: string } };

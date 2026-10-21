@@ -7,14 +7,17 @@ interface Props {
   /** Starting value. Change the component's `key` to load a different one. */
   initialMinor: number | null;
   onChange: (minor: number | null) => void;
+  onBlur?: () => void;
   invalid?: boolean;
+  /** For fields without a visible label. */
+  ariaLabel?: string;
 }
 
 /**
  * An amount field that never writes digits into a DOM attribute: the value is set as a property only,
  * so privacy mode's leak checks (text, attributes, title) stay clean, and it is masked on screen.
  */
-export function AmountInput({ id, initialMinor, onChange, invalid }: Props) {
+export function AmountInput({ id, initialMinor, onChange, onBlur, invalid, ariaLabel }: Props) {
   const ref = useRef<HTMLInputElement>(null);
   const masked = usePrivacy();
 
@@ -35,6 +38,8 @@ export function AmountInput({ id, initialMinor, onChange, invalid }: Props) {
       enterKeyHint="next"
       data-masked={masked ? '' : undefined}
       aria-invalid={invalid || undefined}
+      aria-label={ariaLabel}
+      onBlur={onBlur}
       onInput={(e) => {
         const text = e.currentTarget.value;
         onChange(text.trim() ? parseAmountToMinor(text) : null);

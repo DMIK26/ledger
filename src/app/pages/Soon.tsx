@@ -1,8 +1,4 @@
 const DROPS: Record<string, { drop: number; what: string }> = {
-  Budgets: {
-    drop: 3,
-    what: 'Overall and per-category budgets, with suggestions and an allocation bar.',
-  },
   Reports: {
     drop: 4,
     what: 'Month, quarter and financial-year reports with comparisons and exports.',
@@ -13,7 +9,7 @@ const DROPS: Record<string, { drop: number; what: string }> = {
   },
 };
 
-export function Soon({ page }: { page: 'Budgets' | 'Reports' | 'Recurring' }) {
+export function Soon({ page }: { page: 'Reports' | 'Recurring' }) {
   const info = DROPS[page]!;
   return (
     <section className="card empty">

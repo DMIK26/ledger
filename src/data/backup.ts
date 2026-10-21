@@ -1,6 +1,11 @@
 import { isValidYMD } from '../domain/dates';
 import {
-  DEFAULT_SETTINGS, type Category, type MerchantRule, type Settings, type Transaction,
+  DEFAULT_SETTINGS,
+  type Budget,
+  type Category,
+  type MerchantRule,
+  type Settings,
+  type Transaction,
 } from '../domain/types';
 import { DB_VERSION, type Db } from './db';
 
@@ -13,6 +18,8 @@ export interface BackupFile {
     categories: Category[];
     rules: MerchantRule[];
     settings: Settings;
+    /** Added in Drop 3; older backups have none. */
+    budgets?: Budget[];
   };
 }
 
@@ -35,6 +42,7 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       categories: await db.getAll('categories'),
       rules: await db.getAll('rules'),
       settings: await loadSettings(db),
+      budgets: await db.getAll('budgets'),
     },
   };
 }
@@ -59,20 +67,43 @@ export function validateBackup(json: unknown): BackupFile | null {
   if (!isObj(json) || json.app !== 'ledger' || !isObj(json.data)) return null;
   const { transactions, categories, rules } = json.data;
   if (!Array.isArray(transactions) || !transactions.every(validTransaction)) return null;
-  if (!Array.isArray(categories) || !categories.every((c) => isObj(c) && typeof c.id === 'string')) return null;
+  if (!Array.isArray(categories) || !categories.every((c) => isObj(c) && typeof c.id === 'string'))
+    return null;
   if (!Array.isArray(rules)) return null;
+  const { budgets } = json.data;
+  if (
+    budgets !== undefined &&
+    !(
+      Array.isArray(budgets) &&
+      budgets.every((b) => isObj(b) && typeof b.id === 'string' && Number.isInteger(b.amountMinor))
+    )
+  )
+    return null;
   return json as unknown as BackupFile;
 }
 
 /** `merge` adds what is missing; `replace` makes the device match the backup exactly. */
-export async function importBackup(db: Db, file: BackupFile, mode: 'merge' | 'replace'): Promise<number> {
-  const t = db.transaction(['transactions', 'categories', 'rules', 'settings'], 'readwrite');
+export async function importBackup(
+  db: Db,
+  file: BackupFile,
+  mode: 'merge' | 'replace',
+): Promise<number> {
+  const t = db.transaction(
+    ['transactions', 'categories', 'rules', 'settings', 'budgets'],
+    'readwrite',
+  );
   if (mode === 'replace') {
     await Promise.all([
       t.objectStore('transactions').clear(),
       t.objectStore('categories').clear(),
       t.objectStore('rules').clear(),
+      t.objectStore('budgets').clear(),
     ]);
+  }
+  for (const b of file.data.budgets ?? []) {
+    if (mode === 'replace' || !(await t.objectStore('budgets').get(b.id))) {
+      await t.objectStore('budgets').put(b);
+    }
   }
   let added = 0;
   for (const c of file.data.categories) {

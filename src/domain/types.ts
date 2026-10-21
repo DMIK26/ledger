@@ -82,3 +82,13 @@ export interface LockConfig {
   hash: string;
   iterations: number;
 }
+
+/** A spending limit for one month: the whole month ("overall") or one category. */
+export interface Budget {
+  /** `${month}|${scope}`, see budgetId(). */
+  id: string;
+  /** 'YYYY-MM' */
+  month: string;
+  scope: 'overall' | CategoryId;
+  amountMinor: number;
+}

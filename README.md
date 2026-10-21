@@ -4,7 +4,7 @@ A private, offline-first expense tracker. Your data stays on your device (Indexe
 cloud and no analytics. It installs on iPhone and Android as a PWA and is published free on GitHub Pages at
 https://dmik26.github.io/ledger/.
 
-**Status:** Drops 1 and 2 of 7 are built and tested. Next: Drop 3. See `docs/HANDOFF.md`.
+**Status:** Drops 1 to 3 of 7 are built and tested. Next: Drop 4. See `docs/HANDOFF.md`.
 
 What works now: quick add with live highlighting and editable chips; an Add sheet (bottom sheet on phones)
 with amount, merchant, date, category, method, tags, notes and a receipt photo; Transactions with filters
@@ -12,7 +12,9 @@ with amount, merchant, date, category, method, tags, notes and a receipt photo; 
 inline edit, bulk move/tag/delete, saved views, duplicate warnings and a 30-day Trash; undo and redo
 (Ctrl/Cmd+Z, Shift for redo); privacy mode on every page; an optional PIN screen lock; Settings (theme,
 privacy, currency, financial year, backup, screen lock, learned categories, storage, updates); offline use
-and install as an app. Budgets, Reports and Recurring show which drop delivers them.
+and install as an app. The Dashboard has KPIs, a budget card with a what-if slider, a category donut
+and six-month bars with a draggable budget line; Budgets has suggestions, copy last month and an
+allocation bar. Reports and Recurring show which drop delivers them.
 
 ## Quick start
 
@@ -22,7 +24,7 @@ npm run dev
 ```
 
 Open http://localhost:5173/ledger/ . Run `npm run lint && npm run typecheck && npm test && npm run build`
-before every commit. `npm run e2e` runs the Playwright smoke test (desktop and Pixel 7).
+before every commit. `npm run e2e` runs the Playwright browser tests (desktop and Pixel 7); GitHub runs them on every push.
 
 ## Documents
 

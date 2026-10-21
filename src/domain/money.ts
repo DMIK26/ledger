@@ -56,7 +56,6 @@ function formatter(currency: string, compact: boolean, signed: boolean): Intl.Nu
     f = new Intl.NumberFormat(info.locale, {
       style: 'currency',
       currency: known ? currency : 'INR',
-      notation: compact ? 'compact' : 'standard',
       minimumFractionDigits: compact ? 0 : 2,
       maximumFractionDigits: compact ? 1 : 2,
       signDisplay: signed ? 'exceptZero' : 'auto',
@@ -75,7 +74,25 @@ export function maskedMoney(currency = 'INR', compact = false): string {
 export function fmtMoney(minor: number, opts: MoneyOptions = {}): string {
   const { currency = 'INR', compact = false, signed = false, reveal = false } = opts;
   if (privacyOn && !reveal) return maskedMoney(currency, compact);
-  return formatter(currency, compact, signed).format(minor / 100);
+  if (!compact) return formatter(currency, false, signed).format(minor / 100);
+  // Compact labels are built here rather than with Intl's compact notation, whose Indian-English
+  // output differs between engines ("₹10K" in one, "₹10T" in another). Rupees use k, L and Cr.
+  const value = minor / 100;
+  const units: Array<[number, string]> =
+    currency === 'INR'
+      ? [
+          [1e7, 'Cr'],
+          [1e5, 'L'],
+          [1e3, 'k'],
+        ]
+      : [
+          [1e9, 'B'],
+          [1e6, 'M'],
+          [1e3, 'k'],
+        ];
+  const unit = units.find(([n]) => Math.abs(value) >= n);
+  const scaled = unit ? value / unit[0] : value;
+  return formatter(currency, true, signed).format(scaled) + (unit ? unit[1] : '');
 }
 
 /**

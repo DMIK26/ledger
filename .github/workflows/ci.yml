@@ -19,3 +19,26 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  e2e:
+    name: Browser tests (desktop Chrome and Pixel 7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Installs the Chromium build that matches the pinned @playwright/test version, plus its system libraries.
+      - run: npx playwright install --with-deps chromium
+      # playwright.config.ts builds the app and serves it on port 4173 before the tests run.
+      - run: npm run e2e
+      - name: Keep traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 14

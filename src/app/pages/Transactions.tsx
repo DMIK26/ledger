@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
-import { fmtDate } from '../../domain/dates';
+import { fmtDate, parseISO } from '../../domain/dates';
 import {
   allTags,
   applyFilters,
@@ -396,18 +396,18 @@ function TrashView() {
   );
 }
 
-function Ledger() {
+function Ledger({ initialFilters }: { initialFilters: Filters }) {
   const transactions = useLedger((s) => s.transactions);
   const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
   const trashCount = useLedger((s) => s.trash.length);
   const removeTransaction = useLedger((s) => s.removeTransaction);
 
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>(initialFilters);
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const [page, setPage] = useState(1);
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(() => isFiltered(initialFilters));
   const [panelKey, setPanelKey] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -623,6 +623,24 @@ function Ledger() {
   );
 }
 
-export function Transactions({ view }: { view?: string | null }) {
-  return view === 'trash' ? <TrashView /> : <Ledger />;
+/** Filters passed in the address, e.g. from a donut slice: ?category=food&from=2026-10-01&to=2026-10-19 */
+export function filtersFromQuery(query: URLSearchParams): Filters {
+  const date = (v: string | null) => (v && parseISO(v) ? v : undefined);
+  const category = query.get('category');
+  return {
+    ...EMPTY_FILTERS,
+    categories: category ? [category] : [],
+    from: date(query.get('from')),
+    to: date(query.get('to')),
+  };
+}
+
+export function Transactions({
+  view,
+  initialFilters = EMPTY_FILTERS,
+}: {
+  view?: string | null;
+  initialFilters?: Filters;
+}) {
+  return view === 'trash' ? <TrashView /> : <Ledger initialFilters={initialFilters} />;
 }

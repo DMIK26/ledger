@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { DEFAULT_CATEGORIES } from '../domain/categories';
 import { categorise, normalizeMerchantKey } from '../domain/categoriser';
 import type { SavedView } from '../domain/filters';
+import { budgetsForMonth, toBudgetRows, type MonthBudgets } from '../domain/budgets';
 import { hashPin, resetDue, verifyPin } from '../domain/pin';
 import { setPrivacy } from '../domain/money';
 import type { ParsedEntry } from '../domain/parser';
 import {
   DEFAULT_SETTINGS,
+  type Budget,
   type Category,
   type CategoryId,
   type ISODate,
@@ -26,6 +28,7 @@ import {
   deleteTransaction,
   importTransactions,
   restoreFromTrash,
+  setMonthBudgets as setMonthBudgetsCommand,
   setReceipt,
   setRule,
   setViews,
@@ -60,6 +63,8 @@ export interface LedgerState {
   categories: Category[];
   rules: Record<string, CategoryId>;
   trash: TrashItem[];
+  /** Every month's budgets. Read them with budgetsForMonth(). */
+  budgets: Budget[];
   views: SavedView[];
   settings: Settings;
   lock: LockConfig | null;
@@ -93,6 +98,8 @@ export interface LedgerState {
   removePin: (pin: string) => Promise<boolean>;
   unlock: (pin: string) => Promise<boolean>;
   lockNow: () => void;
+  /** Replaces a month's budgets in one undoable step. Zero amounts are removed. */
+  setMonthBudgets: (month: string, next: MonthBudgets, label?: string) => Promise<void>;
   /** Epoch ms when a forgotten-PIN reset was requested, or null. */
   lockReset: number | null;
   requestPinReset: () => Promise<void>;
@@ -138,12 +145,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
     const refresh = async (): Promise<void> => {
       const d = requireDb();
-      const [transactions, categories, rules, trash, views] = await Promise.all([
+      const [transactions, categories, rules, trash, views, budgets] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
         d.getAll('rules'),
         d.getAll('trash'),
         d.get('settings', VIEWS_KEY),
+        d.getAll('budgets'),
       ]);
       trash.sort((a, b) => b.deletedAt - a.deletedAt);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
@@ -153,6 +161,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         categories,
         rules: Object.fromEntries(rules.map((r) => [r.key, r.categoryId])),
         trash,
+        budgets,
         views: Array.isArray(views) ? (views as SavedView[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
@@ -167,6 +176,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       categories: [],
       rules: {},
       trash: [],
+      budgets: [],
       views: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
@@ -469,21 +479,42 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (tx) await get().run(deleteTransaction(tx), `Deleted ${tx.merchant}`);
       },
 
+      setMonthBudgets: async (month, next, label = 'Updated budgets') => {
+        const previous = get().budgets.filter((b) => b.month === month);
+        const rows = toBudgetRows(month, next);
+        const same =
+          JSON.stringify(budgetsForMonth(previous, month)) ===
+          JSON.stringify(budgetsForMonth(rows, month));
+        if (same) return;
+        await get().run(setMonthBudgetsCommand(previous, rows, label));
+      },
+
       importFromBackup: async (file) => {
-        const { transactions, categories, rules } = get();
+        const { transactions, categories, rules, budgets } = get();
         const haveTx = new Set(transactions.map((t) => t.id));
         const haveCat = new Set(categories.map((c) => c.id));
         const newTx = file.data.transactions.filter((t) => !haveTx.has(t.id));
         const newCats = file.data.categories.filter((c) => !haveCat.has(c.id));
         const newRules = file.data.rules.filter((r) => !(r.key in rules));
-        if (newTx.length === 0 && newCats.length === 0 && newRules.length === 0) {
+        const haveBudget = new Set(budgets.map((b) => b.id));
+        const newBudgets = (file.data.budgets ?? []).filter((b) => !haveBudget.has(b.id));
+        if (
+          newTx.length === 0 &&
+          newCats.length === 0 &&
+          newRules.length === 0 &&
+          newBudgets.length === 0
+        ) {
           set({ notice: 'Nothing new in that backup' });
           return 0;
         }
-        const label = `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`;
+        const label =
+          newTx.length > 0
+            ? `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`
+            : 'Imported categories, rules and budgets';
         const steps: Command[] = [
           importTransactions(newTx, newCats, label),
           ...newRules.map((r) => setRule(r)),
+          ...(newBudgets.length > 0 ? [setMonthBudgetsCommand([], newBudgets, label)] : []),
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;

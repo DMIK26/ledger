@@ -1,5 +1,5 @@
 import type { SavedView } from '../domain/filters';
-import type { Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
+import type { Budget, Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
 import type { Db } from './db';
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
@@ -154,5 +154,22 @@ export const setViews = (next: SavedView[], previous: SavedView[], label: string
   },
   revert: async (db) => {
     await db.put('settings', previous, VIEWS_KEY);
+  },
+});
+
+/** Replaces one month's budgets (overall and per category) as a single undoable step. */
+export const setMonthBudgets = (previous: Budget[], next: Budget[], label: string): Command => ({
+  label,
+  apply: async (db) => {
+    const t = db.transaction('budgets', 'readwrite');
+    for (const b of previous) void t.store.delete(b.id);
+    for (const b of next) void t.store.put(b);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction('budgets', 'readwrite');
+    for (const b of next) void t.store.delete(b.id);
+    for (const b of previous) void t.store.put(b);
+    await t.done;
   },
 });

@@ -33,6 +33,7 @@ test('add through the sheet with a receipt, edit inline, delete, undo', async ({
   await page.goto('./#/transactions');
 
   // Add through the sheet.
+  await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
   if (await page.locator('.topbar-add').isVisible()) await page.locator('.topbar-add').click();
   else await page.getByRole('button', { name: 'Add expense' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add expense' });
