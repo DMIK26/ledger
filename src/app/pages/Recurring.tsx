@@ -15,6 +15,7 @@ import {
 } from '../../domain/recurring';
 import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
+import { usePins, useScopedTransactions } from '../../kit/view';
 import { Money } from '../Money';
 
 function AddForm({ onDone }: { onDone: () => void }) {
@@ -144,9 +145,19 @@ function AddForm({ onDone }: { onDone: () => void }) {
 }
 
 export function Recurring() {
-  const transactions = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
   const categories = useLedger((s) => s.categories);
-  const recurring = useLedger((s) => s.recurring);
+  const allRecurring = useLedger((s) => s.recurring);
+  const pins = usePins();
+  // Category and merchant pins narrow the list; other pins do not apply to plans.
+  const recurring = allRecurring.filter((r) =>
+    (['category', 'merchant'] as const).every((kind) => {
+      const ofKind = pins.filter((p) => p.kind === kind);
+      if (ofKind.length === 0) return true;
+      const id = kind === 'category' ? r.categoryId : normalizeMerchantKey(r.merchant);
+      return ofKind.some((p) => p.id === id);
+    }),
+  );
   const ignored = useLedger((s) => s.recurringIgnored);
   const currency = useLedger((s) => s.settings.currency);
   const saveRecurring = useLedger((s) => s.saveRecurring);
@@ -158,8 +169,8 @@ export function Recurring() {
   const today = todayISO();
 
   const known = useMemo(
-    () => new Set([...ignored, ...recurring.map((r) => normalizeMerchantKey(r.merchant))]),
-    [ignored, recurring],
+    () => new Set([...ignored, ...allRecurring.map((r) => normalizeMerchantKey(r.merchant))]),
+    [ignored, allRecurring],
   );
   const candidates = useMemo(
     () => detectRecurring(transactions, today, known),

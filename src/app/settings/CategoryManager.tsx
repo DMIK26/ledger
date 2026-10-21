@@ -7,6 +7,7 @@ import {
   OTHER_ID,
 } from '../../domain/categories';
 import type { Category } from '../../domain/types';
+import { tick } from '../../kit/haptics';
 
 const COLOUR_NAMES = [
   'Clay',
@@ -245,7 +246,10 @@ export function CategoryManager() {
             onHandleMove={(e) => {
               if (!drag) return;
               const target = targetAt(e.clientY, drag.id);
-              if (target !== drag.target) setDrag({ ...drag, target });
+              if (target !== drag.target) {
+                tick();
+                setDrag({ ...drag, target });
+              }
             }}
             onHandleUp={() => {
               if (!drag) return;

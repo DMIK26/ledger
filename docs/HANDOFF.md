@@ -1,13 +1,17 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **Drops 1, 2 and 3 are published** at https://dmik26.github.io/ledger/. **Drop 4 is
-complete** and waiting to be committed and published. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
+Updated 21 Oct 2026. **Drops 1 to 4 are published** at https://dmik26.github.io/ledger/. **Drop 5 is
+complete and awaiting publish.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
 
-`npm run lint`, `npm run typecheck`, `npm test` (168 tests, 16 files) and `npm run build` pass.
-`npm run e2e` passes on desktop Chrome and Pixel 7 (34 tests, also with `CI=1`). Drop 4 adds: reports
+`npm run lint`, `npm run typecheck`, `npm test` (187 tests, 19 files) and `npm run build` pass.
+`npm run e2e` passes on desktop Chrome and Pixel 7 (43 passed, 3 desktop-only skipped on phone, with
+`CI=1`). Drop 5 adds: the pin-bar total equals the sum on Dashboard, Transactions, Budgets and Reports;
+the marquee total equals the sum of selected rows; undo history and redo restore exactly; month
+switcher, bar click and keyboard roving; hover highlight and card; heatmap brush sets a custom period.
+Drop 4 added: reports
 split the financial year at 1 April; a CSV export from Reports has the BOM and `Amount (₹)` header and,
 imported again, adds nothing (every row skipped as a duplicate); a found subscription goes on the timeline
 and its pill drags by days; the what-if yearly saving; categories reorder by dragging; no page scrolls
@@ -15,6 +19,31 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
+
+## Drop 5: what was added
+
+- `src/kit/`: EntityBus (one CSS rule dims everything not linked to what is hovered or focused; touch
+  uses long press; Escape clears), view store (pins and viewed month), HoverCard (after 350 ms, spring
+  positioned), month switcher (twelve months with mini bars and budget mood dots), pin bar, undo with a
+  history of chips and redo, nav badges and peeks, roving tab stops for charts, marquee, haptic ticks on
+  snaps, View Transitions where motion is on.
+- Pins: category, merchant, method, tag and day; any chip or row part pins it to every page. Same kind is
+  OR, different kinds are AND (`src/domain/pins.ts`). Escape removes the last pin.
+- Dashboard: KPI cards open a breakdown with a breadcrumb (categories, merchants, days, compare); donut
+  click drills in place; bars preview the donut on hover and switch month on click.
+- Reports heatmap: brush a range to set a custom period, click a day to pin it.
+- Settings: Motion (full, reduced, off) and haptics.
+
+## Decisions taken in Drop 5
+
+- The pin bar total is all-time for the pinned set; page totals stay in the page's period.
+- The month switcher shows on Dashboard and Budgets only; other pages keep their own period controls.
+- The six bars end at the viewed month. Insights show for the current month only.
+- With category pins the budget card sums those categories' budgets; other pins show a note instead.
+- Marquee select is mouse only; touch keeps the checkboxes. Quick add on the Dashboard follows a saved
+  entry into its month and announces it.
+- The context bar is sticky on desktop only, to save height on phones.
+- Not verified on a real phone: long-press highlight and haptics.
 
 ## Drop 4: what was added
 
@@ -143,10 +172,8 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
 
 ## Next
 
-1. Commit and publish Drop 4 with GitHub Desktop; check both CI jobs in the Actions tab.
-2. Drop 5 (`docs/PLAN.md`): the interaction kit everywhere (EntityBus, pins and filter bar, HoverCard,
-   Breadcrumb, drag and brushes, month strip, nav peeks, linked highlighting, global undo UI, keyboard
-   model).
+1. Publish Drop 5 (commit "Drop 5: interaction kit").
+2. Drop 6 (`docs/PLAN.md`): Doodle Studio.
 
 ## Notes
 

@@ -1,11 +1,15 @@
 import { scaleBand, scaleLinear } from 'd3-scale';
-import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Money, usePrivacy } from '../app/Money';
 import type { MonthPoint } from '../domain/aggregates';
 import { BUDGET_STEP, snapToStep } from '../domain/budgets';
 import { monthLabel } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import type { Category } from '../domain/types';
+import { entityKey } from '../kit/entityKeys';
+import { tick } from '../kit/haptics';
+import { useRoving } from '../kit/roving';
+import { createSpring2D } from '../kit/spring';
 import { fillFor, HatchDefs } from './fills';
 import { useSize } from './useSize';
 
@@ -19,6 +23,12 @@ interface Props {
   /** The current month's overall budget, drawn as a draggable line. Null hides it. */
   budgetMinor: number | null;
   onBudgetChange: (minor: number) => Promise<void> | void;
+  /** The month the switcher is on; drawn darker in Total mode. */
+  selectedMonth?: string;
+  /** Hovering or focusing a month previews it elsewhere (the donut). */
+  onHoverMonth?: (month: string | null) => void;
+  /** Clicking a month (or Enter) switches the whole app to it. */
+  onSelectMonth?: (month: string) => void;
 }
 
 const MIN_HEIGHT = 220;
@@ -33,6 +43,9 @@ export function MonthBars({
   mode,
   budgetMinor,
   onBudgetChange,
+  selectedMonth,
+  onHoverMonth,
+  onSelectMonth,
 }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
@@ -40,7 +53,13 @@ export function MonthBars({
   const width = size.width;
   const HEIGHT = Math.max(MIN_HEIGHT, size.height);
   const masked = usePrivacy();
-  const [hover, setHover] = useState<string | null>(null);
+  const [hover, setHoverState] = useState<string | null>(null);
+  const setHover = (m: string | null) => {
+    setHoverState(m);
+    onHoverMonth?.(m);
+  };
+  const roving = useRoving(series.length);
+  const tag = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<number | null>(null);
   // Holds the dropped value until the saved budget arrives, so the line never jumps back.
   const [pending, setPending] = useState<number | null>(null);
@@ -62,7 +81,7 @@ export function MonthBars({
     .range([M.left, Math.max(M.left + 60, width - M.right)])
     .padding(0.35);
   const yMax = y.domain()[1] ?? 0;
-  const current = series[series.length - 1]?.month;
+  const current = selectedMonth ?? series[series.length - 1]?.month;
 
   const valueAt = (clientY: number): number => {
     const top = svg.current?.getBoundingClientRect().top ?? 0;
@@ -78,7 +97,9 @@ export function MonthBars({
   };
   const onPointerMove = (e: PointerEvent<SVGGElement>) => {
     if (draft === null) return;
-    setDraft(valueAt(e.clientY));
+    const v = valueAt(e.clientY);
+    if (v !== draft) tick();
+    setDraft(v);
   };
   const finishDrag = () => {
     if (draft === null) return;
@@ -106,6 +127,19 @@ export function MonthBars({
   };
 
   const hovered = series.find((p) => p.month === hover);
+  const tagTop = budget !== null ? y(budget) - 30 : 0;
+  // The budget label follows the line on a spring while dragging.
+  const spring = useRef<ReturnType<typeof createSpring2D> | null>(null);
+  useEffect(() => {
+    const sp = createSpring2D((_, top) => {
+      if (tag.current) tag.current.style.top = `${top}px`;
+    });
+    spring.current = sp;
+    return () => sp.stop();
+  }, []);
+  useEffect(() => {
+    spring.current?.set(0, tagTop);
+  }, [tagTop, budget]);
   const ordered = [...categories].sort((a, b) => a.order - b.order);
 
   return (
@@ -116,7 +150,8 @@ export function MonthBars({
         height={HEIGHT}
         className={`bars-svg bars-${mode}`}
         role="group"
-        aria-label="Spending in the last six months"
+        aria-label="Spending in the last six months. Use the arrow keys to move between months and Enter to open one."
+        data-roving-group=""
       >
         <HatchDefs categories={categories} />
         {y.ticks(4).map((t) => (
@@ -127,21 +162,42 @@ export function MonthBars({
             </text>
           </g>
         ))}
-        {series.map((p) => {
+        {hovered && (
+          <line
+            className="crosshair"
+            x1={(x(hovered.month) ?? 0) + x.bandwidth() / 2}
+            x2={(x(hovered.month) ?? 0) + x.bandwidth() / 2}
+            y1={M.top}
+            y2={HEIGHT - M.bottom}
+          />
+        )}
+        {series.map((p, i) => {
           const x0 = x(p.month) ?? 0;
           let acc = 0;
+          const rv = roving.props(i);
           return (
             <g
               key={p.month}
               className="bar"
-              tabIndex={0}
-              role="img"
-              aria-label={`${monthLabel(p.month)}, ${fmtMoney(p.totalMinor, { currency })}`}
+              role="button"
+              aria-pressed={p.month === current}
+              aria-label={`${monthLabel(p.month)}, ${fmtMoney(p.totalMinor, { currency })}. Open this month`}
               data-testid={`bar-${p.month}`}
+              {...rv}
               onPointerEnter={() => setHover(p.month)}
               onPointerLeave={() => setHover(null)}
-              onFocus={() => setHover(p.month)}
+              onFocus={() => {
+                rv.onFocus();
+                setHover(p.month);
+              }}
               onBlur={() => setHover(null)}
+              onClick={() => onSelectMonth?.(p.month)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectMonth?.(p.month);
+                } else rv.onKeyDown(e);
+              }}
             >
               <rect
                 className="bar-hit"
@@ -157,10 +213,13 @@ export function MonthBars({
                 const top = y(acc + v);
                 const h = y(acc) - top;
                 acc += v;
+                const key = entityKey('category', c.id);
                 return (
                   <rect
                     key={c.id}
                     className="bar-seg"
+                    data-hl={key}
+                    data-entity={`${key} ${entityKey('month', p.month)}`}
                     x={x0}
                     y={top}
                     width={x.bandwidth()}
@@ -218,7 +277,7 @@ export function MonthBars({
         )}
       </svg>
       {budget !== null && (
-        <div className="budget-tag" style={{ top: y(budget) - 30 }} aria-hidden="true">
+        <div className="budget-tag" ref={tag} aria-hidden="true">
           Budget <Money minor={budget} currency={currency} />
         </div>
       )}

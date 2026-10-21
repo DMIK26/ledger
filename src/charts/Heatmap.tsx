@@ -1,4 +1,7 @@
+import { useRef, useState, type PointerEvent } from 'react';
 import { usePrivacy } from '../app/Money';
+import { entityKey } from '../kit/entityKeys';
+import { useRoving } from '../kit/roving';
 import { diffDays, fmtDate, MONTHS, parseISO, weekdayOf } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import type { DayCell } from '../domain/reports';
@@ -26,9 +29,51 @@ const level = (v: number, cuts: number[]): number =>
  * Daily spending as a calendar: weeks run left to right, Monday at the top. Each day says its date and
  * amount to screen readers; colour only adds a quick read of busy days.
  */
-export function Heatmap({ days, currency }: { days: DayCell[]; currency: string }) {
+export function Heatmap({
+  days,
+  currency,
+  onRange,
+  onPick,
+}: {
+  days: DayCell[];
+  currency: string;
+  /** Brushing across two or more days (drag with a mouse or pen) picks that range. */
+  onRange?: (start: string, end: string) => void;
+  /** Clicking or Enter on one day. */
+  onPick?: (date: string) => void;
+}) {
   usePrivacy(); // labels use fmtMoney
+  const roving = useRoving(days.length, 7);
+  const [brush, setBrush] = useState<{ from: number; to: number } | null>(null);
+  const brushed = useRef(false);
   if (days.length === 0) return null;
+
+  const indexAt = (x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-day-index]');
+    return el ? Number(el.getAttribute('data-day-index')) : null;
+  };
+  const onDown = (i: number) => (e: PointerEvent<SVGRectElement>) => {
+    if (e.pointerType === 'touch' || !onRange) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    brushed.current = false;
+    setBrush({ from: i, to: i });
+  };
+  const onMove = (e: PointerEvent<SVGRectElement>) => {
+    if (!brush) return;
+    const i = indexAt(e.clientX, e.clientY);
+    if (i !== null && i !== brush.to) {
+      brushed.current = true;
+      setBrush({ ...brush, to: i });
+    }
+  };
+  const onUp = () => {
+    if (!brush) return;
+    const [a, b] = [Math.min(brush.from, brush.to), Math.max(brush.from, brush.to)];
+    setBrush(null);
+    if (a !== b) onRange?.(days[a]!.date, days[b]!.date);
+  };
+  const inBrush = (i: number) =>
+    brush !== null && i >= Math.min(brush.from, brush.to) && i <= Math.max(brush.from, brush.to);
   const cuts = bands(days);
   const offset = mondayIndex(days[0]!.date);
   const weeks = Math.ceil((offset + days.length) / 7);
@@ -50,7 +95,13 @@ export function Heatmap({ days, currency }: { days: DayCell[]; currency: string 
 
   return (
     <div className="heatmap">
-      <svg width={width} height={height} role="group" aria-label="Spending by day">
+      <svg
+        width={width}
+        height={height}
+        role="group"
+        aria-label={`Spending by day. Arrow keys move by day and week; Enter pins a day.${onRange ? ' Drag across days with a mouse to pick a range.' : ''}`}
+        data-roving-group=""
+      >
         {DAYS.map((d, i) =>
           i % 2 === 0 ? (
             <text
@@ -69,8 +120,10 @@ export function Heatmap({ days, currency }: { days: DayCell[]; currency: string 
             {t.label}
           </text>
         ))}
-        {days.map((d) => {
+        {days.map((d, index) => {
           const i = diffDays(d.date, days[0]!.date) + offset;
+          const rv = roving.props(index);
+          const key = entityKey('day', d.date);
           const x = left + Math.floor(i / 7) * (cell + gap);
           const y = top + (i % 7) * (cell + gap);
           const label = `${fmtDate(d.date)}, ${d.totalMinor > 0 ? fmtMoney(d.totalMinor, { currency }) : 'nothing spent'}`;
@@ -78,13 +131,35 @@ export function Heatmap({ days, currency }: { days: DayCell[]; currency: string 
             <rect
               key={d.date}
               className={`hm-cell hm-${level(d.totalMinor, cuts)}`}
+              data-brush={inBrush(index) ? '' : undefined}
+              data-day-index={index}
+              data-hl={key}
+              data-entity={key}
               x={x}
               y={y}
               width={cell}
               height={cell}
               rx={3}
-              role="img"
+              role="button"
               aria-label={label}
+              {...rv}
+              onPointerDown={onDown(index)}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerCancel={onUp}
+              onClick={() => {
+                if (brushed.current) {
+                  brushed.current = false;
+                  return;
+                }
+                onPick?.(d.date);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onPick?.(d.date);
+                } else rv.onKeyDown(e);
+              }}
             >
               <title>{label}</title>
             </rect>

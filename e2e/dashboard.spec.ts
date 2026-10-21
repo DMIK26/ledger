@@ -27,12 +27,15 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(TODAY);
 });
 
-test('donut slice opens Transactions with the same category total', async ({ page }) => {
+test('donut slice drills in and opens Transactions with the same category total', async ({
+  page,
+}) => {
   await seed(page);
   await page.goto('./#/');
   const slice = page.getByTestId('slice-transport');
-  await expect(slice).toHaveAttribute('aria-label', 'Transport & Travel, ₹360.00. Show entries');
+  await expect(slice).toHaveAttribute('aria-label', 'Transport & Travel, ₹360.00. Show breakdown');
   await slice.click();
+  await page.getByTestId('breakdown').getByRole('link', { name: 'Open in Transactions' }).click();
   await expect(page).toHaveURL(/#\/transactions\?category=transport/);
   await expect(page.getByTestId('tx-row')).toHaveCount(2);
   await expect(page.getByTestId('tx-footer')).toContainText('₹360.00');

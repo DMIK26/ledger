@@ -28,7 +28,8 @@ src/
   design/   tokens.css (themes), base.css (layout and components)
   app/      shell: router, Layout, pages, Money component, QuickAdd, Toast, icons, files (export),
             settings/ (category manager, CSV import, activity)
-  kit/      EntityBus, Pins, HoverCard, Drag, Breadcrumb, shortcuts   (Drop 5)
+  kit/      entityBus (linked highlight), view (pins, month), HoverCard, Shell (month switcher,
+            pin bar, undo history, nav peeks), roving keys, spring, haptics, marquee, transitions
   charts/   donut, bars, heatmap, sparkline, waterfall, brush        (Drop 3 onward)
   doodle/   art, companion, sketch, anchors, notes                   (Drop 6)
   pwa/      register, install, update

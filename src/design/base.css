@@ -2132,3 +2132,417 @@ dialog::backdrop {
     overflow: visible;
   }
 }
+
+/* Drop 5: interaction kit */
+
+/* EntityBus dims everything that is not the highlighted entity; this makes it a soft fade. */
+[data-entity] {
+  transition: opacity var(--dur-fast) linear;
+}
+
+[data-hl] {
+  cursor: pointer;
+}
+
+.context-bar {
+  position: relative;
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+  padding: 0 max(var(--s4), env(safe-area-inset-right)) 0 max(var(--s4), env(safe-area-inset-left));
+  background: var(--bg);
+}
+
+.context-bar:empty {
+  display: none;
+}
+
+.context-bar > * {
+  margin: var(--s2) 0;
+}
+
+@media (min-width: 900px) {
+  .context-bar {
+    position: sticky;
+    top: 72px;
+    padding-left: var(--s6);
+    padding-right: var(--s6);
+  }
+}
+
+.month-switcher {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.month-button {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: var(--s2);
+  min-width: 240px;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+.month-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.month-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--s2);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.month-item[aria-current] {
+  background: var(--fill);
+  font-weight: 600;
+}
+
+.mini-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--fill);
+}
+
+.mini-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--text);
+}
+
+.mood {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.mood-under {
+  background: var(--green);
+}
+
+.mood-near {
+  background: var(--sand);
+}
+
+.mood-over {
+  background: var(--accent-ink);
+}
+
+.mood-none {
+  background: transparent;
+  outline: 1px solid var(--faint);
+  outline-offset: -1px;
+}
+
+.pin-bar {
+  display: flex;
+  flex: 1 1 320px;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.pin-chip {
+  border: 1px solid var(--text);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.pin-total {
+  font-variant-numeric: tabular-nums;
+}
+
+.undo-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.history-pop {
+  right: 0;
+  left: auto;
+  width: min(360px, calc(100vw - 32px));
+}
+
+.history-chips {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.history-chips .chip {
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  white-space: normal;
+}
+
+@media (max-width: 599px) {
+  .undo-text {
+    display: none;
+  }
+}
+
+/* Navigation badges and peek cards (desktop sidebar) */
+.nav-item {
+  position: relative;
+}
+
+.nav-label {
+  flex: 1;
+}
+
+.nav-badge {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.peek {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  z-index: 40;
+  width: 220px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-4px, -50%);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover .peek {
+    opacity: 1;
+    transform: translate(0, -50%);
+    transition-delay: 300ms;
+  }
+}
+
+.nav-item:focus-within .peek {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.hover-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  max-width: 260px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  font-size: 13px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  pointer-events: none;
+}
+
+.bar {
+  cursor: pointer;
+}
+
+/* KPI cards open a breakdown */
+.kpi-button {
+  display: block;
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kpi-button[data-open] {
+  border-color: var(--text);
+}
+
+.breakdown {
+  display: grid;
+  gap: var(--s3);
+}
+
+.breakdown > * + * {
+  margin-top: 0;
+}
+
+.crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.crumbs li + li::before {
+  content: '›';
+  margin-right: var(--s1);
+  color: var(--muted);
+}
+
+.crumb {
+  min-height: 32px;
+  padding: 0 var(--s1);
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.crumbs [aria-current] {
+  font-weight: 600;
+}
+
+.drill-rows > li > .drill-row {
+  width: 100%;
+  padding: var(--s1) var(--s2);
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .drill-row:hover {
+    background: var(--fill);
+  }
+}
+
+/* Pinnable bits inside a transaction row */
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link-button[aria-pressed='true'],
+.chip-pin[aria-pressed='true'],
+.tag[aria-pressed='true'] {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.chip-pin {
+  border: 0;
+  cursor: pointer;
+}
+
+.tag {
+  background: none;
+  cursor: pointer;
+}
+
+/* Marquee selection */
+.marquee-area {
+  position: relative;
+}
+
+.marquee {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  pointer-events: none;
+}
+
+.hm-cell {
+  cursor: pointer;
+  outline: none;
+}
+
+.hm-cell:focus-visible,
+.hm-cell[data-brush] {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+
+/* Motion setting: Reduced keeps short fades, Off stops everything. */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  transition-duration: var(--dur-fast) !important;
+  animation-duration: var(--dur-fast) !important;
+}
+
+:root[data-motion='off'] *,
+:root[data-motion='off'] *::before,
+:root[data-motion='off'] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+::view-transition-group(*) {
+  animation-duration: var(--dur);
+  animation-timing-function: var(--ease-out);
+}

@@ -6,6 +6,10 @@ import { LockScreen } from './LockScreen';
 import { usePrivacy } from './Money';
 import { href, navigate, parseHash, type RoutePath } from './router';
 import { Toast } from './Toast';
+import { getHighlight } from '../kit/entityBus';
+import { HoverCard } from '../kit/HoverCard';
+import { LiveRegion, MonthSwitcher, PinBar, UndoControls, useNavInfo } from '../kit/Shell';
+import { useView } from '../kit/view';
 
 interface NavItem {
   path: RoutePath;
@@ -90,27 +94,29 @@ function useAutoLock(): void {
   }, [hasLock, lockNow, applyPinResetIfDue]);
 }
 
+/** Escape removes the last pin, unless something else (a dialog, a popover, a field) has it. */
+function usePinEscape(): void {
+  const popPin = useView((s) => s.popPin);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (isTyping(document.activeElement) || document.querySelector('dialog[open]')) return;
+      if (getHighlight()) return;
+      popPin();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [popPin]);
+}
+
 function TopBar({ title }: { title: string }) {
-  const canUndo = useLedger((s) => s.canUndo);
-  const undoLabel = useLedger((s) => s.undoLabel);
-  const undo = useLedger((s) => s.undo);
   const setSetting = useLedger((s) => s.setSetting);
   const privacy = usePrivacy();
 
   return (
     <header className="topbar">
       <h1>{title}</h1>
-      {canUndo && (
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={() => void undo()}
-          title={undoLabel ? `Undo: ${undoLabel}` : 'Undo'}
-        >
-          <Icon name="undo" />
-          <span>Undo</span>
-        </button>
-      )}
+      <UndoControls />
       <button
         type="button"
         className="btn btn-ghost btn-icon"
@@ -230,6 +236,8 @@ export function Layout({
   const locked = useLedger((s) => s.locked);
   const title = titleFor(path);
   useUndoShortcuts();
+  usePinEscape();
+  const nav = useNavInfo();
   useAutoLock();
 
   useEffect(() => {
@@ -280,29 +288,48 @@ export function Layout({
         <p className="wordmark">Ledger</p>
         <nav aria-label="Sections">
           <ul className="nav-list">
-            {NAV.map((n) => (
-              <li key={n.path}>
-                <a
-                  className="nav-link"
-                  href={href(n.path)}
-                  aria-current={path === n.path ? 'page' : undefined}
-                >
-                  <Icon name={n.icon} />
-                  {n.label}
-                </a>
-              </li>
-            ))}
+            {NAV.map((n) => {
+              const badge = nav.badges[n.path];
+              return (
+                <li key={n.path} className="nav-item">
+                  <a
+                    className="nav-link"
+                    href={href(n.path)}
+                    aria-current={path === n.path ? 'page' : undefined}
+                    aria-describedby={`peek-${n.label.toLowerCase()}`}
+                  >
+                    <Icon name={n.icon} />
+                    <span className="nav-label">{n.label}</span>
+                    {badge && (
+                      <span className="nav-badge" data-testid={`badge-${n.label.toLowerCase()}`}>
+                        {badge.count}
+                        <span className="visually-hidden">, {badge.text}</span>
+                      </span>
+                    )}
+                  </a>
+                  <span className="peek" role="tooltip" id={`peek-${n.label.toLowerCase()}`}>
+                    {nav.peeks[n.path]}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </nav>
       </aside>
       <div className="main">
         <TopBar title={title} />
+        <div className="context-bar">
+          {(path === '/' || path === '/budgets') && <MonthSwitcher />}
+          <PinBar />
+        </div>
         <main id="main" tabIndex={-1} className="content">
           {children}
         </main>
       </div>
       <TabBar path={path} />
       <AddSheet open={adding} onClose={() => navigate(path)} />
+      <HoverCard />
+      <LiveRegion />
       <Toast />
     </div>
   );

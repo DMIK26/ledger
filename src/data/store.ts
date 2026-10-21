@@ -89,6 +89,9 @@ export interface LedgerState {
   canUndo: boolean;
   canRedo: boolean;
   undoLabel: string | null;
+  redoLabel: string | null;
+  /** Undoable steps, newest first (up to 20). */
+  history: string[];
   notice: string | null;
   init: () => Promise<void>;
   getDb: () => Db;
@@ -140,17 +143,22 @@ export interface LedgerState {
   /** Merges a Ledger backup: adds entries, categories and rules this device lacks. Undoable. */
   importFromBackup: (file: BackupFile) => Promise<number>;
   undo: () => Promise<void>;
+  /** Undoes the newest `steps` changes in order. */
+  undoMany: (steps: number) => Promise<void>;
   redo: () => Promise<void>;
   setSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => Promise<void>;
   dismissNotice: () => void;
 }
 
 /** Theme and privacy are mirrored to localStorage so the page can paint correctly before React loads. */
-export function applyBoot(settings: Pick<Settings, 'theme' | 'privacy'>): void {
+export function applyBoot(
+  settings: Pick<Settings, 'theme' | 'privacy'> & Partial<Pick<Settings, 'motion'>>,
+): void {
   setPrivacy(settings.privacy);
   if (typeof document !== 'undefined') {
     if (settings.theme === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = settings.theme;
+    document.documentElement.dataset.motion = settings.motion ?? 'full';
   }
   try {
     localStorage.setItem('ledger.boot', JSON.stringify(settings));
@@ -204,6 +212,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
+        redoLabel: bus?.redoLabel ?? null,
+        history: bus?.undoLabels ?? [],
       });
     };
 
@@ -225,6 +235,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       canUndo: false,
       canRedo: false,
       undoLabel: null,
+      redoLabel: null,
+      history: [],
       notice: null,
 
       init: () => {
@@ -698,6 +710,20 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;
+      },
+
+      undoMany: async (steps) => {
+        let last: string | null = null;
+        for (let i = 0; i < steps; i += 1) {
+          const label = await bus?.undo();
+          if (!label) break;
+          last = label;
+        }
+        if (last)
+          set({
+            notice:
+              steps === 1 ? `Undid: ${last}` : `Undid ${steps} changes, back to before ${last}`,
+          });
       },
 
       undo: async () => {

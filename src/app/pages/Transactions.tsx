@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
 import { fmtDate, parseISO, todayISO } from '../../domain/dates';
@@ -23,6 +23,8 @@ import { CURRENCIES, parseAmountToMinor } from '../../domain/money';
 import { normalizeTag } from '../../domain/tags';
 import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { csvFile, ExportButton } from '../files';
+import { useMarquee } from '../../kit/useMarquee';
+import { useScopedTransactions } from '../../kit/view';
 import { Icon } from '../icons';
 import { Money } from '../Money';
 import { QuickAdd } from '../QuickAdd';
@@ -50,7 +52,7 @@ const toggle = <T,>(list: readonly T[], item: T): T[] =>
   list.includes(item) ? list.filter((x) => x !== item) : [...list, item];
 
 function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Filters) => void }) {
-  const transactions = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
   const categories = useLedger((s) => s.categories);
   const counts = useMemo(() => facetCounts(transactions, filters), [transactions, filters]);
   const tags = useMemo(() => allTags(transactions), [transactions]);
@@ -187,8 +189,17 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
   );
 }
 
-function BulkBar({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+function BulkBar({
+  ids,
+  totalMinor,
+  onDone,
+}: {
+  ids: string[];
+  totalMinor: number;
+  onDone: () => void;
+}) {
   const categories = useLedger((s) => s.categories);
+  const currency = useLedger((s) => s.settings.currency);
   const bulkDelete = useLedger((s) => s.bulkDelete);
   const bulkSetCategory = useLedger((s) => s.bulkSetCategory);
   const bulkAddTag = useLedger((s) => s.bulkAddTag);
@@ -196,7 +207,10 @@ function BulkBar({ ids, onDone }: { ids: string[]; onDone: () => void }) {
 
   return (
     <section className="bulk-bar" aria-label="Bulk actions">
-      <p>{ids.length === 1 ? '1 selected' : `${ids.length} selected`}</p>
+      <p aria-live="polite" data-testid="bulk-total">
+        {ids.length === 1 ? '1 selected' : `${ids.length} selected`},{' '}
+        <Money minor={totalMinor} currency={currency} />
+      </p>
       <label className="visually-hidden" htmlFor="bulk-category">
         Move selected to
       </label>
@@ -400,7 +414,9 @@ function TrashView() {
 }
 
 function Ledger({ initialFilters }: { initialFilters: Filters }) {
-  const transactions = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
+  const allCount = useLedger((s) => s.transactions.length);
+  const listRef = useRef<HTMLElement>(null);
   const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
   const trashCount = useLedger((s) => s.trash.length);
@@ -449,7 +465,13 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
       return next;
     });
 
-  if (transactions.length === 0) {
+  const marquee = useMarquee(listRef, (ids, additive) =>
+    setSelected((cur) => (additive ? new Set([...cur, ...ids]) : new Set(ids))),
+  );
+  const shownSelected =
+    marquee.preview.size > 0 ? new Set([...selected, ...marquee.preview]) : selected;
+
+  if (allCount === 0) {
     return (
       <>
         <QuickAdd />
@@ -549,7 +571,13 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
         </div>
       )}
       {selectedIds.length > 0 && (
-        <BulkBar ids={selectedIds} onDone={() => setSelected(new Set())} />
+        <BulkBar
+          ids={selectedIds}
+          totalMinor={filtered
+            .filter((t) => selected.has(t.id))
+            .reduce((sum, t) => sum + t.amountMinor, 0)}
+          onDone={() => setSelected(new Set())}
+        />
       )}
       {filtered.length === 0 ? (
         <section className="card empty">
@@ -569,7 +597,24 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
           </p>
         </section>
       ) : (
-        <section className="card" aria-label="All transactions">
+        <section
+          className="card marquee-area"
+          aria-label="All transactions"
+          ref={listRef}
+          {...marquee.handlers}
+        >
+          {marquee.rect && (
+            <span
+              className="marquee"
+              aria-hidden="true"
+              style={{
+                left: marquee.rect.left,
+                top: marquee.rect.top,
+                width: marquee.rect.width,
+                height: marquee.rect.height,
+              }}
+            />
+          )}
           <label className="select-all">
             <input
               type="checkbox"
@@ -602,7 +647,7 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
                 onDelete={(id) => void removeTransaction(id)}
                 onEdit={setEditingId}
                 onReceipt={setReceiptId}
-                selected={selected}
+                selected={shownSelected}
                 onToggle={toggleOne}
                 editingId={editingId}
               />

@@ -5,6 +5,10 @@ import type { Transaction } from '../domain/types';
 import { EntryForm } from './EntryForm';
 import { Icon } from './icons';
 import { Money, usePrivacy } from './Money';
+import { normalizeMerchantKey } from '../domain/categoriser';
+import type { Pin } from '../domain/pins';
+import { entityKey, merchantKey, txEntities } from '../kit/entityKeys';
+import { usePins, useView } from '../kit/view';
 
 export interface RowActions {
   onDelete?: (id: string) => void;
@@ -23,6 +27,12 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   // The typed text holds the amount, so privacy mode hides it along with every other figure.
   const showRaw = !masked && tx.raw && tx.raw.trim().toLowerCase() !== tx.merchant.toLowerCase();
   const name = tx.merchant || 'entry';
+  const pins = usePins();
+  const toggle = useView((s) => s.togglePin);
+  const isPinned = (kind: Pin['kind'], id: string) =>
+    pins.some((p) => p.kind === kind && p.id === id);
+  const catKey = entityKey('category', tx.categoryId);
+  const mKey = normalizeMerchantKey(tx.merchant) || 'untitled';
   const when = fmtDate(tx.date);
 
   if (actions.editingId === tx.id && actions.onEdit) {
@@ -54,7 +64,13 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   const selectable = actions.selected !== undefined && actions.onToggle !== undefined;
 
   return (
-    <li className={selectable ? 'tx-row tx-selectable' : 'tx-row'} data-testid="tx-row">
+    <li
+      className={selectable ? 'tx-row tx-selectable' : 'tx-row'}
+      data-testid="tx-row"
+      data-id={tx.id}
+      data-entity={txEntities(tx)}
+      data-hl={catKey}
+    >
       {selectable && (
         <span className="tx-select">
           <input
@@ -68,29 +84,67 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
       )}
       <span className="tx-date">{when}</span>
       <span className="tx-merchant">
-        <span>{tx.merchant || 'Untitled'}</span>
+        <span>
+          <button
+            type="button"
+            className="link-button"
+            data-hl={merchantKey(tx.merchant)}
+            aria-pressed={isPinned('merchant', mKey)}
+            title={`Pin ${tx.merchant || 'Untitled'} to every page`}
+            onClick={() => toggle({ kind: 'merchant', id: mKey, label: tx.merchant || 'Untitled' })}
+          >
+            {tx.merchant || 'Untitled'}
+          </button>
+        </span>
         {showRaw && <span className="tx-raw">{tx.raw}</span>}
         {tx.tags.length > 0 && (
           <span className="tx-tags">
             {tx.tags.map((t) => (
-              <span key={t} className="tag">
+              <button
+                key={t}
+                type="button"
+                className="tag"
+                data-hl={entityKey('tag', t)}
+                aria-pressed={isPinned('tag', t)}
+                title={`Pin tag ${t} to every page`}
+                onClick={() => toggle({ kind: 'tag', id: t, label: `#${t}` })}
+              >
                 {t}
-              </span>
+              </button>
             ))}
           </span>
         )}
       </span>
       <span className="tx-cat">
-        <span className="chip">
+        <button
+          type="button"
+          className="chip chip-pin"
+          aria-pressed={isPinned('category', tx.categoryId)}
+          title={`Pin ${category?.name ?? 'Other'} to every page`}
+          onClick={() =>
+            toggle({ kind: 'category', id: tx.categoryId, label: category?.name ?? 'Other' })
+          }
+        >
           <span className="dot" style={{ background: category?.color ?? 'var(--faint)' }} />
           {category?.name ?? 'Other'}
           {tx.unsure && <span className="chip-note">unsure</span>}
-        </span>
+        </button>
         <span className="tx-mobile-meta">
           {when} · {tx.method}
         </span>
       </span>
-      <span className="tx-method">{tx.method}</span>
+      <span className="tx-method">
+        <button
+          type="button"
+          className="link-button"
+          data-hl={entityKey('method', tx.method)}
+          aria-pressed={isPinned('method', tx.method)}
+          title={`Pin ${tx.method} to every page`}
+          onClick={() => toggle({ kind: 'method', id: tx.method, label: tx.method })}
+        >
+          {tx.method}
+        </button>
+      </span>
       <Money className="tx-amount" minor={tx.amountMinor} currency={tx.currency} />
       <span className="tx-actions">
         {tx.hasReceipt && actions.onReceipt && (

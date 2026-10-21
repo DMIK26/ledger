@@ -21,6 +21,13 @@ export class CommandBus {
   get canRedo(): boolean {
     return this.redoStack.length > 0;
   }
+  /** Labels of the steps that can be undone, newest first. */
+  get undoLabels(): string[] {
+    return this.undoStack.map((c) => c.label).reverse();
+  }
+  get redoLabel(): string | null {
+    return this.redoStack[this.redoStack.length - 1]?.label ?? null;
+  }
   get undoLabel(): string | null {
     return this.undoStack[this.undoStack.length - 1]?.label ?? null;
   }

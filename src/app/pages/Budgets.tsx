@@ -12,7 +12,9 @@ import {
   type MonthBudgets,
   type Segment,
 } from '../../domain/budgets';
-import { monthLabel, todayISO } from '../../domain/dates';
+import { daysInMonth, isoFromYMD, monthLabel, todayISO } from '../../domain/dates';
+import { pinnedCategories } from '../../domain/pins';
+import { usePins, useScopedTransactions, useViewMonth } from '../../kit/view';
 import type { Category } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { Money } from '../Money';
@@ -119,8 +121,13 @@ function GhostBar({
 }
 
 export function Budgets() {
-  const transactions = useLedger((s) => s.transactions);
-  const categories = useLedger((s) => s.categories);
+  const transactions = useScopedTransactions();
+  const allCategories = useLedger((s) => s.categories);
+  const pinnedCats = pinnedCategories(usePins());
+  // With categories pinned, only those rows show; the monthly budget and split stay whole.
+  const categories = pinnedCats
+    ? allCategories.filter((c) => pinnedCats.includes(c.id))
+    : allCategories;
   const budgets = useLedger((s) => s.budgets);
   const currency = useLedger((s) => s.settings.currency);
   const setMonthBudgets = useLedger((s) => s.setMonthBudgets);
@@ -129,8 +136,12 @@ export function Budgets() {
     budgets: MonthBudgets;
   } | null>(null);
 
-  const today = todayISO();
-  const month = today.slice(0, 7);
+  const now = todayISO();
+  const month = useViewMonth();
+  const [vy, vm] = month.split('-').map(Number);
+  const monthEnd = isoFromYMD(vy!, vm!, daysInMonth(vy!, vm!));
+  // Spent so far for the current month; the whole month for a past one.
+  const today = monthEnd < now ? monthEnd : now;
   const mine = budgetsForMonth(budgets, month);
   const last = budgetsForMonth(budgets, previousMonth(month));
   const spentBy: Record<string, number> = Object.fromEntries(

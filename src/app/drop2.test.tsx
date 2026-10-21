@@ -139,7 +139,8 @@ describe('transactions page', () => {
     const user = userEvent.setup();
     render(<Transactions />);
     await user.click(screen.getByRole('button', { name: 'Filters' }));
-    const transport = screen.getByRole('button', { name: /Transport & Travel/ });
+    const panel = screen.getByRole('region', { name: 'Filters' });
+    const transport = within(panel).getByRole('button', { name: /Transport & Travel/ });
     expect(transport).toHaveTextContent('1');
     await user.click(transport);
     expect(screen.getAllByTestId('tx-row')).toHaveLength(1);
@@ -170,7 +171,7 @@ describe('transactions page', () => {
     render(<Transactions />);
     await user.click(screen.getByLabelText('Select A on 18 Oct 2026'));
     await user.click(screen.getByLabelText('Select B on 18 Oct 2026'));
-    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expect(screen.getByTestId('bulk-total')).toHaveTextContent('2 selected');
     await user.selectOptions(screen.getByLabelText('Move selected to'), 'business');
     await waitFor(() =>
       expect(

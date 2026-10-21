@@ -4,6 +4,7 @@ import { Donut } from '../../charts/Donut';
 import { useLedger } from '../../data/store';
 import {
   categoryTotals,
+  inMonth,
   kpis,
   lastMonths,
   monthSeries,
@@ -22,7 +23,12 @@ import { daysInMonth, isoFromYMD, monthLabel, parseISO, todayISO } from '../../d
 import { fmtMoney } from '../../domain/money';
 import { Money, usePrivacy } from '../Money';
 import { QuickAdd } from '../QuickAdd';
-import { href, navigate } from '../router';
+import { href } from '../router';
+import { Breakdown, type BreakdownPath } from '../Breakdown';
+import { pinnedCategories } from '../../domain/pins';
+import { entityKey } from '../../kit/entityKeys';
+import { withTransition } from '../../kit/transition';
+import { usePins, useScopedTransactions, useView, useViewMonth } from '../../kit/view';
 import { TxList } from '../TxList';
 import { Insights } from '../Insights';
 import { BackupReminder } from '../BackupReminder';
@@ -56,10 +62,13 @@ function BudgetCard({
   spent,
   dailyAvg,
   today,
+  pinned,
 }: {
   spent: number;
   dailyAvg: number;
   today: string;
+  /** With pins: the budget for what is pinned (sum of pinned categories), or a reason there is none. */
+  pinned?: { budget: number | null; note: string } | null;
 }) {
   const budgets = useLedger((s) => s.budgets);
   const currency = useLedger((s) => s.settings.currency);
@@ -72,7 +81,7 @@ function BudgetCard({
   const p = parseISO(today)!;
   const dim = daysInMonth(p.y, p.m);
   const left = daysLeft(today);
-  const budget = mine.overall;
+  const budget = pinned ? pinned.budget : mine.overall;
   const maxPerDay = Math.max(
     dailyAvg * 2,
     budget !== null ? Math.round((budget / dim) * 2) : 0,
@@ -84,6 +93,15 @@ function BudgetCard({
   const projected = projectMonthEnd(spent, today);
   const whatIf = whatIfMonthEnd(spent, today, perDay);
   const endLabel = `${p.d === dim ? 'today' : `by ${dim} ${monthLabel(month).slice(0, 3)}`}`;
+
+  if (budget === null && pinned) {
+    return (
+      <section className="card" aria-labelledby="budget-title">
+        <h2 id="budget-title">Budget</h2>
+        <p className="muted">{pinned.note}</p>
+      </section>
+    );
+  }
 
   if (budget === null) {
     const ghost = !dismissed && !hasBudgets(mine) && last.overall !== null ? last.overall : null;
@@ -189,39 +207,121 @@ function BudgetCard({
   );
 }
 
+type KpiView = 'spent' | 'change' | 'daily' | 'top' | null;
+
+function KpiButton({
+  id,
+  open,
+  onToggle,
+  children,
+}: {
+  id: Exclude<KpiView, null>;
+  open: boolean;
+  onToggle: (id: Exclude<KpiView, null>) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className="card kpi kpi-button"
+      aria-expanded={open}
+      aria-controls="kpi-breakdown"
+      data-open={open ? '' : undefined}
+      style={open ? { viewTransitionName: 'kpi-open' } : undefined}
+      onClick={() => onToggle(id)}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function Dashboard() {
-  const transactions = useLedger((s) => s.transactions);
+  const all = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
   const categories = useLedger((s) => s.categories);
   const budgets = useLedger((s) => s.budgets);
   const currency = useLedger((s) => s.settings.currency);
   const removeTransaction = useLedger((s) => s.removeTransaction);
   const setMonthBudgets = useLedger((s) => s.setMonthBudgets);
+  const pins = usePins();
+  const setMonth = useView((s) => s.setMonth);
   const [mode, setMode] = useState<BarMode>('total');
+  const [preview, setPreview] = useState<string | null>(null);
+  const [kpiView, setKpiView] = useState<KpiView>(null);
+  const [kpiPath, setKpiPath] = useState<BreakdownPath>([]);
+  const [donutPath, setDonutPath] = useState<BreakdownPath>([]);
 
   const today = todayISO();
-  const month = today.slice(0, 7);
-  const k = useMemo(() => kpis(transactions, today), [transactions, today]);
-  const toDate = useMemo(() => transactions.filter((t) => t.date <= today), [transactions, today]);
-  const totals = useMemo(() => categoryTotals(toDate, month), [toDate, month]);
-  const series = useMemo(() => monthSeries(toDate, lastMonths(today, 6)), [toDate, today]);
+  const month = useViewMonth();
+  const current = month === today.slice(0, 7);
+  const [y, m] = month.split('-').map(Number);
+  const first = isoFromYMD(y!, m!, 1);
+  const monthEnd = isoFromYMD(y!, m!, daysInMonth(y!, m!));
+  // A past month is shown as it ended; the current one up to today.
+  const asOf = current ? today : monthEnd < today ? monthEnd : today;
+  const k = useMemo(() => kpis(transactions, asOf), [transactions, asOf]);
+  const toDate = useMemo(() => transactions.filter((t) => t.date <= asOf), [transactions, asOf]);
+  const monthEntries = useMemo(() => inMonth(toDate, month), [toDate, month]);
+  const lastMonthEntries = useMemo(() => {
+    const prev = previousMonth(month);
+    const [py, pm] = prev.split('-').map(Number);
+    const cutoff = isoFromYMD(py!, pm!, Math.min(parseISO(asOf)!.d, daysInMonth(py!, pm!)));
+    return inMonth(transactions, prev).filter((t) => t.date <= cutoff);
+  }, [transactions, month, asOf]);
+  const donutMonth = preview ?? month;
+  const totals = useMemo(() => categoryTotals(toDate, donutMonth), [toDate, donutMonth]);
+  const series = useMemo(() => monthSeries(toDate, lastMonths(asOf, 6)), [toDate, asOf]);
   const mine = budgetsForMonth(budgets, month);
   const recent = transactions.slice(0, 6);
   const top = k.topCategory ? categoryById(categories, k.topCategory.categoryId) : undefined;
-  const first = isoFromYMD(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1);
 
+  // Budgets belong to whole categories, so with pins the budget card follows the pinned categories.
+  const pinnedCats = pinnedCategories(pins);
+  const otherPins = pins.some((p) => p.kind !== 'category');
+  const pinnedBudget =
+    pins.length === 0
+      ? null
+      : otherPins
+        ? {
+            budget: null,
+            note: 'Budgets cover whole categories. Unpin merchants, days, methods and tags to see one.',
+          }
+        : pinnedCats!.every((id) => mine.categories[id] !== undefined)
+          ? { budget: pinnedCats!.reduce((s, id) => s + mine.categories[id]!, 0), note: '' }
+          : { budget: null, note: 'No budget set for the pinned categories this month.' };
+
+  const toggleKpi = (id: Exclude<KpiView, null>) =>
+    withTransition(() => {
+      setKpiView((v) => (v === id ? null : id));
+      setKpiPath(id === 'top' && k.topCategory ? [`c:${k.topCategory.categoryId}`] : []);
+    });
+
+  if (all.length === 0) {
+    return (
+      <>
+        <QuickAdd followMonth />
+        <section className="card empty">
+          <h2>Nothing logged yet</h2>
+          <p className="muted">Type your first expense above, something like “chai 20 cash”.</p>
+        </section>
+      </>
+    );
+  }
+
+  const label = monthLabel(month);
   return (
     <>
       <BackupReminder />
-      <QuickAdd />
-      <section className="kpis" aria-label={`${monthLabel(month)} so far`}>
-        <div className="card kpi">
-          <h2>Spent this month</h2>
+      <QuickAdd followMonth />
+      <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
+        <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
+          <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>
           <p className="kpi-value" data-testid="month-total">
             <Money minor={k.spentMinor} currency={currency} />
           </p>
           <p className="muted small">{k.entries === 1 ? '1 entry' : `${k.entries} entries`}</p>
-        </div>
-        <div className="card kpi">
+        </KpiButton>
+        <KpiButton id="change" open={kpiView === 'change'} onToggle={toggleKpi}>
           <h2>Against last month</h2>
           <p className="kpi-value" data-testid="kpi-change">
             {k.changePct === null
@@ -234,8 +334,8 @@ export function Dashboard() {
             Than by day {k.daysElapsed} of last month,{' '}
             <Money minor={k.lastMonthToDateMinor} currency={currency} />
           </p>
-        </div>
-        <div className="card kpi">
+        </KpiButton>
+        <KpiButton id="daily" open={kpiView === 'daily'} onToggle={toggleKpi}>
           <h2>Daily average</h2>
           <p className="kpi-value">
             <Money minor={k.dailyAvgMinor} currency={currency} />
@@ -243,10 +343,15 @@ export function Dashboard() {
           <p className="muted small">
             Over {k.daysElapsed === 1 ? '1 day' : `${k.daysElapsed} days`}
           </p>
-        </div>
-        <div className="card kpi">
+        </KpiButton>
+        <KpiButton id="top" open={kpiView === 'top'} onToggle={toggleKpi}>
           <h2>Top category</h2>
-          <p className="kpi-value kpi-name">{top ? top.name : 'None yet'}</p>
+          <p
+            className="kpi-value kpi-name"
+            data-hl={k.topCategory ? entityKey('category', k.topCategory.categoryId) : undefined}
+          >
+            {top ? top.name : 'None yet'}
+          </p>
           <p className="muted small">
             {k.topCategory ? (
               <Money minor={k.topCategory.totalMinor} currency={currency} />
@@ -254,23 +359,78 @@ export function Dashboard() {
               'Add an entry to see it'
             )}
           </p>
-        </div>
+        </KpiButton>
       </section>
-      <BudgetCard key={month} spent={k.spentMinor} dailyAvg={k.dailyAvgMinor} today={today} />
-      <Insights overallBudgetMinor={mine.overall} />
+      {kpiView && (
+        <section
+          className="card"
+          id="kpi-breakdown"
+          aria-label="Breakdown"
+          style={{ viewTransitionName: 'kpi-open' }}
+        >
+          <div className="card-head">
+            <h2>
+              {
+                {
+                  spent: 'Where it went',
+                  change: 'Against last month',
+                  daily: 'Day by day',
+                  top: 'Top category',
+                }[kpiView]
+              }
+            </h2>
+            <button type="button" className="btn btn-ghost" onClick={() => toggleKpi(kpiView)}>
+              Close
+            </button>
+          </div>
+          <Breakdown
+            root={kpiView === 'daily' ? 'days' : kpiView === 'change' ? 'compare' : 'categories'}
+            rootLabel={kpiView === 'daily' ? 'All days' : 'All categories'}
+            entries={monthEntries}
+            compareEntries={lastMonthEntries}
+            path={kpiPath}
+            onPath={setKpiPath}
+            range={{ from: first, to: asOf }}
+          />
+        </section>
+      )}
+      <BudgetCard
+        key={month}
+        spent={k.spentMinor}
+        dailyAvg={k.dailyAvgMinor}
+        today={asOf}
+        pinned={pinnedBudget}
+      />
+      {current && <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />}
       <div className="chart-row">
         <section className="card chart-card" aria-labelledby="donut-title">
           <div className="card-head">
             <h2 id="donut-title">Where it went</h2>
-            <span className="muted small">{monthLabel(month)}</span>
+            <span className="muted small" aria-live="polite">
+              {preview && preview !== month ? `Preview: ${monthLabel(preview)}` : label}
+            </span>
           </div>
           <Donut
             totals={totals}
             categories={categories}
             currency={currency}
-            caption="This month"
-            onSelect={(id) => navigate(`/transactions?category=${id}&from=${first}&to=${today}`)}
+            caption={
+              preview && preview !== month ? monthLabel(preview) : current ? 'This month' : label
+            }
+            selected={donutPath[0]?.slice(2) ?? null}
+            legend={donutPath.length === 0}
+            onSelect={(id) => withTransition(() => setDonutPath([`c:${id}`]))}
           />
+          {donutPath.length > 0 && (
+            <Breakdown
+              root="categories"
+              rootLabel="All categories"
+              entries={monthEntries}
+              path={donutPath}
+              onPath={setDonutPath}
+              range={{ from: first, to: asOf }}
+            />
+          )}
         </section>
         <section className="card chart-card" aria-labelledby="bars-title">
           <div className="card-head">
@@ -297,12 +457,19 @@ export function Dashboard() {
             categories={categories}
             currency={currency}
             mode={mode}
-            budgetMinor={mine.overall}
+            budgetMinor={pins.length === 0 ? mine.overall : null}
+            selectedMonth={month}
+            onHoverMonth={setPreview}
+            onSelectMonth={(mm) => {
+              setPreview(null);
+              setDonutPath([]);
+              setMonth(mm);
+            }}
             onBudgetChange={(v) =>
               setMonthBudgets(month, { ...mine, overall: v }, 'Changed the monthly budget')
             }
           />
-          {mine.overall === null && (
+          {pins.length === 0 && mine.overall === null && (
             <p className="muted small">
               <a href={href('/budgets')}>Set a monthly budget</a> to draw it here and drag it.
             </p>
@@ -311,8 +478,8 @@ export function Dashboard() {
       </div>
       {transactions.length === 0 ? (
         <section className="card empty">
-          <h2>Nothing logged yet</h2>
-          <p className="muted">Type your first expense above, something like “chai 20 cash”.</p>
+          <h2>No entries match the pins</h2>
+          <p className="muted">Remove a pin from the bar at the top to see more.</p>
         </section>
       ) : (
         <section className="card" aria-labelledby="recent-title">

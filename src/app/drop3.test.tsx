@@ -78,9 +78,13 @@ describe('dashboard', () => {
     const slice = await screen.findByTestId('slice-transport');
     expect(slice).toHaveAttribute(
       'aria-label',
-      `Transport & Travel, ${fmtMoney(36000)}. Show entries`,
+      `Transport & Travel, ${fmtMoney(36000)}. Show breakdown`,
     );
     fireEvent.click(slice);
+    // The slice drills into the category; from there it opens in Transactions.
+    const breakdown = await screen.findByTestId('breakdown');
+    expect(breakdown).toHaveTextContent(`${fmtMoney(36000)} in 2 entries`);
+    fireEvent.click(within(breakdown).getByRole('link', { name: 'Open in Transactions' }));
     await waitFor(() =>
       expect(window.location.hash).toContain('#/transactions?category=transport'),
     );

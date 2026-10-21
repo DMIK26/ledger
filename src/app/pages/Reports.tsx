@@ -17,6 +17,7 @@ import {
 } from '../../domain/periods';
 import { buildReport, inRange } from '../../domain/reports';
 import { csvFile, ExportButton } from '../files';
+import { useScopedTransactions, useView } from '../../kit/view';
 import { Money } from '../Money';
 import { href } from '../router';
 
@@ -67,7 +68,8 @@ function Bars({
 }
 
 export function Reports() {
-  const transactions = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
+  const togglePin = useView((s) => s.togglePin);
   const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
   const fyStart = useLedger((s) => s.settings.fyStartMonth);
@@ -337,7 +339,19 @@ export function Reports() {
 
           <section className="card" aria-labelledby="heat-title">
             <h2 id="heat-title">Day by day</h2>
-            <Heatmap days={report.days} currency={currency} />
+            <Heatmap
+              days={report.days}
+              currency={currency}
+              onRange={(a, b) => {
+                setFrom(a);
+                setTo(b);
+                setKind('custom');
+              }}
+              onPick={(date) => togglePin({ kind: 'day', id: date, label: fmtDate(date) })}
+            />
+            <p className="muted small no-print">
+              Drag across days to report on just those; click a day to pin it to every page.
+            </p>
           </section>
         </>
       )}

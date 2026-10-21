@@ -55,6 +55,10 @@ export interface Settings {
   lastMethod: PaymentMethod;
   /** When a backup was last exported (epoch ms, 0 = never). Drives the weekly reminder on phones. */
   lastBackupAt: number;
+  /** Full motion, short fades only, or none. The system's reduce-motion setting also counts. */
+  motion: 'full' | 'reduced' | 'off';
+  /** A tiny vibration when drags snap, where the phone supports it. */
+  haptics: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -64,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   fyStartMonth: 4,
   lastMethod: 'UPI',
   lastBackupAt: 0,
+  motion: 'full',
+  haptics: true,
 };
 
 export interface AuditEvent {

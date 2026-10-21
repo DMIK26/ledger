@@ -5,6 +5,7 @@ import { categoryById } from '../domain/categories';
 import { fmtMoney } from '../domain/money';
 import type { Category } from '../domain/types';
 import { fillFor } from './fills';
+import { tick } from '../kit/haptics';
 
 interface Props {
   segments: Segment[];
@@ -47,7 +48,9 @@ export function AllocationBar({
     if (!drag || !bar.current) return;
     const w = bar.current.getBoundingClientRect().width || 1;
     const delta = ((e.clientX - drag.startX) / w) * total;
-    setDraft(moveAllocation(drag.start, drag.index, delta));
+    const next = moveAllocation(drag.start, drag.index, delta);
+    if (next[drag.index]?.amountMinor !== draft?.[drag.index]?.amountMinor) tick();
+    setDraft(next);
   };
   const finish = () => {
     if (!drag) return;

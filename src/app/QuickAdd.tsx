@@ -7,6 +7,7 @@ import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
+import { useView, useViewMonth } from '../kit/view';
 
 function dateLabel(date: string, today: string): string {
   if (date === today) return 'Today';
@@ -14,13 +15,26 @@ function dateLabel(date: string, today: string): string {
   return fmtDate(date);
 }
 
-export function QuickAdd({ autoFocus = false }: { autoFocus?: boolean }) {
+/**
+ * `followMonth`: on pages that show one month (the Dashboard), saving into another month switches the
+ * page to it, so the new entry is on screen.
+ */
+export function QuickAdd({
+  autoFocus = false,
+  followMonth = false,
+}: {
+  autoFocus?: boolean;
+  followMonth?: boolean;
+}) {
   const categories = useLedger((s) => s.categories);
   const rules = useLedger((s) => s.rules);
   const transactions = useLedger((s) => s.transactions);
   const lastMethod = useLedger((s) => s.settings.lastMethod);
   const currency = useLedger((s) => s.settings.currency);
   const addFromParsed = useLedger((s) => s.addFromParsed);
+  const viewMonth = useViewMonth();
+  const setMonth = useView((s) => s.setMonth);
+  const announce = useView((s) => s.announce);
   usePrivacy(); // re-render the amount chip when privacy changes
 
   const [text, setText] = useState('');
@@ -84,6 +98,12 @@ export function QuickAdd({ autoFocus = false }: { autoFocus?: boolean }) {
         date: dateOverride,
         method: methodOverride,
       });
+      // Saved into another month: follow it there, so the new entry is on screen.
+      const savedMonth = monthKey(dateOverride ?? parsed.date);
+      if (followMonth && savedMonth !== viewMonth) {
+        setMonth(savedMonth);
+        announce(`Saved to ${monthLabel(savedMonth)}. Showing that month.`);
+      }
       clear();
     } finally {
       setSaving(false);

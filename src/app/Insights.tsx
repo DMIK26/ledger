@@ -5,6 +5,7 @@ import { fmtDate, todayISO } from '../domain/dates';
 import { buildInsights, type Insight } from '../domain/insights';
 import { Money } from './Money';
 import { href } from './router';
+import { useScopedTransactions } from '../kit/view';
 
 function Text({ insight, currency }: { insight: Insight; currency: string }) {
   const categories = useLedger((s) => s.categories);
@@ -65,7 +66,7 @@ function Text({ insight, currency }: { insight: Insight; currency: string }) {
 
 /** Up to four plain observations about the month, from data on this device only. */
 export function Insights({ overallBudgetMinor }: { overallBudgetMinor: number | null }) {
-  const transactions = useLedger((s) => s.transactions);
+  const transactions = useScopedTransactions();
   const recurring = useLedger((s) => s.recurring);
   const currency = useLedger((s) => s.settings.currency);
   const [today] = useState(todayISO);

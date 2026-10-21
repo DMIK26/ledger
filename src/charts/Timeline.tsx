@@ -5,6 +5,7 @@ import { fmtMoney } from '../domain/money';
 import { occurrencesBetween, type RecurringItem } from '../domain/recurring';
 import type { Category } from '../domain/types';
 import { fillFor } from './fills';
+import { tick } from '../kit/haptics';
 
 export const TIMELINE_DAYS = 30;
 
@@ -44,7 +45,10 @@ export function Timeline({ items, categories, currency, today, off, onShift }: P
   const onPointerMove = (e: PointerEvent<HTMLButtonElement>) => {
     if (!drag) return;
     const days = Math.round((e.clientX - drag.startX) / dayWidth());
-    if (days !== drag.days) setDrag({ ...drag, days });
+    if (days !== drag.days) {
+      tick();
+      setDrag({ ...drag, days });
+    }
   };
   const onPointerUp = () => {
     if (!drag) return;

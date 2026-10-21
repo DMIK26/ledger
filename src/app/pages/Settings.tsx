@@ -42,6 +42,52 @@ function Appearance() {
   );
 }
 
+function Experience() {
+  const motion = useLedger((s) => s.settings.motion);
+  const haptics = useLedger((s) => s.settings.haptics);
+  const setSetting = useLedger((s) => s.setSetting);
+  return (
+    <section className="card" aria-labelledby="experience-title">
+      <h2 id="experience-title">Experience</h2>
+      <div className="field-row">
+        <span id="motion-label">Motion</span>
+        <div className="segmented" role="group" aria-labelledby="motion-label">
+          {(
+            [
+              ['full', 'Full'],
+              ['reduced', 'Reduced'],
+              ['off', 'Off'],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={motion === value}
+              onClick={() => void setSetting('motion', value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="muted small">
+        Reduced keeps short fades only. Your device&rsquo;s reduce-motion setting always wins.
+      </p>
+      <div className="field-row">
+        <span id="haptics-label">Vibrate when a drag snaps</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={haptics}
+          aria-labelledby="haptics-label"
+          onClick={() => void setSetting('haptics', !haptics)}
+        />
+      </div>
+    </section>
+  );
+}
+
 function Privacy() {
   const privacy = usePrivacy();
   const setSetting = useLedger((s) => s.setSetting);
@@ -508,6 +554,7 @@ export function Settings({ view }: { view?: string | null }) {
     <>
       <Appearance />
       <Privacy />
+      <Experience />
       <MoneySettings />
       <CategoryManager />
       <LearnedRules />

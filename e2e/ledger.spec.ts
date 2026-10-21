@@ -86,7 +86,10 @@ test('filters, faceted counts, no matches and clear', async ({ page }) => {
   await expect(page.getByTestId('tx-row')).toHaveCount(3);
 
   await page.getByRole('button', { name: 'Filters' }).click();
-  await page.getByRole('button', { name: /^Transport & Travel/ }).click();
+  await page
+    .getByRole('region', { name: 'Filters' })
+    .getByRole('button', { name: /^Transport & Travel/ })
+    .click();
   await expect(page.getByTestId('tx-row')).toHaveCount(1);
   await expect(page.getByTestId('tx-footer')).toContainText('1 transaction');
   await expect(page.getByTestId('tx-footer')).toContainText('₹240.00');

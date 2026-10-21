@@ -119,7 +119,7 @@ describe('reports', () => {
       within(screen.getByTestId('report-row-housing')).getAllByText(fmtMoney(800000)),
     ).toHaveLength(2);
     expect(
-      screen.getByRole('img', { name: '12 Oct 2026, ' + fmtMoney(50000) }),
+      screen.getByRole('button', { name: '12 Oct 2026, ' + fmtMoney(50000) }),
     ).toBeInTheDocument();
   });
 

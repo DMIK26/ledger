@@ -1,10 +1,12 @@
 import { arc, pie, type PieArcDatum } from 'd3-shape';
-import { useState } from 'react';
 import { Money, usePrivacy } from '../app/Money';
 import type { CategoryTotal } from '../domain/aggregates';
 import { categoryById } from '../domain/categories';
 import { fmtMoney } from '../domain/money';
 import type { Category } from '../domain/types';
+import { useHighlight } from '../kit/entityBus';
+import { entityKey } from '../kit/entityKeys';
+import { useRoving } from '../kit/roving';
 import { fillFor, HatchDefs } from './fills';
 
 const SIZE = 220;
@@ -16,13 +18,32 @@ interface Props {
   categories: readonly Category[];
   currency: string;
   caption: string;
+  /** The category drilled into, drawn raised. */
+  selected?: string | null;
   onSelect: (categoryId: string) => void;
+  /** Hide the legend (when a breakdown takes its place). */
+  legend?: boolean;
 }
 
-/** Spending by category. Hover or focus a slice to see it in the centre; click to open those entries. */
-export function Donut({ totals, categories, currency, caption, onSelect }: Props) {
+/**
+ * Spending by category. Hovering or focusing a slice, a legend row, or anything else of that category
+ * on the page highlights it everywhere and shows it in the centre. Click or Enter drills in. Arrow
+ * keys move between slices.
+ */
+export function Donut({
+  totals,
+  categories,
+  currency,
+  caption,
+  selected = null,
+  onSelect,
+  legend = true,
+}: Props) {
   usePrivacy(); // slice labels are built with fmtMoney, so re-render when privacy changes
-  const [active, setActive] = useState<string | null>(null);
+  const highlight = useHighlight();
+  const roving = useRoving(totals.length);
+  const hovered = highlight?.startsWith('category:') ? highlight.slice(9) : null;
+  const active = totals.some((t) => t.categoryId === hovered) ? hovered : selected;
   const total = totals.reduce((s, t) => s + t.totalMinor, 0);
   const arcs = pie<CategoryTotal>()
     .value((d) => d.totalMinor)
@@ -40,7 +61,8 @@ export function Donut({ totals, categories, currency, caption, onSelect }: Props
           height={SIZE}
           viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`}
           role="group"
-          aria-label={`Spending by category, ${caption}`}
+          aria-label={`Spending by category, ${caption}. Use the arrow keys to move between slices.`}
+          data-roving-group=""
         >
           <HatchDefs categories={categories} />
           {total === 0 ? (
@@ -51,35 +73,35 @@ export function Donut({ totals, categories, currency, caption, onSelect }: Props
               strokeWidth={R_OUT - R_IN}
             />
           ) : (
-            arcs.map((a) => {
+            arcs.map((a, i) => {
               const id = a.data.categoryId;
-              const on = active === id;
+              const key = entityKey('category', id);
+              const raised = active === id;
               const d = shape({
                 ...a,
                 innerRadius: R_IN,
-                outerRadius: on ? R_OUT + 6 : R_OUT,
+                outerRadius: raised ? R_OUT + 6 : R_OUT,
               } as PieArcDatum<CategoryTotal> & { innerRadius: number; outerRadius: number });
+              const rv = roving.props(i);
               return (
                 <path
                   key={id}
                   d={d ?? undefined}
                   className="donut-slice"
                   fill={fillFor(categoryById(categories, id))}
-                  opacity={active && !on ? 0.35 : 1}
-                  tabIndex={0}
                   role="button"
-                  aria-label={`${name(id)}, ${fmtMoney(a.data.totalMinor, { currency })}. Show entries`}
+                  aria-label={`${name(id)}, ${fmtMoney(a.data.totalMinor, { currency })}. Show breakdown`}
+                  aria-pressed={selected === id}
                   data-testid={`slice-${id}`}
-                  onPointerEnter={() => setActive(id)}
-                  onPointerLeave={() => setActive(null)}
-                  onFocus={() => setActive(id)}
-                  onBlur={() => setActive(null)}
+                  data-hl={key}
+                  data-entity={key}
+                  {...rv}
                   onClick={() => onSelect(id)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       onSelect(id);
-                    }
+                    } else rv.onKeyDown(e);
                   }}
                 />
               );
@@ -98,32 +120,33 @@ export function Donut({ totals, categories, currency, caption, onSelect }: Props
         </div>
       </div>
       {total === 0 ? (
-        <p className="muted small">Nothing spent yet this month.</p>
+        <p className="muted small">Nothing spent in this month.</p>
       ) : (
-        <ul className="legend" aria-label="Categories">
-          {totals.map((t) => {
-            const c = categoryById(categories, t.categoryId);
-            return (
-              <li key={t.categoryId}>
-                <button
-                  type="button"
-                  className="legend-item"
-                  data-active={active === t.categoryId ? '' : undefined}
-                  onPointerEnter={() => setActive(t.categoryId)}
-                  onPointerLeave={() => setActive(null)}
-                  onFocus={() => setActive(t.categoryId)}
-                  onBlur={() => setActive(null)}
-                  onClick={() => onSelect(t.categoryId)}
-                >
-                  <span className="dot" style={{ background: c?.color ?? 'var(--faint)' }} />
-                  <span className="legend-name">{name(t.categoryId)}</span>
-                  <Money minor={t.totalMinor} currency={currency} />
-                  <span className="legend-pct">{Math.round((t.totalMinor / total) * 100)}%</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        legend && (
+          <ul className="legend" aria-label="Categories">
+            {totals.map((t) => {
+              const c = categoryById(categories, t.categoryId);
+              const key = entityKey('category', t.categoryId);
+              return (
+                <li key={t.categoryId}>
+                  <button
+                    type="button"
+                    className="legend-item"
+                    data-active={active === t.categoryId ? '' : undefined}
+                    data-hl={key}
+                    data-entity={key}
+                    onClick={() => onSelect(t.categoryId)}
+                  >
+                    <span className="dot" style={{ background: c?.color ?? 'var(--faint)' }} />
+                    <span className="legend-name">{name(t.categoryId)}</span>
+                    <Money minor={t.totalMinor} currency={currency} />
+                    <span className="legend-pct">{Math.round((t.totalMinor / total) * 100)}%</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )
       )}
     </div>
   );
