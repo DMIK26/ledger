@@ -1,8 +1,7 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **All seven drops are built.** Drops 1 to 6 are published at
-https://dmik26.github.io/ledger/; **Drop 7 (version 1.0.0) is complete and awaiting publish and the
-`v1.0.0` tag** (steps in `docs/PUBLISHING.md`). Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
+Updated 21 Oct 2026. **All seven drops are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.0.0**. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
@@ -260,9 +259,8 @@ backups, CSV import; installable and offline on iPhone and Android.
 
 ## Next
 
-1. Publish Drop 7 (commit "Drop 7: mobile and release") and tag it `v1.0.0` (`docs/PUBLISHING.md`).
-2. Try the unverified items above on a real iPhone and Android phone.
-3. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
+1. Try the unverified items above on a real iPhone and Android phone.
+2. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
 
 ## Notes
 
