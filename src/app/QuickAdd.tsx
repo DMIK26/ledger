@@ -7,6 +7,8 @@ import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
+import { Icon } from './icons';
+import { listen, speechSupported } from './voice';
 import { useView, useViewMonth } from '../kit/view';
 
 function dateLabel(date: string, today: string): string {
@@ -44,6 +46,10 @@ export function QuickAdd({
   const [attempted, setAttempted] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [voice] = useState(speechSupported);
+  const [listening, setListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const stopListening = useRef<(() => void) | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
   const datePicker = useRef<HTMLInputElement>(null);
@@ -110,6 +116,31 @@ export function QuickAdd({
     }
   };
 
+  useEffect(() => () => stopListening.current?.(), []);
+
+  const toggleVoice = () => {
+    if (listening) {
+      stopListening.current?.();
+      return;
+    }
+    setVoiceError(null);
+    setListening(true);
+    stopListening.current = listen(
+      (heard) => {
+        setText(heard);
+        setAttempted(false);
+        setConfirmDuplicate(false);
+        setDateOverride(undefined);
+      },
+      (error) => {
+        setListening(false);
+        setVoiceError(error);
+        stopListening.current = null;
+        input.current?.focus();
+      },
+    );
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -144,7 +175,7 @@ export function QuickAdd({
       <h2>
         <label htmlFor="quick-add-input">Quick add</label>
       </h2>
-      <div className="qa-field">
+      <div className={voice ? 'qa-field qa-has-mic' : 'qa-field'}>
         <div className="qa-mirror" ref={mirror} aria-hidden="true">
           {segments.map((s, i) =>
             s.kind ? (
@@ -179,7 +210,29 @@ export function QuickAdd({
           onKeyUp={syncScroll}
           onSelect={syncScroll}
         />
+        {voice && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-icon qa-mic"
+            aria-pressed={listening}
+            aria-label={listening ? 'Stop listening' : 'Speak an entry'}
+            onClick={toggleVoice}
+          >
+            <Icon name="mic" />
+          </button>
+        )}
       </div>
+      {listening && (
+        <p className="muted small" role="status">
+          Listening. Say something like “chai twenty cash”. Your browser&rsquo;s speech service may
+          process the audio online.
+        </p>
+      )}
+      {voiceError && (
+        <p className="warning" role="alert">
+          {voiceError}
+        </p>
+      )}
       {!parsed && (
         <p id="quick-add-help" className="muted small">
           Type what, how much and when. Press Enter to save, Escape to clear.

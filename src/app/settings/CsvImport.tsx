@@ -166,7 +166,12 @@ export function CsvImport() {
                 </ul>
               )}
               {plan.transactions.length > 0 && (
-                <div className="table-wrap">
+                <div
+                  className="table-wrap"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="First rows to be added"
+                >
                   <table className="report-table">
                     <caption className="visually-hidden">First rows to be added</caption>
                     <thead>

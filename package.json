@@ -1,12 +1,12 @@
 {
   "name": "ledger",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Ledger: a private, offline-first expense tracker.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/budget.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -27,6 +27,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.56.1",
     "@testing-library/jest-dom": "^7.0.1",

@@ -34,6 +34,7 @@ import { usePins, useScopedTransactions, useView, useViewMonth } from '../../kit
 import { TxList } from '../TxList';
 import { Insights } from '../Insights';
 import { BackupReminder } from '../BackupReminder';
+import { InstallBanner } from '../InstallBanner';
 
 const PER_DAY_STEP = 1000; // ₹10
 
@@ -304,6 +305,7 @@ export function Dashboard() {
   if (all.length === 0) {
     return (
       <>
+        <InstallBanner />
         <QuickAdd followMonth />
         <section className="card empty">
           <EmptyDoodle art="notebook" />
@@ -317,6 +319,7 @@ export function Dashboard() {
   const label = monthLabel(month);
   return (
     <>
+      <InstallBanner />
       <BackupReminder />
       <QuickAdd followMonth />
       <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>

@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { replaceRoute, useBackClose } from '../pwa/back';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLedger } from '../data/store';
 import { AddSheet } from './AddSheet';
 import { Icon, type IconName } from './icons';
@@ -165,11 +166,14 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
 
 function TabBar({ path }: { path: RoutePath }) {
   const sheet = useRef<HTMLDialogElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = MORE.includes(path);
+  useBackClose(moreOpen, () => sheet.current?.close());
 
   const go = (to: RoutePath) => {
+    // Replace the sheet's history entry, so back returns to the page the sheet was opened on.
+    replaceRoute(to);
     sheet.current?.close();
-    navigate(to);
   };
 
   return (
@@ -208,7 +212,10 @@ function TabBar({ path }: { path: RoutePath }) {
           className="tab"
           aria-haspopup="dialog"
           aria-current={moreActive ? 'page' : undefined}
-          onClick={() => sheet.current?.showModal()}
+          onClick={() => {
+            sheet.current?.showModal();
+            setMoreOpen(true);
+          }}
         >
           <Icon name="more" />
           More
@@ -218,6 +225,7 @@ function TabBar({ path }: { path: RoutePath }) {
         ref={sheet}
         className="sheet"
         aria-labelledby="more-title"
+        onClose={() => setMoreOpen(false)}
         onClick={(e) => {
           if (e.target === e.currentTarget) sheet.current?.close();
         }}

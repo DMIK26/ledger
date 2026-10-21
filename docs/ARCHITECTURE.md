@@ -33,7 +33,7 @@ src/
   charts/   donut, bars, heatmap, sparkline, waterfall, brush        (Drop 3 onward)
   doodle/   art and faces, Companion (the pencil), DoodleLayer (strokes, notes, annotations,
             drawing surface), Studio (toolbar, notes list, save doodle), anchors, state
-  pwa/      register, install, update
+  pwa/      register (updates), install, back (Android back closes sheets), viewport (keyboard)
   test/     setup.ts
 e2e/        Playwright specs
 docs/       this folder

@@ -234,7 +234,10 @@ export function UndoControls() {
           aria-haspopup="true"
           onClick={() => setOpen((o) => !o)}
         >
-          History
+          <span className="history-icon" aria-hidden="true">
+            <Icon name="history" />
+          </span>
+          <span className="history-text">History</span>
         </button>
       )}
       {open && (

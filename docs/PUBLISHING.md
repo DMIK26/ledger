@@ -38,6 +38,17 @@ GitHub website. The repository must be **public** (Pages on a Free account needs
 Change files, open GitHub Desktop, write a short summary, Commit to main, then Push origin. The deploy runs
 by itself. Installed apps show an "Update ready" toast; tap Reload.
 
+## Tag a release (v1.0.0)
+
+After the "Drop 7" commit is pushed and the deploy is green:
+
+1. In GitHub Desktop open the **History** tab.
+2. Right-click the "Drop 7: mobile and release" commit and choose **Create Tag…**.
+3. Name it `v1.0.0` and click **Create Tag**.
+4. Click **Push origin** (it now says it will push the tag too).
+5. Optional: on github.com open the repo, **Releases**, **Draft a new release**, choose the tag `v1.0.0`,
+   title it "Ledger 1.0" and paste the "What is in 1.0" list from `docs/HANDOFF.md`.
+
 ## If something goes wrong
 
 - Page not found: Pages Source is not set to GitHub Actions, or the first deploy has not finished.

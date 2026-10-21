@@ -1,14 +1,27 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **Drops 1 to 5 are published** at https://dmik26.github.io/ledger/. **Drop 6 is
-complete and awaiting publish.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
+Updated 21 Oct 2026. **All seven drops are built.** Drops 1 to 6 are published at
+https://dmik26.github.io/ledger/; **Drop 7 (version 1.0.0) is complete and awaiting publish and the
+`v1.0.0` tag** (steps in `docs/PUBLISHING.md`). Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
 
-`npm run lint`, `npm run typecheck`, `npm test` (213 tests, 22 files) and `npm run build` pass.
-`npm run e2e` passes on desktop Chrome and Pixel 7 (52 passed, 6 desktop-only skipped on phone, with
-`CI=1`). Drop 6 adds: a drawing survives a reload and belongs to its page and month; a held loop snaps
+`npm run lint`, `npm run typecheck`, `npm test` (220 tests, 24 files) and `npm run build` pass; the build
+now ends with a size check (`scripts/budget.mjs`: JavaScript 152 of 170 KB gzipped, CSS 10 of 16 KB,
+offline precache 961 of 1100 KB). `npm run e2e` passes on desktop Chrome and Pixel 7 (63 passed, 13
+skipped where a test only applies to one of them, with `CI=1`). Drop 7 adds: axe finds no serious or
+critical problems on any page (and no contrast problems in dark mode); at 360, 390 and 430px no page
+scrolls sideways, every control is at least 44px and every field uses 16px text; the app reloads offline
+after one visit; with 5,000 entries the Dashboard, Transactions and Reports open in about 0.3 s and saving
+or pinning takes about 0.2 s (limits in the test are 4 s and 1.5 s for slow CI machines); Android back
+closes the More sheet first; an iPhone sees the install and move-your-data note.
+
+Lighthouse 12.8 on the built app (local preview, so the network is simulated): mobile performance 88,
+accessibility 100, best practices 100; desktop performance 99. SEO scores 60 only because the page asks
+search engines not to index it (`noindex`), which is deliberate for a private app.
+
+Drop 6 added: a drawing survives a reload and belongs to its page and month; a held loop snaps
 to a clean circle; a note stays beside its donut slice when the window resizes; the pencil's answer
 points at the right element; reduced motion turns off tracing, wobble and eye tracking; doodles off
 removes the pencil and annotations; privacy hides amounts in captions and numbers in notes.
@@ -23,6 +36,49 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
+
+## Drop 7: what was added
+
+- Install help (`src/domain/platform.ts`, `src/pwa/install.ts`, `src/app/InstallBanner.tsx`): Chrome and
+  Edge get an Install button only when the browser offers it (never a dead button); iPhone and iPad get
+  Share then Add to Home Screen, the note that the installed app keeps its own data so install first,
+  and, when the browser tab already holds entries, a link to back up and restore in the app; in-app
+  browsers (Instagram, Facebook, Gmail and others) are told to open Safari or Chrome. The banner shows on
+  the Dashboard until Not now; Settings > About always shows it.
+- Android back (`src/pwa/back.ts`): back closes the top layer first (More sheet, notes list, receipt,
+  sketch mode); the Add sheet already used the address. Choosing a page from the More sheet replaces its
+  history entry, so back returns to where it was opened.
+- Voice quick add (`src/app/voice.ts`): a microphone in quick add where the browser supports speech
+  recognition, in Indian English; the words fill the field and the usual chips appear.
+- Sheets ride above the keyboard (`src/pwa/viewport.ts`, `--kb`); gestures that start within 24px of a
+  screen edge are ignored (`src/kit/edge.ts`) so system back swipes win.
+- Storage: Ledger asks once, on first run, for persistent storage.
+- Touch: on phones and touch screens every control is at least 44px (the visible pill stays the same size,
+  the extra is transparent); History in the header is an icon on narrow phones.
+- Settings > Experience: a "Click when a drag snaps" switch (off by default; the sound is generated, no
+  files).
+- Size: font subsets Ledger never shows (Cyrillic, Greek, Vietnamese) are not precached.
+- Version 1.0.0.
+
+## Decisions taken in Drop 7
+
+- Voice input uses the browser's own speech service, which in Chrome sends audio to Google. The app makes
+  no network call itself, and the listening message says the audio may be processed online.
+- Pages are not split into separate files: it would save only about 10 KB on first load.
+- Lighthouse's SEO score is left at 60: indexing a private app is the wrong thing to fix.
+- Counts in the Transactions footer stay plain digits ("5000 transactions"): grouping digits would need
+  number formatting outside `money.ts`.
+- Not verified on real devices: the iPhone install flow and the separate storage of the installed app,
+  Android's back gesture, voice input, the keyboard lift and haptics. Please try these on your phones.
+
+## What is in 1.0
+
+Quick add with live highlighting; a full Add sheet with receipts; Transactions with filters, grouping,
+saved views, bulk edits and Trash; Dashboard KPIs, budget card, donut and six-month bars; Budgets with
+suggestions and an allocation bar; Reports by month, quarter, financial year or custom range with a
+heatmap, CSV and PDF; Recurring with a 30-day timeline; pins, linked highlighting, hover cards, drill-downs
+and undo history everywhere; Doodle Studio (the pencil, sketches, notes and stamps); privacy mode, PIN lock,
+backups, CSV import; installable and offline on iPhone and Android.
 
 ## Drop 6: what was added
 
@@ -204,8 +260,9 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
 
 ## Next
 
-1. Publish Drop 6 (commit "Drop 6: Doodle Studio").
-2. Drop 7 (`docs/PLAN.md`): mobile and release.
+1. Publish Drop 7 (commit "Drop 7: mobile and release") and tag it `v1.0.0` (`docs/PUBLISHING.md`).
+2. Try the unverified items above on a real iPhone and Android phone.
+3. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
 
 ## Notes
 

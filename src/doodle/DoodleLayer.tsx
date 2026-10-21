@@ -1,3 +1,4 @@
+import { fromScreenEdge } from '../kit/edge';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useLedger, newId } from '../data/store';
 import { budgetsForMonth } from '../domain/budgets';
@@ -240,6 +241,7 @@ export function DoodleLayer({ path }: { path: string }) {
 
   const onDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
+    if (fromScreenEdge(e)) return;
     if (tool === 'note' || tool === 'stamp') {
       const anchor = anchorAt(e);
       if (!anchor) {

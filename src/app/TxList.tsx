@@ -73,7 +73,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
       data-hl={catKey}
     >
       {selectable && (
-        <span className="tx-select">
+        <label className="tx-select">
           <input
             type="checkbox"
             className="checkbox"
@@ -81,7 +81,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
             checked={actions.selected!.has(tx.id)}
             onChange={() => actions.onToggle!(tx.id)}
           />
-        </span>
+        </label>
       )}
       <span className="tx-date">{when}</span>
       <span className="tx-merchant">

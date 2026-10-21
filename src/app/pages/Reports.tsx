@@ -247,7 +247,13 @@ export function Reports() {
         <>
           <section className="card" aria-labelledby="cat-table-title">
             <h2 id="cat-table-title">By category</h2>
-            <div className="table-wrap">
+            {/* Focusable so the table can be scrolled sideways with the keyboard on narrow screens. */}
+            <div
+              className="table-wrap"
+              tabIndex={0}
+              role="region"
+              aria-labelledby="cat-table-title"
+            >
               <table className="report-table">
                 <thead>
                   <tr>

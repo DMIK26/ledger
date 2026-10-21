@@ -1,3 +1,4 @@
+import { InstallButton, InstallText } from '../InstallBanner';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { exportBackup, validateBackup, type BackupFile } from '../../data/backup';
 import { useLedger } from '../../data/store';
@@ -45,6 +46,7 @@ function Appearance() {
 function Experience() {
   const motion = useLedger((s) => s.settings.motion);
   const haptics = useLedger((s) => s.settings.haptics);
+  const sounds = useLedger((s) => s.settings.sounds);
   const doodles = useLedger((s) => s.settings.doodles);
   const sketchStyle = useLedger((s) => s.settings.sketchStyle);
   const setSetting = useLedger((s) => s.setSetting);
@@ -84,6 +86,17 @@ function Experience() {
           aria-checked={haptics}
           aria-labelledby="haptics-label"
           onClick={() => void setSetting('haptics', !haptics)}
+        />
+      </div>
+      <div className="field-row">
+        <span id="sounds-label">Click when a drag snaps</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={sounds}
+          aria-labelledby="sounds-label"
+          onClick={() => void setSetting('sounds', !sounds)}
         />
       </div>
       <div className="field-row">
@@ -554,6 +567,10 @@ function About() {
         Ledger {__APP_VERSION__}.{' '}
         {pwa.installed ? 'Installed as an app.' : 'Running in the browser.'}
       </p>
+      <InstallText />
+      <div className="btn-row">
+        <InstallButton />
+      </div>
       <div className="btn-row">
         <button
           type="button"

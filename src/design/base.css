@@ -3262,3 +3262,165 @@ g.mood-face {
     display: none;
   }
 }
+
+/* Drop 7: touch targets. On phones and touch screens every control is at least 44px; the visible
+   pill stays its usual size and the extra is a transparent border around it. */
+@media (max-width: 899px), (pointer: coarse) {
+  .segmented button,
+  .legend-item {
+    min-height: 44px;
+  }
+
+  .link-button {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .chip-pin {
+    min-height: 44px;
+    border: 6px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    border: 12px solid transparent;
+    background-clip: padding-box;
+    outline: 1px solid var(--border);
+    outline-offset: -13px;
+  }
+
+  .companion-header .companion-button {
+    width: 44px;
+  }
+}
+
+@media (max-width: 899px), (pointer: coarse) {
+  .tx-select {
+    min-width: 44px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .switch {
+    width: 64px;
+    height: 44px;
+    border: 8px solid transparent;
+    background-clip: padding-box;
+    outline: 1px solid var(--border);
+    outline-offset: -9px;
+  }
+
+  .switch[aria-checked='true'] {
+    border-color: transparent;
+    outline-color: var(--primary-bg);
+  }
+
+  .swatch-button,
+  .categories .swatch,
+  .swatches .swatch {
+    width: 44px;
+    height: 44px;
+    border: 10px solid transparent;
+    background-clip: padding-box;
+    outline-offset: -10px;
+  }
+}
+
+/* Bottom sheets ride above the on-screen keyboard (--kb is set from the visual viewport). */
+@media (max-width: 899px) {
+  dialog.sheet {
+    margin-bottom: var(--kb, 0px);
+    max-height: calc(100dvh - var(--kb, 0px) - 24px);
+  }
+}
+
+.install-banner {
+  flex-wrap: wrap;
+}
+
+.banner-text {
+  display: grid;
+  flex: 1 1 260px;
+  gap: var(--s2);
+}
+
+.banner {
+  flex-wrap: wrap;
+}
+
+.banner > p {
+  flex: 1 1 220px;
+}
+
+/* Voice quick add */
+.qa-has-mic .qa-input {
+  padding-right: 52px;
+}
+
+.qa-has-mic .qa-mirror {
+  padding-right: 52px;
+}
+
+.qa-mic {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+}
+
+.qa-mic[aria-pressed='true'] {
+  color: var(--accent-ink);
+}
+
+@media (max-width: 899px), (pointer: coarse) {
+  .chip-button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 899px), (pointer: coarse) {
+  .switch[aria-checked='true'] {
+    background-clip: padding-box;
+  }
+}
+
+/* Phone header: History becomes an icon so long page titles fit beside the pencil. */
+.history-icon {
+  display: none;
+}
+
+@media (max-width: 599px) {
+  .history-icon {
+    display: inline-flex;
+  }
+
+  .history-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .history-button {
+    min-width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .topbar {
+    gap: 2px;
+  }
+
+  .topbar h1 {
+    font-size: 26px;
+  }
+}

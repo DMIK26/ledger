@@ -1,3 +1,4 @@
+import { useBackClose } from '../pwa/back';
 import { useEffect, useRef, useState } from 'react';
 import { useLedger } from '../data/store';
 import { fmtDate } from '../domain/dates';
@@ -13,6 +14,7 @@ export function ReceiptViewer({ id, onClose }: { id: string | null; onClose: () 
   const masked = usePrivacy();
   const [loaded, setLoaded] = useState<{ id: string; blob: Blob | null } | null>(null);
   const url = useObjectUrl(loaded && loaded.id === id ? loaded.blob : null);
+  useBackClose(id !== null, onClose);
 
   useEffect(() => {
     const d = ref.current;

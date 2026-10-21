@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLedger } from '../data/store';
 import { href } from './router';
+import { useInstallMode } from '../pwa/install';
 
 export const BACKUP_EVERY_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -13,6 +14,9 @@ export function BackupReminder() {
   const lastBackupAt = useLedger((s) => s.settings.lastBackupAt);
   const [hidden, setHidden] = useState(false);
   const [now] = useState(() => Date.now());
+  const mode = useInstallMode();
+  // In a phone browser tab the install banner already says to back up and move to the app.
+  if (mode === 'ios' || mode === 'in-app') return null;
   if (hidden || count === 0 || !onPhone() || now - lastBackupAt < BACKUP_EVERY_MS) return null;
   return (
     <div className="banner" role="status" data-testid="backup-reminder">

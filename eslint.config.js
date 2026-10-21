@@ -34,6 +34,10 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+  {
     files: ['src/domain/money.ts', 'src/**/*.test.{ts,tsx}', 'e2e/**'],
     rules: { 'no-restricted-syntax': 'off' },
   },

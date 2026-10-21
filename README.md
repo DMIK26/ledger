@@ -4,7 +4,7 @@ A private, offline-first expense tracker. Your data stays on your device (Indexe
 cloud and no analytics. It installs on iPhone and Android as a PWA and is published free on GitHub Pages at
 https://dmik26.github.io/ledger/.
 
-**Status:** Drops 1 to 6 of 7 are built and tested. Next: Drop 7. See `docs/HANDOFF.md`.
+**Status:** version 1.0.0. All seven drops are built and tested. See `docs/HANDOFF.md`.
 
 What works now: quick add with live highlighting and editable chips; an Add sheet (bottom sheet on phones)
 with amount, merchant, date, category, method, tags, notes and a receipt photo; Transactions with filters
@@ -17,6 +17,10 @@ and six-month bars with a draggable budget line; Budgets has suggestions, copy l
 allocation bar. Reports cover any month, quarter, financial year or custom range with comparisons, a
 heatmap, CSV export and print to PDF; Recurring shows the next 30 days of subscriptions and what switching
 one off would save; Settings has a category manager, CSV import, full restore and an activity log.
+Everywhere: pins that filter every page, linked highlighting, hover cards, drill-down breakdowns, a month
+switcher and undo history. Doodle Studio adds a pencil companion that answers questions about the page,
+a sketch layer, notes and stamps attached to bars, slices and rows, and hand-drawn category doodles. On
+phones: install help for iPhone and Android, voice quick add, back closes sheets, 44px touch targets.
 
 ## Quick start
 

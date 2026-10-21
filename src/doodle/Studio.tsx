@@ -5,7 +5,7 @@ import { anchorLabel, noteText, STAMPS, STAMP_LABEL, MAX_NOTE_LENGTH } from '../
 import { SKETCH_COLORS, type SketchColor } from '../domain/sketch';
 import { Icon } from '../app/icons';
 import { usePrivacy } from '../app/Money';
-import { navigate } from '../app/router';
+import { replaceRoute, useBackClose } from '../pwa/back';
 import { useViewMonth } from '../kit/view';
 import { artForCategory, Doodle, EMPTY_ART, STAMP_ART } from './art';
 import { findAnchor, useDoodle, type SketchToolChoice } from './state';
@@ -80,6 +80,7 @@ export function SketchToolbar({ path }: { path: string }) {
   const hasStrokes = useLedger((s) =>
     s.sketches.some((k) => k.page === path && k.month === month && k.strokes.length > 0),
   );
+  useBackClose(sketchOn, () => setSketch(false));
   if (!sketchOn) return null;
   return (
     <div
@@ -194,8 +195,8 @@ function NoteRow({ id }: { id: string }) {
     (txId) => transactions.find((t) => t.id === txId)?.merchant,
   );
   const show = () => {
+    replaceRoute(note.page);
     setNotesOpen(false);
-    navigate(note.page);
     // Point at it once the page has drawn.
     window.setTimeout(() => {
       const el = findAnchor(note.anchor);
@@ -280,6 +281,7 @@ export function NotesPanel() {
   const setNotesOpen = useDoodle((s) => s.setNotesOpen);
   const ids = useLedger((s) => s.notes.map((n) => n.id).join(' '));
   const dialog = useRef<HTMLDialogElement>(null);
+  useBackClose(open, () => setNotesOpen(false));
 
   useEffect(() => {
     const d = dialog.current;

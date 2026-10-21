@@ -1,3 +1,4 @@
+import { fromScreenEdge } from './edge';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -115,6 +116,7 @@ export function initEntityBus(): () => void {
   const down = (e: PointerEvent) => {
     if (e.pointerType !== 'touch') return;
     if (current) setHighlight(null);
+    if (fromScreenEdge(e)) return;
     const hit = keyFrom(e.target);
     if (!hit) return;
     holdStart = { x: e.clientX, y: e.clientY };

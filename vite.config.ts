@@ -50,7 +50,12 @@ export default defineConfig({
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          {
+            src: 'icons/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
         ],
         shortcuts: [
           { name: 'Add expense', url: `${BASE}#/transactions?action=add` },
@@ -59,6 +64,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
+        // Font subsets for scripts Ledger never shows (Cyrillic, Greek, Vietnamese) are not precached;
+        // the browser still fetches them if such text ever appears while online.
+        globIgnores: ['**/*-cyrillic*', '**/*-greek*', '**/*-vietnamese*'],
         navigateFallback: `${BASE}index.html`,
         cleanupOutdatedCaches: true,
       },

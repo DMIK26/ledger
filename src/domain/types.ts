@@ -59,6 +59,8 @@ export interface Settings {
   motion: 'full' | 'reduced' | 'off';
   /** A tiny vibration when drags snap, where the phone supports it. */
   haptics: boolean;
+  /** A soft click when drags snap. Off unless chosen. */
+  sounds: boolean;
   /** The pencil, category doodles, mood faces and handwritten annotations. Notes and sketches stay. */
   doodles: boolean;
   /** Hand-drawn outlines on cards and buttons (never in print). */
@@ -74,6 +76,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: 0,
   motion: 'full',
   haptics: true,
+  sounds: false,
   doodles: true,
   sketchStyle: false,
 };
