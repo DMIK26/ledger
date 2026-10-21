@@ -93,6 +93,7 @@ export function Donut({
                   aria-label={`${name(id)}, ${fmtMoney(a.data.totalMinor, { currency })}. Show breakdown`}
                   aria-pressed={selected === id}
                   data-testid={`slice-${id}`}
+                  data-anchor={`category:${id}`}
                   data-hl={key}
                   data-entity={key}
                   {...rv}

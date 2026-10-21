@@ -10,6 +10,12 @@ import { getHighlight } from '../kit/entityBus';
 import { HoverCard } from '../kit/HoverCard';
 import { LiveRegion, MonthSwitcher, PinBar, UndoControls, useNavInfo } from '../kit/Shell';
 import { useView } from '../kit/view';
+import { Companion } from '../doodle/Companion';
+import { DoodleLayer } from '../doodle/DoodleLayer';
+import { DoodleDefs } from '../doodle/art';
+import { useIsDesktop } from '../doodle/anchors';
+import { DoodleBurst, NotesPanel, SketchToolbar, useDoodleKeys } from '../doodle/Studio';
+import { useDoodle } from '../doodle/state';
 
 interface NavItem {
   path: RoutePath;
@@ -109,14 +115,32 @@ function usePinEscape(): void {
   }, [popPin]);
 }
 
-function TopBar({ title }: { title: string }) {
+function TopBar({ title, path }: { title: string; path: RoutePath }) {
   const setSetting = useLedger((s) => s.setSetting);
+  const doodles = useLedger((s) => s.settings.doodles);
   const privacy = usePrivacy();
+  const desktop = useIsDesktop();
+  const sketchOn = useDoodle((s) => s.sketchOn);
+  const toggleSketch = useDoodle((s) => s.toggleSketch);
 
   return (
     <header className="topbar">
       <h1>{title}</h1>
+      {!desktop && doodles && <Companion path={path} placement="header" />}
       <UndoControls />
+      {desktop && (
+        <button
+          type="button"
+          className="btn btn-ghost sketch-toggle"
+          aria-pressed={sketchOn}
+          aria-keyshortcuts="D"
+          title="Sketch on this page (D)"
+          onClick={toggleSketch}
+        >
+          <Icon name="edit" />
+          Sketch
+        </button>
+      )}
       <button
         type="button"
         className="btn btn-ghost btn-icon"
@@ -237,7 +261,10 @@ export function Layout({
   const title = titleFor(path);
   useUndoShortcuts();
   usePinEscape();
+  useDoodleKeys();
   const nav = useNavInfo();
+  const desktop = useIsDesktop();
+  const doodles = useLedger((s) => s.settings.doodles);
   useAutoLock();
 
   useEffect(() => {
@@ -315,19 +342,25 @@ export function Layout({
             })}
           </ul>
         </nav>
+        {desktop && doodles && <Companion path={path} placement="sidebar" />}
       </aside>
       <div className="main">
-        <TopBar title={title} />
+        <TopBar title={title} path={path} />
         <div className="context-bar">
           {(path === '/' || path === '/budgets') && <MonthSwitcher />}
           <PinBar />
         </div>
         <main id="main" tabIndex={-1} className="content">
           {children}
+          <DoodleLayer path={path} />
         </main>
       </div>
       <TabBar path={path} />
       <AddSheet open={adding} onClose={() => navigate(path)} />
+      <SketchToolbar path={path} />
+      <NotesPanel />
+      <DoodleBurst />
+      <DoodleDefs />
       <HoverCard />
       <LiveRegion />
       <Toast />

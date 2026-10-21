@@ -1,5 +1,7 @@
 import type { SavedView } from '../domain/filters';
 import type { RecurringItem } from '../domain/recurring';
+import type { Note } from '../domain/notes';
+import type { Sketch } from '../domain/sketch';
 import type { Budget, Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
 import type { Db } from './db';
 
@@ -282,4 +284,42 @@ export const replaceEverything = (before: LedgerSnapshot, after: LedgerSnapshot)
   label: `Restored a backup (${after.transactions.length} entries)`,
   apply: (db) => writeSnapshot(db, after),
   revert: (db) => writeSnapshot(db, before),
+});
+
+/** Adds or changes a note or stamp. */
+export const putNote = (next: Note, previous: Note | undefined, label: string): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put('notes', next);
+  },
+  revert: async (db) => {
+    if (previous) await db.put('notes', previous);
+    else await db.delete('notes', next.id);
+  },
+});
+
+export const removeNote = (note: Note): Command => ({
+  label: note.text ? 'Deleted a note' : 'Removed a stamp',
+  apply: async (db) => {
+    await db.delete('notes', note.id);
+  },
+  revert: async (db) => {
+    await db.put('notes', note);
+  },
+});
+
+/** Labels of sketch steps start with this, so undoing them does not pop a toast for every stroke. */
+export const SKETCH_LABEL = 'Sketch: ';
+
+/** Replaces one page's drawing for one month (a stroke added, strokes erased, or cleared). */
+export const putSketch = (next: Sketch, previous: Sketch | undefined, label: string): Command => ({
+  label: `${SKETCH_LABEL}${label}`,
+  apply: async (db) => {
+    if (next.strokes.length === 0) await db.delete('sketches', next.id);
+    else await db.put('sketches', next);
+  },
+  revert: async (db) => {
+    if (previous && previous.strokes.length > 0) await db.put('sketches', previous);
+    else await db.delete('sketches', next.id);
+  },
 });

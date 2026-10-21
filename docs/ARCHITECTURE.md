@@ -31,7 +31,8 @@ src/
   kit/      entityBus (linked highlight), view (pins, month), HoverCard, Shell (month switcher,
             pin bar, undo history, nav peeks), roving keys, spring, haptics, marquee, transitions
   charts/   donut, bars, heatmap, sparkline, waterfall, brush        (Drop 3 onward)
-  doodle/   art, companion, sketch, anchors, notes                   (Drop 6)
+  doodle/   art and faces, Companion (the pencil), DoodleLayer (strokes, notes, annotations,
+            drawing surface), Studio (toolbar, notes list, save doodle), anchors, state
   pwa/      register, install, update
   test/     setup.ts
 e2e/        Playwright specs

@@ -59,6 +59,10 @@ export interface Settings {
   motion: 'full' | 'reduced' | 'off';
   /** A tiny vibration when drags snap, where the phone supports it. */
   haptics: boolean;
+  /** The pencil, category doodles, mood faces and handwritten annotations. Notes and sketches stay. */
+  doodles: boolean;
+  /** Hand-drawn outlines on cards and buttons (never in print). */
+  sketchStyle: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -70,6 +74,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lastBackupAt: 0,
   motion: 'full',
   haptics: true,
+  doodles: true,
+  sketchStyle: false,
 };
 
 export interface AuditEvent {

@@ -45,6 +45,8 @@ function Appearance() {
 function Experience() {
   const motion = useLedger((s) => s.settings.motion);
   const haptics = useLedger((s) => s.settings.haptics);
+  const doodles = useLedger((s) => s.settings.doodles);
+  const sketchStyle = useLedger((s) => s.settings.sketchStyle);
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <section className="card" aria-labelledby="experience-title">
@@ -84,6 +86,33 @@ function Experience() {
           onClick={() => void setSetting('haptics', !haptics)}
         />
       </div>
+      <div className="field-row">
+        <span id="doodles-label">Doodles</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={doodles}
+          aria-labelledby="doodles-label"
+          onClick={() => void setSetting('doodles', !doodles)}
+        />
+      </div>
+      <p className="muted small">
+        The pencil, category drawings, mood faces and handwritten notes on charts. Your own notes
+        and sketches stay either way.
+      </p>
+      <div className="field-row">
+        <span id="sketch-style-label">Sketch style</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={sketchStyle}
+          aria-labelledby="sketch-style-label"
+          onClick={() => void setSetting('sketchStyle', !sketchStyle)}
+        />
+      </div>
+      <p className="muted small">Hand-drawn outlines on cards and buttons. Printing stays clean.</p>
     </section>
   );
 }

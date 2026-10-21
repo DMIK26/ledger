@@ -1,3 +1,4 @@
+import { EmptyDoodle } from '../../doodle/Studio';
 import { useMemo, useState } from 'react';
 import { Heatmap } from '../../charts/Heatmap';
 import { Sparkline } from '../../charts/Sparkline';
@@ -236,6 +237,7 @@ export function Reports() {
 
       {report.entries === 0 ? (
         <section className="card empty">
+          <EmptyDoodle art="chart" />
           <h2>Nothing in this period</h2>
           <p className="muted">
             Pick another period above, or <a href={href('/transactions')}>add entries</a>.

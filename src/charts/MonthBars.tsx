@@ -1,3 +1,5 @@
+import { MoodFaceG, MOOD_OF } from '../doodle/faces';
+import { budgetStatus } from '../domain/budgets';
 import { scaleBand, scaleLinear } from 'd3-scale';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Money, usePrivacy } from '../app/Money';
@@ -183,6 +185,7 @@ export function MonthBars({
               aria-pressed={p.month === current}
               aria-label={`${monthLabel(p.month)}, ${fmtMoney(p.totalMinor, { currency })}. Open this month`}
               data-testid={`bar-${p.month}`}
+              data-anchor={`month:${p.month}`}
               {...rv}
               onPointerEnter={() => setHover(p.month)}
               onPointerLeave={() => setHover(null)}
@@ -243,6 +246,13 @@ export function MonthBars({
               >
                 {shortMonth(p.month)}
               </text>
+              {budget !== null && p.totalMinor > 0 && (
+                <MoodFaceG
+                  mood={MOOD_OF[budgetStatus(p.totalMinor, budget).kind]}
+                  x={x0 + x.bandwidth() / 2}
+                  y={Math.max(M.top + 2, y(p.totalMinor) - 12)}
+                />
+              )}
             </g>
           );
         })}

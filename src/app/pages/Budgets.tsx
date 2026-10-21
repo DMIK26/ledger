@@ -1,3 +1,4 @@
+import { MoodFace, MOOD_OF } from '../../doodle/faces';
 import { useState, type FormEvent } from 'react';
 import { AllocationBar } from '../../charts/AllocationBar';
 import { fillFor } from '../../charts/fills';
@@ -43,15 +44,26 @@ function Status({
   );
 }
 
-function Meter({ spent, budget }: { spent: number; budget: number | null }) {
+function Meter({
+  spent,
+  budget,
+  anchor,
+}: {
+  spent: number;
+  budget: number | null;
+  anchor: string;
+}) {
   if (budget === null) return <div className="meter meter-empty" aria-hidden="true" />;
   const s = budgetStatus(spent, budget);
   return (
-    <div className="meter" aria-hidden="true">
-      <span
-        className={`meter-fill meter-${s.kind}`}
-        style={{ width: `${Math.min(100, s.ratio * 100)}%` }}
-      />
+    <div className="meter-wrap" data-anchor={anchor}>
+      <div className="meter" aria-hidden="true">
+        <span
+          className={`meter-fill meter-${s.kind}`}
+          style={{ width: `${Math.min(100, s.ratio * 100)}%` }}
+        />
+      </div>
+      <MoodFace mood={MOOD_OF[s.kind]} />
     </div>
   );
 }
@@ -179,7 +191,7 @@ export function Budgets() {
             <Status spent={spent} budget={mine.overall} currency={currency} />
           </p>
         </div>
-        <Meter spent={spent} budget={mine.overall} />
+        <Meter spent={spent} budget={mine.overall} anchor="budget:overall" />
         <p className="muted small">
           <Money minor={spent} currency={currency} /> spent so far this month.
         </p>
@@ -333,7 +345,7 @@ export function Budgets() {
                     )
                   }
                 />
-                <Meter spent={used} budget={budget} />
+                <Meter spent={used} budget={budget} anchor={`budget:${c.id}`} />
                 {proposal && proposed !== undefined && (
                   <span className="ghost-chip">
                     {proposal.kind === 'suggest' ? 'Suggested' : 'Last month'}{' '}

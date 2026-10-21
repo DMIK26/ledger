@@ -68,6 +68,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
       className={selectable ? 'tx-row tx-selectable' : 'tx-row'}
       data-testid="tx-row"
       data-id={tx.id}
+      data-anchor={`tx:${tx.id}`}
       data-entity={txEntities(tx)}
       data-hl={catKey}
     >

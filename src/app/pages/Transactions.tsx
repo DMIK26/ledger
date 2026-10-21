@@ -1,3 +1,4 @@
+import { EmptyDoodle } from '../../doodle/Studio';
 import { useMemo, useRef, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
@@ -363,6 +364,7 @@ function TrashView() {
       </p>
       {trash.length === 0 ? (
         <section className="card empty">
+          <EmptyDoodle art="jar" />
           <h2>Trash is empty</h2>
           <p className="muted">Deleted entries stay here for {TRASH_DAYS} days.</p>
         </section>
@@ -476,6 +478,7 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
       <>
         <QuickAdd />
         <section className="card empty">
+          <EmptyDoodle art="receipt" />
           <h2>Nothing logged yet</h2>
           <p className="muted">Every expense you add shows up here, newest first.</p>
         </section>
@@ -581,6 +584,7 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
       )}
       {filtered.length === 0 ? (
         <section className="card empty">
+          <EmptyDoodle art="receipt" />
           <h2>No matches</h2>
           <p className="muted">Nothing fits these filters.</p>
           <p>

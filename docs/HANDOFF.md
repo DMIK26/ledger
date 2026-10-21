@@ -1,14 +1,18 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **Drops 1 to 4 are published** at https://dmik26.github.io/ledger/. **Drop 5 is
+Updated 21 Oct 2026. **Drops 1 to 5 are published** at https://dmik26.github.io/ledger/. **Drop 6 is
 complete and awaiting publish.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
 
-`npm run lint`, `npm run typecheck`, `npm test` (187 tests, 19 files) and `npm run build` pass.
-`npm run e2e` passes on desktop Chrome and Pixel 7 (43 passed, 3 desktop-only skipped on phone, with
-`CI=1`). Drop 5 adds: the pin-bar total equals the sum on Dashboard, Transactions, Budgets and Reports;
+`npm run lint`, `npm run typecheck`, `npm test` (213 tests, 22 files) and `npm run build` pass.
+`npm run e2e` passes on desktop Chrome and Pixel 7 (52 passed, 6 desktop-only skipped on phone, with
+`CI=1`). Drop 6 adds: a drawing survives a reload and belongs to its page and month; a held loop snaps
+to a clean circle; a note stays beside its donut slice when the window resizes; the pencil's answer
+points at the right element; reduced motion turns off tracing, wobble and eye tracking; doodles off
+removes the pencil and annotations; privacy hides amounts in captions and numbers in notes.
+Drop 5 added: the pin-bar total equals the sum on Dashboard, Transactions, Budgets and Reports;
 the marquee total equals the sum of selected rows; undo history and redo restore exactly; month
 switcher, bar click and keyboard roving; hover highlight and card; heatmap brush sets a custom period.
 Drop 4 added: reports
@@ -19,6 +23,34 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
+
+## Drop 6: what was added
+
+- `src/domain/sketch.ts` (Ramer-Douglas-Peucker at epsilon 0.8, line/circle/box snapping, the 200KB cap,
+  eraser hit test), `notes.ts` (anchors, labels, privacy masking of numbers), `companion.ts` (moods,
+  props per page, questions and answers, one auto-annotation per page, the top insight as a sentence).
+- `src/doodle/`: line art (ten category drawings, empty-state drawings, stamps), mood faces, the
+  companion pencil, the layer over each page (saved strokes, notes, auto-annotation, the pencil's
+  caption, the drawing surface), sketch toolbar, notes list, the save-time category doodle.
+- Notes and drawings use the `notes` and `sketches` stores that existed since v1 (no migration). Every
+  change is a command; sketch steps are labelled `Sketch: ...` so undoing them pops no toast. Backups now
+  carry notes and drawings; importing or restoring adds missing ones and never removes any.
+- Anchors are `data-anchor` attributes on donut slices, month bars, entry rows, heatmap days, budget
+  meters and recurring rows.
+- Settings > Experience: Doodles and Sketch style switches. Caveat is self-hosted for captions.
+
+## Decisions taken in Drop 6
+
+- Notes attach to things, not to a page and month, so a note on Food shows wherever Food's slice is.
+  Drawings are per page and month, as required.
+- Outside sketch mode nothing drawn can be clicked; notes are edited from the list (Shift+N).
+- Sketch undo and redo use the app's undo (so History and Ctrl+Z include strokes).
+- The pencil sits at the bottom of the sidebar on desktop. On phones it sits in the header and tapping it
+  opens the questions as a list (there is no room for a separate Ask button).
+- Desktop has a Sketch button in the top bar; phones start sketching from the pencil's list.
+- Mood faces on the six bars compare each month with the current budget line.
+- Doodles off keeps the user's own notes and drawings.
+- Not verified on a real phone: drawing with a finger or stylus, pressure, and the long-press wake.
 
 ## Drop 5: what was added
 
@@ -172,8 +204,8 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
 
 ## Next
 
-1. Publish Drop 5 (commit "Drop 5: interaction kit").
-2. Drop 6 (`docs/PLAN.md`): Doodle Studio.
+1. Publish Drop 6 (commit "Drop 6: Doodle Studio").
+2. Drop 7 (`docs/PLAN.md`): mobile and release.
 
 ## Notes
 

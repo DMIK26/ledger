@@ -8,6 +8,8 @@ import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../
 import type { ImportPlan } from '../domain/csvImport';
 import type { RecurringItem } from '../domain/recurring';
 import type { AuditEvent } from '../domain/types';
+import { cleanNote, type Note, type StampKind } from '../domain/notes';
+import { fitCap, sketchId, type Sketch, type Stroke } from '../domain/sketch';
 import { hashPin, resetDue, verifyPin } from '../domain/pin';
 import { setPrivacy } from '../domain/money';
 import type { ParsedEntry } from '../domain/parser';
@@ -45,6 +47,10 @@ import {
   setReceipt,
   setRule,
   setViews,
+  putNote,
+  removeNote,
+  putSketch,
+  SKETCH_LABEL,
   updateTransaction,
   VIEWS_KEY,
   type Command,
@@ -82,6 +88,10 @@ export interface LedgerState {
   /** Merchant keys the user said are not recurring. */
   recurringIgnored: string[];
   views: SavedView[];
+  /** Notes and stamps attached to things on the pages. */
+  notes: Note[];
+  /** Saved drawings, one per page and month. */
+  sketches: Sketch[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -142,6 +152,18 @@ export interface LedgerState {
   applyPinResetIfDue: () => Promise<boolean>;
   /** Merges a Ledger backup: adds entries, categories and rules this device lacks. Undoable. */
   importFromBackup: (file: BackupFile) => Promise<number>;
+  /** Adds a note (or a stamp, with empty text) or changes one when `id` is given. Undoable. */
+  saveNote: (input: {
+    id?: string;
+    anchor: string;
+    page: string;
+    text: string;
+    stamp?: StampKind;
+  }) => Promise<void>;
+  deleteNote: (id: string) => Promise<void>;
+  addStroke: (page: string, month: string, stroke: Stroke) => Promise<void>;
+  eraseStrokes: (page: string, month: string, ids: string[]) => Promise<void>;
+  clearSketch: (page: string, month: string) => Promise<void>;
   undo: () => Promise<void>;
   /** Undoes the newest `steps` changes in order. */
   undoMany: (steps: number) => Promise<void>;
@@ -152,13 +174,18 @@ export interface LedgerState {
 
 /** Theme and privacy are mirrored to localStorage so the page can paint correctly before React loads. */
 export function applyBoot(
-  settings: Pick<Settings, 'theme' | 'privacy'> & Partial<Pick<Settings, 'motion'>>,
+  settings: Pick<Settings, 'theme' | 'privacy'> &
+    Partial<Pick<Settings, 'motion' | 'doodles' | 'sketchStyle'>>,
 ): void {
   setPrivacy(settings.privacy);
   if (typeof document !== 'undefined') {
-    if (settings.theme === 'system') delete document.documentElement.dataset.theme;
-    else document.documentElement.dataset.theme = settings.theme;
-    document.documentElement.dataset.motion = settings.motion ?? 'full';
+    const root = document.documentElement;
+    if (settings.theme === 'system') delete root.dataset.theme;
+    else root.dataset.theme = settings.theme;
+    root.dataset.motion = settings.motion ?? 'full';
+    root.dataset.doodles = settings.doodles === false ? 'off' : 'on';
+    if (settings.sketchStyle) root.dataset.sketch = 'on';
+    else delete root.dataset.sketch;
   }
   try {
     localStorage.setItem('ledger.boot', JSON.stringify(settings));
@@ -185,17 +212,30 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
     const refresh = async (): Promise<void> => {
       const d = requireDb();
-      const [transactions, categories, rules, trash, views, budgets, recurring, ignored] =
-        await Promise.all([
-          d.getAll('transactions'),
-          d.getAll('categories'),
-          d.getAll('rules'),
-          d.getAll('trash'),
-          d.get('settings', VIEWS_KEY),
-          d.getAll('budgets'),
-          d.getAll('recurring'),
-          d.get('settings', IGNORED_RECURRING_KEY),
-        ]);
+      const [
+        transactions,
+        categories,
+        rules,
+        trash,
+        views,
+        budgets,
+        recurring,
+        ignored,
+        notes,
+        sketches,
+      ] = await Promise.all([
+        d.getAll('transactions'),
+        d.getAll('categories'),
+        d.getAll('rules'),
+        d.getAll('trash'),
+        d.get('settings', VIEWS_KEY),
+        d.getAll('budgets'),
+        d.getAll('recurring'),
+        d.get('settings', IGNORED_RECURRING_KEY),
+        d.getAll('notes'),
+        d.getAll('sketches'),
+      ]);
+      notes.sort((a, b) => a.createdAt - b.createdAt);
       recurring.sort((a, b) => a.merchant.localeCompare(b.merchant));
       trash.sort((a, b) => b.deletedAt - a.deletedAt);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
@@ -209,6 +249,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         recurring,
         recurringIgnored: Array.isArray(ignored) ? (ignored as string[]) : [],
         views: Array.isArray(views) ? (views as SavedView[]) : [],
+        notes,
+        sketches,
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -228,6 +270,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       recurring: [],
       recurringIgnored: [],
       views: [],
+      notes: [],
+      sketches: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -669,7 +713,21 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           budgets: file.data.budgets ?? [],
           recurring: file.data.recurring ?? [],
         };
-        await get().run(replaceEverything(before, after));
+        // Notes and drawings are never removed by a restore; the backup's missing ones are added.
+        const haveNotes = new Set(get().notes.map((n) => n.id));
+        const haveSketches = new Set(get().sketches.map((k) => k.id));
+        const extra: Command[] = [
+          ...(file.data.notes ?? [])
+            .filter((n) => !haveNotes.has(n.id))
+            .map((n) => putNote(n, undefined, 'Restored a note')),
+          ...(file.data.sketches ?? [])
+            .filter((k) => !haveSketches.has(k.id))
+            .map((k) => putSketch(k, undefined, 'Restored a drawing')),
+        ];
+        const replace = replaceEverything(before, after);
+        await get().run(
+          extra.length === 0 ? replace : composite(replace.label, [replace, ...extra]),
+        );
       },
 
       getActivity: async () => {
@@ -688,12 +746,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const newBudgets = (file.data.budgets ?? []).filter((b) => !haveBudget.has(b.id));
         const haveRecurring = new Set(get().recurring.map((r) => r.id));
         const newRecurring = (file.data.recurring ?? []).filter((r) => !haveRecurring.has(r.id));
+        const haveNotes = new Set(get().notes.map((n) => n.id));
+        const newNotes = (file.data.notes ?? []).filter((n) => !haveNotes.has(n.id));
+        const haveSketches = new Set(get().sketches.map((k) => k.id));
+        const newSketches = (file.data.sketches ?? []).filter((k) => !haveSketches.has(k.id));
         if (
           newTx.length === 0 &&
           newCats.length === 0 &&
           newRules.length === 0 &&
           newBudgets.length === 0 &&
-          newRecurring.length === 0
+          newRecurring.length === 0 &&
+          newNotes.length === 0 &&
+          newSketches.length === 0
         ) {
           set({ notice: 'Nothing new in that backup' });
           return 0;
@@ -701,15 +765,62 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const label =
           newTx.length > 0
             ? `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`
-            : 'Imported categories, rules, budgets and recurring payments';
+            : 'Imported categories, rules, budgets, recurring payments and notes';
         const steps: Command[] = [
           importTransactions(newTx, newCats, label),
           ...newRules.map((r) => setRule(r)),
           ...(newBudgets.length > 0 ? [setMonthBudgetsCommand([], newBudgets, label)] : []),
           ...newRecurring.map((r) => putRecurring(r, undefined, label)),
+          ...newNotes.map((n) => putNote(n, undefined, label)),
+          ...newSketches.map((k) => putSketch(k, undefined, label)),
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;
+      },
+
+      saveNote: async ({ id, anchor, page, text, stamp }) => {
+        const clean = cleanNote(text);
+        if (!clean && !stamp) return;
+        const now = Date.now();
+        const previous = id ? get().notes.find((n) => n.id === id) : undefined;
+        const next: Note = previous
+          ? { ...previous, text: clean, stamp, updatedAt: now }
+          : { id: newId(), anchor, page, text: clean, stamp, createdAt: now, updatedAt: now };
+        const label = previous ? 'Edited a note' : clean ? 'Added a note' : 'Added a stamp';
+        await get().run(putNote(next, previous, label));
+      },
+
+      deleteNote: async (id) => {
+        const note = get().notes.find((n) => n.id === id);
+        if (note) await get().run(removeNote(note));
+      },
+
+      addStroke: async (page, month, stroke) => {
+        const id = sketchId(page, month);
+        const previous = get().sketches.find((s) => s.id === id);
+        const strokes = fitCap([...(previous?.strokes ?? []), stroke]);
+        const next: Sketch = { id, page, month, strokes, updatedAt: Date.now() };
+        await get().run(putSketch(next, previous, 'Drew a stroke'), '');
+      },
+
+      eraseStrokes: async (page, month, ids) => {
+        const id = sketchId(page, month);
+        const previous = get().sketches.find((s) => s.id === id);
+        if (!previous || ids.length === 0) return;
+        const strokes = previous.strokes.filter((s) => !ids.includes(s.id));
+        if (strokes.length === previous.strokes.length) return;
+        const next: Sketch = { ...previous, strokes, updatedAt: Date.now() };
+        await get().run(putSketch(next, previous, 'Erased'), '');
+      },
+
+      clearSketch: async (page, month) => {
+        const id = sketchId(page, month);
+        const previous = get().sketches.find((s) => s.id === id);
+        if (!previous) return;
+        await get().run(
+          putSketch({ ...previous, strokes: [], updatedAt: Date.now() }, previous, 'Cleared'),
+          'Cleared the drawing',
+        );
       },
 
       undoMany: async (steps) => {
@@ -728,11 +839,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
       undo: async () => {
         const label = await bus?.undo();
-        if (label) set({ notice: `Undid: ${label}` });
+        if (label && !label.startsWith(SKETCH_LABEL)) set({ notice: `Undid: ${label}` });
       },
       redo: async () => {
         const label = await bus?.redo();
-        if (label) set({ notice: `Redid: ${label}` });
+        if (label && !label.startsWith(SKETCH_LABEL)) set({ notice: `Redid: ${label}` });
       },
 
       setSetting: async (key, value) => {

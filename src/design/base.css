@@ -2546,3 +2546,719 @@ dialog::backdrop {
   animation-duration: var(--dur);
   animation-timing-function: var(--ease-out);
 }
+
+/* Drop 6: Doodle Studio */
+
+:root {
+  --font-hand: 'Caveat Variable', Caveat, 'Comic Sans MS', cursive;
+}
+
+.doodle {
+  display: block;
+  overflow: visible;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.doodle-fill {
+  fill: var(--sand);
+  fill-opacity: 0.35;
+  stroke: none;
+}
+
+.doodle-ink {
+  stroke: var(--text);
+  stroke-width: 2;
+  fill: none;
+}
+
+.doodle-accent {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: none;
+}
+
+/* Drawing in: each line traces itself; the wobble filter is on only while it moves. */
+.doodle-draw {
+  filter: url(#ledger-wobble);
+}
+
+.doodle-draw .doodle-ink,
+.doodle-draw .doodle-accent {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: doodle-trace 700ms var(--ease-out) forwards;
+}
+
+.doodle-draw .doodle-accent {
+  animation-delay: 450ms;
+}
+
+.doodle-draw .doodle-fill {
+  opacity: 0;
+  animation: doodle-fade 400ms 300ms linear forwards;
+}
+
+@keyframes doodle-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes doodle-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: drawings appear with a short fade, no tracing and no wobble. */
+:root[data-motion='reduced'] .doodle-draw,
+:root[data-motion='off'] .doodle-draw {
+  filter: none;
+}
+
+:root[data-motion='reduced'] .doodle-draw .doodle-ink,
+:root[data-motion='reduced'] .doodle-draw .doodle-accent,
+:root[data-motion='off'] .doodle-draw .doodle-ink,
+:root[data-motion='off'] .doodle-draw .doodle-accent {
+  stroke-dashoffset: 0;
+}
+
+:root[data-motion='off'] .doodle-draw .doodle-fill {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doodle-draw {
+    filter: none;
+  }
+
+  .doodle-draw .doodle-ink,
+  .doodle-draw .doodle-accent {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .doodle-draw .doodle-fill {
+    opacity: 1;
+    animation: none;
+  }
+}
+
+/* Doodles switched off in Settings. Notes and sketches are the user's own and stay. */
+:root[data-doodles='off'] .doodle-ui {
+  display: none !important;
+}
+
+.empty-doodle {
+  justify-self: center;
+  margin: 0 auto var(--s1);
+}
+
+.empty-inline {
+  display: grid;
+  justify-items: center;
+  gap: var(--s2);
+  text-align: center;
+}
+
+/* Mood faces next to budget meters and over the six-month bars. */
+.mood-face {
+  flex: none;
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.mood-face .dot {
+  fill: var(--text);
+  stroke: none;
+}
+
+.mood-face-dizzy circle:first-child {
+  stroke: var(--accent-ink);
+}
+
+g.mood-face {
+  pointer-events: none;
+}
+
+.meter-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.meter-wrap .meter {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The companion pencil */
+@media (min-width: 900px) {
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.companion {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+}
+
+.companion-sidebar {
+  margin-top: auto;
+  padding: var(--s4) var(--s2) 0;
+}
+
+.companion-body {
+  transform: var(--drag, none);
+  touch-action: none;
+}
+
+.companion-button {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+.companion-button:active {
+  cursor: grabbing;
+}
+
+.companion-header .companion-button {
+  width: 40px;
+  height: 44px;
+}
+
+.pencil {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pencil .pupils circle {
+  fill: var(--text);
+}
+
+.pencil-prop {
+  stroke-width: 1.5;
+}
+
+.pencil-arm {
+  transform-origin: 34px 30px;
+  transform-box: view-box;
+}
+
+.pencil-wave {
+  animation: pencil-wave 1.1s ease-in-out 1;
+}
+
+@keyframes pencil-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20%,
+  60% {
+    transform: rotate(-24deg);
+  }
+  40%,
+  80% {
+    transform: rotate(8deg);
+  }
+}
+
+.ask-button {
+  min-height: 44px;
+  padding: 0 var(--s2);
+  font-family: var(--font-hand);
+  font-size: 20px;
+}
+
+.companion-bubble {
+  position: absolute;
+  z-index: 35;
+  width: 220px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.companion-sidebar .companion-bubble {
+  left: var(--s2);
+  bottom: calc(100% + 6px);
+}
+
+.companion-header {
+  flex: none;
+}
+
+.companion-header .ask-button {
+  display: none;
+}
+
+.companion-header .companion-bubble {
+  right: -40px;
+  top: calc(100% + 8px);
+}
+
+.ask-ring {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+}
+
+.ask-item {
+  position: fixed;
+  min-height: 44px;
+  max-width: 200px;
+  padding: var(--s1) var(--s3);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 14px;
+  line-height: 1.25;
+  white-space: normal;
+  pointer-events: auto;
+  animation: ask-in var(--dur) var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+
+@keyframes ask-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+}
+
+/* The layer over each page: drawings, notes, annotations. It never takes clicks unless sketching. */
+.content {
+  position: relative;
+}
+
+.doodle-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.doodle-layer > * {
+  position: absolute;
+}
+
+.ink-layer,
+.sketch-capture {
+  left: 0;
+  top: 0;
+  overflow: visible;
+}
+
+.sketch-capture {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.sketch-capture[data-tool='eraser'] {
+  cursor: cell;
+}
+
+.sketch-capture[data-tool='note'],
+.sketch-capture[data-tool='stamp'] {
+  cursor: copy;
+}
+
+.doodle-layer.sketching {
+  outline: 2px dashed var(--faint);
+  outline-offset: -2px;
+}
+
+.ink {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ink-ink {
+  stroke: var(--text);
+}
+
+.ink-clay {
+  stroke: var(--accent);
+}
+
+.ink-blue {
+  stroke: var(--blue);
+}
+
+.ink-green {
+  stroke: var(--green);
+}
+
+.ink-highlighter {
+  stroke-opacity: 0.35;
+}
+
+.ink-fading {
+  animation: ink-fade 3s linear forwards;
+}
+
+@keyframes ink-fade {
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.note-mark,
+.stamp-mark {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.note-mark {
+  max-width: 190px;
+  padding: 2px var(--s2);
+  border: 1px solid var(--sand);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--sand) 22%, var(--card));
+  color: var(--text);
+  font-family: var(--font-hand);
+  font-size: 18px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.stamp-mark .doodle-accent,
+.note-mark .doodle-accent {
+  stroke-width: 3;
+}
+
+.callout {
+  margin: 0;
+  color: var(--accent-ink);
+  font-family: var(--font-hand);
+  font-size: 20px;
+  line-height: 1.1;
+  pointer-events: none;
+}
+
+.callout-arrow {
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: none;
+  stroke: var(--accent-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.pencil-caption.callout {
+  padding: 2px var(--s2);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.pencil-caption.callout-arrow {
+  stroke: var(--text);
+}
+
+.sketch-hint {
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--s1) var(--s3);
+  border-radius: var(--radius-control);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: 14px;
+}
+
+.note-editor {
+  z-index: 6;
+  display: grid;
+  gap: var(--s2);
+  width: 250px;
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  pointer-events: auto;
+}
+
+/* Sketch toolbar */
+.sketch-toolbar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s1) var(--s3);
+  width: min(calc(100% - 2 * var(--s3)), 760px);
+  padding: var(--s2);
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+
+@media (min-width: 900px) {
+  .sketch-toolbar {
+    bottom: var(--s4);
+    left: calc(50% + 116px);
+  }
+}
+
+.tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool[aria-pressed='true'],
+.sketch-toolbar .btn-ghost[aria-pressed='true'] {
+  background: var(--fill);
+  color: var(--text);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  margin: 6px;
+  border: 2px solid var(--card);
+  border-radius: 50%;
+  outline: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.swatch[aria-pressed='true'] {
+  outline: 2px solid var(--text);
+}
+
+.swatch-ink {
+  background: var(--text);
+}
+
+.swatch-clay {
+  background: var(--accent);
+}
+
+.swatch-blue {
+  background: var(--blue);
+}
+
+.swatch-green {
+  background: var(--green);
+}
+
+.sketch-tip {
+  flex-basis: 100%;
+  text-align: center;
+}
+
+.sketch-toggle {
+  display: inline-flex;
+}
+
+/* Notes list */
+.notes-list {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--s2) var(--s3);
+  align-items: start;
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+
+.note-row > .btn-row {
+  grid-column: 1 / -1;
+}
+
+.note-row:not(:has(> .doodle)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.note-text-row {
+  font-family: var(--font-hand);
+  font-size: 20px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* A saved entry's category drawing in the corner. */
+.doodle-burst {
+  position: fixed;
+  right: var(--s4);
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  z-index: 25;
+  display: grid;
+  justify-items: center;
+  pointer-events: none;
+  animation: burst-out 2.2s linear forwards;
+}
+
+@media (min-width: 900px) {
+  .doodle-burst {
+    bottom: var(--s6);
+    right: var(--s6);
+  }
+}
+
+.burst-caption {
+  font-family: var(--font-hand);
+  font-size: 20px;
+  color: var(--text);
+}
+
+@keyframes burst-out {
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Sketch style: a slightly rough, hand-drawn outline on cards and buttons. Never in print. */
+:root[data-sketch='on'] .card,
+:root[data-sketch='on'] .btn {
+  position: relative;
+  border-color: transparent;
+}
+
+:root[data-sketch='on'] .card::after,
+:root[data-sketch='on'] .btn:not(.btn-ghost)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid var(--text);
+  border-radius: inherit;
+  filter: url(#ledger-rough);
+  pointer-events: none;
+}
+
+:root[data-sketch='on'] .card-head h2,
+:root[data-sketch='on'] .kpi h2 {
+  font-family: var(--font-hand);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+@media print {
+  .companion,
+  .ask-ring,
+  .sketch-toolbar,
+  .doodle-burst,
+  .sketch-capture,
+  .note-editor {
+    display: none !important;
+  }
+
+  :root[data-sketch='on'] .card::after,
+  :root[data-sketch='on'] .btn::after {
+    display: none;
+  }
+
+  :root[data-sketch='on'] .card {
+    border-color: var(--border);
+  }
+
+  :root[data-sketch='on'] .card-head h2 {
+    font-family: var(--font-sans);
+  }
+}
+
+/* On phones the pencil's questions are a plain list under the header. */
+.ask-list {
+  inset: auto max(var(--s4), env(safe-area-inset-right)) auto
+    max(var(--s4), env(safe-area-inset-left));
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  pointer-events: auto;
+}
+
+.ask-list .ask-item {
+  position: static;
+  max-width: none;
+  transform: none;
+  border-radius: var(--radius-control);
+  border-color: transparent;
+  justify-content: flex-start;
+  text-align: left;
+  animation-name: ask-list-in;
+}
+
+@keyframes ask-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (max-width: 640px) {
+  .sketch-toolbar {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .sketch-toolbar .tool-group {
+    flex-wrap: nowrap;
+    flex: none;
+  }
+
+  .sketch-toolbar .btn {
+    padding-left: 10px;
+    padding-right: 10px;
+    white-space: nowrap;
+  }
+
+  .sketch-tip {
+    display: none;
+  }
+}

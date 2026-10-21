@@ -8,6 +8,8 @@ import {
   type Transaction,
 } from '../domain/types';
 import type { RecurringItem } from '../domain/recurring';
+import type { Note } from '../domain/notes';
+import type { Sketch } from '../domain/sketch';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -23,6 +25,9 @@ export interface BackupFile {
     budgets?: Budget[];
     /** Added in Drop 4. */
     recurring?: RecurringItem[];
+    /** Added in Drop 6. */
+    notes?: Note[];
+    sketches?: Sketch[];
   };
 }
 
@@ -47,6 +52,8 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       settings: await loadSettings(db),
       budgets: await db.getAll('budgets'),
       recurring: await db.getAll('recurring'),
+      notes: await db.getAll('notes'),
+      sketches: await db.getAll('sketches'),
     },
   };
 }
@@ -98,6 +105,23 @@ export function validateBackup(json: unknown): BackupFile | null {
     )
   )
     return null;
+  const { notes, sketches } = json.data;
+  if (
+    notes !== undefined &&
+    !(
+      Array.isArray(notes) &&
+      notes.every((n) => isObj(n) && typeof n.id === 'string' && typeof n.anchor === 'string')
+    )
+  )
+    return null;
+  if (
+    sketches !== undefined &&
+    !(
+      Array.isArray(sketches) &&
+      sketches.every((k) => isObj(k) && typeof k.id === 'string' && Array.isArray(k.strokes))
+    )
+  )
+    return null;
   return json as unknown as BackupFile;
 }
 
@@ -108,9 +132,24 @@ export async function importBackup(
   mode: 'merge' | 'replace',
 ): Promise<number> {
   const t = db.transaction(
-    ['transactions', 'categories', 'rules', 'settings', 'budgets', 'recurring'],
+    [
+      'transactions',
+      'categories',
+      'rules',
+      'settings',
+      'budgets',
+      'recurring',
+      'notes',
+      'sketches',
+    ],
     'readwrite',
   );
+  for (const n of file.data.notes ?? []) {
+    if (!(await t.objectStore('notes').get(n.id))) await t.objectStore('notes').put(n);
+  }
+  for (const k of file.data.sketches ?? []) {
+    if (!(await t.objectStore('sketches').get(k.id))) await t.objectStore('sketches').put(k);
+  }
   if (mode === 'replace') {
     await Promise.all([
       t.objectStore('transactions').clear(),

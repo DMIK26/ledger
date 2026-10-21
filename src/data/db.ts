@@ -8,6 +8,8 @@ import type {
   TrashItem,
 } from '../domain/types';
 import type { RecurringItem } from '../domain/recurring';
+import type { Note } from '../domain/notes';
+import type { Sketch } from '../domain/sketch';
 import { MIGRATIONS } from './migrations';
 
 export interface LedgerDB extends DBSchema {
@@ -23,8 +25,8 @@ export interface LedgerDB extends DBSchema {
   trash: { key: string; value: TrashItem; indexes: { 'by-deleted': number } };
   budgets: { key: string; value: Budget };
   recurring: { key: string; value: RecurringItem };
-  notes: { key: string; value: { id: string } };
-  sketches: { key: string; value: { id: string } };
+  notes: { key: string; value: Note };
+  sketches: { key: string; value: Sketch };
   receipts: { key: string; value: Blob };
 }
 

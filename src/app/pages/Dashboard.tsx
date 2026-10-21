@@ -1,3 +1,5 @@
+import { EmptyDoodle } from '../../doodle/Studio';
+import { MoodFace, MOOD_OF } from '../../doodle/faces';
 import { useMemo, useState } from 'react';
 import { MonthBars, type BarMode } from '../../charts/MonthBars';
 import { Donut } from '../../charts/Donut';
@@ -152,11 +154,14 @@ function BudgetCard({
       <p className="big-figure" data-testid="budget-left">
         <StatusText spent={spent} budget={budget} currency={currency} />
       </p>
-      <div className="meter" aria-hidden="true">
-        <span
-          className={`meter-fill meter-${status.kind}`}
-          style={{ width: `${Math.min(100, status.ratio * 100)}%` }}
-        />
+      <div className="meter-wrap" data-anchor={pinned ? undefined : 'budget:overall'}>
+        <div className="meter" aria-hidden="true">
+          <span
+            className={`meter-fill meter-${status.kind}`}
+            style={{ width: `${Math.min(100, status.ratio * 100)}%` }}
+          />
+        </div>
+        <MoodFace mood={MOOD_OF[status.kind]} />
       </div>
       <p className="muted small">
         <Money minor={spent} currency={currency} /> of <Money minor={budget} currency={currency} />{' '}
@@ -301,6 +306,7 @@ export function Dashboard() {
       <>
         <QuickAdd followMonth />
         <section className="card empty">
+          <EmptyDoodle art="notebook" />
           <h2>Nothing logged yet</h2>
           <p className="muted">Type your first expense above, something like “chai 20 cash”.</p>
         </section>
@@ -478,6 +484,7 @@ export function Dashboard() {
       </div>
       {transactions.length === 0 ? (
         <section className="card empty">
+          <EmptyDoodle art="pin" />
           <h2>No entries match the pins</h2>
           <p className="muted">Remove a pin from the bar at the top to see more.</p>
         </section>

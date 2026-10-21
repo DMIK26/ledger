@@ -92,7 +92,12 @@ export function Timeline({ items, categories, currency, today, off, onShift }: P
           const dates = occurrencesBetween(item, today, TIMELINE_DAYS);
           const color = fillFor(categories.find((c) => c.id === item.categoryId));
           return (
-            <li key={item.id} className="tl-row" data-off={off.has(item.id) ? '' : undefined}>
+            <li
+              key={item.id}
+              className="tl-row"
+              data-anchor={`recurring:${item.id}`}
+              data-off={off.has(item.id) ? '' : undefined}
+            >
               <span className="tl-name">
                 <span>{item.merchant}</span>
                 <Money minor={item.amountMinor} currency={currency} />

@@ -133,6 +133,7 @@ export function Heatmap({
               className={`hm-cell hm-${level(d.totalMinor, cuts)}`}
               data-brush={inBrush(index) ? '' : undefined}
               data-day-index={index}
+              data-anchor={`day:${d.date}`}
               data-hl={key}
               data-entity={key}
               x={x}

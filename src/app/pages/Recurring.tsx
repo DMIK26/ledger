@@ -1,3 +1,4 @@
+import { EmptyDoodle } from '../../doodle/Studio';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Timeline } from '../../charts/Timeline';
 import { newId, useLedger } from '../../data/store';
@@ -205,9 +206,12 @@ export function Recurring() {
         </div>
         {adding && <AddForm onDone={() => setAdding(false)} />}
         {recurring.length === 0 ? (
-          <p className="muted">
-            No recurring payments yet. Add one, or accept one Ledger found in your entries below.
-          </p>
+          <div className="empty-inline">
+            <EmptyDoodle art="calendar" />
+            <p className="muted">
+              No recurring payments yet. Add one, or accept one Ledger found in your entries below.
+            </p>
+          </div>
         ) : (
           <>
             <p className="muted small">
