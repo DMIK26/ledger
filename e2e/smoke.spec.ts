@@ -12,7 +12,9 @@ function collectErrors(page: Page): string[] {
   return errors;
 }
 
-test('adds an entry, keeps it after reload and hides every amount in privacy mode', async ({ page }, info) => {
+test('adds an entry, keeps it after reload and hides every amount in privacy mode', async ({
+  page,
+}, info) => {
   const errors = collectErrors(page);
   await page.clock.setFixedTime(TODAY);
   await page.goto('./');
@@ -40,7 +42,10 @@ test('adds an entry, keeps it after reload and hides every amount in privacy mod
   await expect(page.getByTestId('month-total')).toContainText('₹500.00');
 
   await page.getByRole('button', { name: 'Privacy mode' }).click();
-  await expect(page.getByRole('button', { name: 'Privacy mode' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Privacy mode' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   for (const path of ['#/', '#/transactions', '#/settings']) {
     await page.goto(`./${path}`);
     await expect(page.locator('.amt').first()).toBeVisible();
@@ -57,9 +62,11 @@ test('adds an entry, keeps it after reload and hides every amount in privacy mod
   expect(errors).toEqual([]);
 });
 
-test('the quick-add shortcut opens Transactions with the input focused', async ({ page }) => {
+test('the add shortcut opens the add sheet with the description focused', async ({ page }) => {
   await page.goto('./#/transactions?action=add');
-  await expect(page.getByLabel('Quick add')).toBeFocused();
+  const sheet = page.getByRole('dialog', { name: 'Add expense' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Describe it')).toBeFocused();
 });
 
 test('serves the manifest and a CSP meta tag', async ({ page, request }) => {

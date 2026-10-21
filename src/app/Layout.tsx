@@ -1,8 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useLedger } from '../data/store';
+import { AddSheet } from './AddSheet';
 import { Icon, type IconName } from './icons';
+import { LockScreen } from './LockScreen';
 import { usePrivacy } from './Money';
-import { href, navigate, type RoutePath } from './router';
+import { href, navigate, parseHash, type RoutePath } from './router';
 import { Toast } from './Toast';
 
 interface NavItem {
@@ -24,6 +26,67 @@ const MORE: RoutePath[] = ['/budgets', '/recurring', '/settings'];
 
 export const titleFor = (path: RoutePath): string =>
   NAV.find((n) => n.path === path)?.label ?? 'Ledger';
+
+const currentPath = (): RoutePath => parseHash(window.location.hash).path;
+
+export const AUTO_LOCK_MS = 30_000;
+
+const isTyping = (el: Element | null): boolean =>
+  el instanceof HTMLElement &&
+  (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
+
+/** Ctrl/Cmd+Z undoes, Shift+Ctrl/Cmd+Z (or Ctrl+Y) redoes, unless a field has focus. */
+function useUndoShortcuts(): void {
+  const undo = useLedger((s) => s.undo);
+  const redo = useLedger((s) => s.redo);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || isTyping(document.activeElement)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z') {
+        e.preventDefault();
+        void (e.shiftKey ? redo() : undo());
+      } else if (key === 'y' && e.ctrlKey) {
+        e.preventDefault();
+        void redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [undo, redo]);
+}
+
+/**
+ * With a PIN set: hides the app behind a plain cover whenever the page is hidden (so the app switcher
+ * shows nothing), and locks after 30 seconds in the background.
+ */
+function useAutoLock(): void {
+  const hasLock = useLedger((s) => s.lock !== null);
+  const lockNow = useLedger((s) => s.lockNow);
+  useEffect(() => {
+    if (!hasLock) return;
+    let hiddenAt: number | null = null;
+    const root = document.documentElement;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        root.classList.add('ledger-covered');
+      } else {
+        if (hiddenAt !== null && Date.now() - hiddenAt >= AUTO_LOCK_MS) lockNow();
+        hiddenAt = null;
+        root.classList.remove('ledger-covered');
+      }
+    };
+    const onPageHide = () => root.classList.add('ledger-covered');
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      root.classList.remove('ledger-covered');
+    };
+  }, [hasLock, lockNow]);
+}
 
 function TopBar({ title }: { title: string }) {
   const canUndo = useLedger((s) => s.canUndo);
@@ -55,6 +118,14 @@ function TopBar({ title }: { title: string }) {
         onClick={() => void setSetting('privacy', !privacy)}
       >
         <Icon name={privacy ? 'eyeOff' : 'eye'} />
+      </button>
+      <button
+        type="button"
+        className="btn btn-primary topbar-add"
+        onClick={() => navigate(`${currentPath()}?action=add`)}
+      >
+        <Icon name="plus" />
+        Add
       </button>
     </header>
   );
@@ -88,7 +159,7 @@ function TabBar({ path }: { path: RoutePath }) {
           type="button"
           className="tab-add"
           aria-label="Add expense"
-          onClick={() => navigate('/transactions?action=add')}
+          onClick={() => navigate(`${path}?action=add`)}
         >
           <Icon name="plus" size={24} />
         </button>
@@ -119,32 +190,45 @@ function TabBar({ path }: { path: RoutePath }) {
           if (e.target === e.currentTarget) sheet.current?.close();
         }}
       >
-        <h2 id="more-title">More</h2>
-        <ul className="sheet-list">
-          {NAV.filter((n) => MORE.includes(n.path)).map((n) => (
-            <li key={n.path}>
-              <button
-                type="button"
-                className="nav-link btn-ghost"
-                style={{ width: '100%', border: 0, background: 'none', cursor: 'pointer' }}
-                aria-current={path === n.path ? 'page' : undefined}
-                onClick={() => go(n.path)}
-              >
-                <Icon name={n.icon} />
-                {n.label}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="sheet-body">
+          <h2 id="more-title">More</h2>
+          <ul className="sheet-list">
+            {NAV.filter((n) => MORE.includes(n.path)).map((n) => (
+              <li key={n.path}>
+                <button
+                  type="button"
+                  className="nav-link btn-ghost"
+                  style={{ width: '100%', border: 0, background: 'none', cursor: 'pointer' }}
+                  aria-current={path === n.path ? 'page' : undefined}
+                  onClick={() => go(n.path)}
+                >
+                  <Icon name={n.icon} />
+                  {n.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       </dialog>
     </>
   );
 }
 
-export function Layout({ path, children }: { path: RoutePath; children: ReactNode }) {
+export function Layout({
+  path,
+  adding,
+  children,
+}: {
+  path: RoutePath;
+  adding: boolean;
+  children: ReactNode;
+}) {
   const ready = useLedger((s) => s.ready);
   const error = useLedger((s) => s.error);
+  const locked = useLedger((s) => s.locked);
   const title = titleFor(path);
+  useUndoShortcuts();
+  useAutoLock();
 
   useEffect(() => {
     document.title = path === '/' ? 'Ledger' : `${title} · Ledger`;
@@ -175,6 +259,8 @@ export function Layout({ path, children }: { path: RoutePath; children: ReactNod
       </main>
     );
   }
+
+  if (locked) return <LockScreen />;
 
   return (
     <div className="app">
@@ -214,6 +300,7 @@ export function Layout({ path, children }: { path: RoutePath; children: ReactNod
         </main>
       </div>
       <TabBar path={path} />
+      <AddSheet open={adding} onClose={() => navigate(path)} />
       <Toast />
     </div>
   );

@@ -5,10 +5,10 @@ import { Soon } from './pages/Soon';
 import { Transactions } from './pages/Transactions';
 import { useRoute, type RoutePath } from './router';
 
-function Page({ path, adding }: { path: RoutePath; adding: boolean }) {
+function Page({ path, view }: { path: RoutePath; view: string | null }) {
   switch (path) {
     case '/transactions':
-      return <Transactions adding={adding} />;
+      return <Transactions view={view} />;
     case '/budgets':
       return <Soon page="Budgets" />;
     case '/reports':
@@ -25,9 +25,10 @@ function Page({ path, adding }: { path: RoutePath; adding: boolean }) {
 export function App() {
   const { path, query } = useRoute();
   const adding = query.get('action') === 'add';
+  const view = query.get('view');
   return (
-    <Layout path={path}>
-      <Page key={adding ? `${path}-add` : path} path={path} adding={adding} />
+    <Layout path={path} adding={adding}>
+      <Page key={view ? `${path}-${view}` : path} path={path} view={view} />
     </Layout>
   );
 }

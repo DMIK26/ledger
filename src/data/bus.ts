@@ -72,6 +72,9 @@ export async function purgeTrash(
 ): Promise<number> {
   const cutoff = now - days * 86_400_000;
   const old = await db.getAllFromIndex('trash', 'by-deleted', IDBKeyRange.upperBound(cutoff));
-  for (const item of old) await db.delete('trash', item.id);
+  for (const item of old) {
+    await db.delete('trash', item.id);
+    await db.delete('receipts', item.id);
+  }
   return old.length;
 }

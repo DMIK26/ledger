@@ -90,3 +90,15 @@ export function parseAmountToMinor(text: string): number | null {
   if (fraction.length > 2 && fraction.charCodeAt(2) >= 53) minor += 1; // round half up
   return Number.isSafeInteger(minor) ? minor : null;
 }
+
+/**
+ * Plain editable text for an amount field ("500", "1200.5" becomes "1200.50"). No grouping, no symbol.
+ * Callers must not render this while privacy mode is on.
+ */
+export function minorToInput(minor: number): string {
+  const sign = minor < 0 ? '-' : '';
+  const abs = Math.abs(Math.trunc(minor));
+  const whole = Math.floor(abs / 100);
+  const cents = abs % 100;
+  return cents === 0 ? `${sign}${whole}` : `${sign}${whole}.${String(cents).padStart(2, '0')}`;
+}

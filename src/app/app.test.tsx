@@ -46,7 +46,7 @@ describe('router', () => {
 describe('quick add', () => {
   it('shows what it understood and saves "shawarma 500 on 18th oct upi" on 18 Oct', async () => {
     const user = userEvent.setup();
-    render(<Transactions adding={false} />);
+    render(<Transactions />);
     const input = screen.getByLabelText('Quick add');
     await user.type(input, 'shawarma 500 on 18th oct upi');
 

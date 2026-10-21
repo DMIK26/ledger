@@ -23,6 +23,8 @@ export interface Transaction {
   /** True when the category was a guess the user has not confirmed. */
   unsure?: boolean;
   recurringId?: string;
+  /** True when a receipt image is stored under this entry's id in the receipts store. */
+  hasReceipt?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -72,4 +74,11 @@ export interface TrashItem {
   id: string;
   tx: Transaction;
   deletedAt: number;
+}
+
+/** A lock screen PIN, stored only as a salted PBKDF2 hash. */
+export interface LockConfig {
+  salt: string;
+  hash: string;
+  iterations: number;
 }

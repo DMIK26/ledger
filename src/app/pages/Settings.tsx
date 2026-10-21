@@ -1,8 +1,10 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { exportBackup, validateBackup, type BackupFile } from '../../data/backup';
 import { useLedger } from '../../data/store';
 import { fmtDate, MONTHS, todayISO } from '../../domain/dates';
+import { categoryById } from '../../domain/categories';
 import { CURRENCIES } from '../../domain/money';
+import { isValidPin } from '../../domain/pin';
 import type { ThemeChoice } from '../../domain/types';
 import { checkForUpdates, usePwaState } from '../../pwa/register';
 import { Money, usePrivacy } from '../Money';
@@ -242,6 +244,161 @@ function Data() {
   );
 }
 
+function ScreenLock() {
+  const hasLock = useLedger((s) => s.lock !== null);
+  const setPin = useLedger((s) => s.setPin);
+  const removePin = useLedger((s) => s.removePin);
+  const lockNow = useLedger((s) => s.lockNow);
+  const [mode, setMode] = useState<'idle' | 'set' | 'remove'>('idle');
+  const [pin, setPinText] = useState('');
+  const [again, setAgain] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reset = () => {
+    setMode('idle');
+    setPinText('');
+    setAgain('');
+    setError(null);
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (mode === 'set') {
+      if (!isValidPin(pin)) return setError('Use 4 to 8 digits.');
+      if (pin !== again) return setError('The two PINs do not match.');
+      setBusy(true);
+      await setPin(pin);
+      setBusy(false);
+      reset();
+    } else if (mode === 'remove') {
+      setBusy(true);
+      const ok = await removePin(pin);
+      setBusy(false);
+      if (ok) reset();
+      else {
+        setError('That PIN is not right.');
+        setPinText('');
+      }
+    }
+  };
+
+  const digits = (v: string) => v.replace(/\D/g, '').slice(0, 8);
+
+  return (
+    <section className="card" aria-labelledby="lock-title">
+      <h2 id="lock-title">Screen lock</h2>
+      <p className="muted small">
+        A 4 to 8 digit PIN, asked when Ledger opens and after 30 seconds in the background. It keeps
+        casual viewers out. It does not encrypt your data.
+      </p>
+      {mode === 'idle' && (
+        <div className="btn-row">
+          {hasLock ? (
+            <>
+              <button type="button" className="btn" onClick={lockNow}>
+                Lock now
+              </button>
+              <button type="button" className="btn btn-ghost" onClick={() => setMode('remove')}>
+                Turn off
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn" onClick={() => setMode('set')}>
+              Set a PIN
+            </button>
+          )}
+        </div>
+      )}
+      {mode !== 'idle' && (
+        <form className="lock-settings" onSubmit={(e) => void submit(e)}>
+          <div className="field">
+            <label htmlFor="pin-1">{mode === 'set' ? 'New PIN' : 'Current PIN'}</label>
+            <input
+              id="pin-1"
+              className="input pin-input"
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              value={pin}
+              onChange={(e) => {
+                setPinText(digits(e.target.value));
+                setError(null);
+              }}
+            />
+          </div>
+          {mode === 'set' && (
+            <div className="field">
+              <label htmlFor="pin-2">Repeat the PIN</label>
+              <input
+                id="pin-2"
+                className="input pin-input"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                value={again}
+                onChange={(e) => {
+                  setAgain(digits(e.target.value));
+                  setError(null);
+                }}
+              />
+            </div>
+          )}
+          {error && (
+            <p className="errors" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="btn-row">
+            <button type="submit" className="btn btn-primary" disabled={busy}>
+              {mode === 'set' ? 'Turn on lock' : 'Turn off lock'}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={reset}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function LearnedRules() {
+  const rules = useLedger((s) => s.rules);
+  const categories = useLedger((s) => s.categories);
+  const forgetRule = useLedger((s) => s.forgetRule);
+  const entries = Object.entries(rules).sort(([a], [b]) => a.localeCompare(b));
+  return (
+    <section className="card" aria-labelledby="rules-title">
+      <h2 id="rules-title">Learned categories</h2>
+      {entries.length === 0 ? (
+        <p className="muted small">
+          When you pick a category for a merchant Ledger did not recognise, it remembers it here.
+        </p>
+      ) : (
+        <ul className="rule-list">
+          {entries.map(([key, categoryId]) => (
+            <li key={key} className="rule-row">
+              <span>{key}</span>
+              <span className="muted">{categoryById(categories, categoryId)?.name ?? 'Other'}</span>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                aria-label={`Forget ${key}`}
+                onClick={() => void forgetRule(key)}
+              >
+                Forget
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function formatMB(bytes: number): string {
   const tenths = Math.round(bytes / 104_857.6);
   return `${Math.floor(tenths / 10)}.${tenths % 10} MB`;
@@ -329,6 +486,8 @@ export function Settings() {
       <Privacy />
       <MoneySettings />
       <Data />
+      <ScreenLock />
+      <LearnedRules />
       <Storage />
       <About />
     </>

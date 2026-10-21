@@ -1,4 +1,5 @@
-import type { Category, MerchantRule, Transaction } from '../domain/types';
+import type { SavedView } from '../domain/filters';
+import type { Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
 import type { Db } from './db';
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
@@ -83,5 +84,75 @@ export const composite = (label: string, commands: Command[]): Command => ({
   },
   revert: async (db) => {
     for (const c of [...commands].reverse()) await c.revert(db);
+  },
+});
+
+/** Brings an entry back from Trash. */
+export const restoreFromTrash = (item: TrashItem): Command => ({
+  label: `Restored ${item.tx.merchant}`,
+  apply: async (db) => {
+    const t = db.transaction(['transactions', 'trash'], 'readwrite');
+    void t.objectStore('transactions').put(item.tx);
+    void t.objectStore('trash').delete(item.id);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction(['transactions', 'trash'], 'readwrite');
+    void t.objectStore('transactions').delete(item.id);
+    void t.objectStore('trash').put(item);
+    await t.done;
+  },
+});
+
+/** Removes an entry from Trash for good. Undo still works during this session. */
+export const deleteForever = (item: TrashItem, receipt?: Blob): Command => ({
+  label: `Deleted ${item.tx.merchant} for good`,
+  apply: async (db) => {
+    const t = db.transaction(['trash', 'receipts'], 'readwrite');
+    void t.objectStore('trash').delete(item.id);
+    void t.objectStore('receipts').delete(item.id);
+    await t.done;
+  },
+  revert: async (db) => {
+    const t = db.transaction(['trash', 'receipts'], 'readwrite');
+    void t.objectStore('trash').put(item);
+    if (receipt) void t.objectStore('receipts').put(receipt, item.id);
+    await t.done;
+  },
+});
+
+/** Stores (or removes, when `next` is null) the receipt for an entry, keyed by the entry id. */
+export const setReceipt = (txId: string, next: Blob | null, previous?: Blob): Command => ({
+  label: next ? 'Attached a receipt' : 'Removed a receipt',
+  apply: async (db) => {
+    if (next) await db.put('receipts', next, txId);
+    else await db.delete('receipts', txId);
+  },
+  revert: async (db) => {
+    if (previous) await db.put('receipts', previous, txId);
+    else await db.delete('receipts', txId);
+  },
+});
+
+export const deleteRule = (rule: MerchantRule): Command => ({
+  label: `Forgot ${rule.key}`,
+  apply: async (db) => {
+    await db.delete('rules', rule.key);
+  },
+  revert: async (db) => {
+    await db.put('rules', rule);
+  },
+});
+
+export const VIEWS_KEY = 'savedViews';
+
+/** Saved views live in the settings store as one list. */
+export const setViews = (next: SavedView[], previous: SavedView[], label: string): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put('settings', next, VIEWS_KEY);
+  },
+  revert: async (db) => {
+    await db.put('settings', previous, VIEWS_KEY);
   },
 });

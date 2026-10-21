@@ -54,6 +54,27 @@ const PATHS = {
     </>
   ),
   check: <path d="M4.5 12.5 9.5 17.5 19.5 6.5" />,
+  edit: <path d="M4 20h4L19 9l-4-4L4 16Zm9-13 4 4" />,
+  receipt: (
+    <>
+      <path d="M6 3.5h12v17l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5Z" />
+      <path d="M9 8h6M9 11.5h6M9 15h3" />
+    </>
+  ),
+  filter: <path d="M4 5.5h16M7 12h10M10 18.5h4" />,
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+    </>
+  ),
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  redo: (
+    <>
+      <path d="M16 4.5 20 8.5l-4 4" />
+      <path d="M20 8.5H9.5a5.5 5.5 0 0 0 0 11H15" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;
