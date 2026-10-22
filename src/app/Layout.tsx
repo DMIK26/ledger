@@ -257,10 +257,13 @@ function TabBar({ path }: { path: RoutePath }) {
 export function Layout({
   path,
   adding,
+  addDate,
   children,
 }: {
   path: RoutePath;
   adding: boolean;
+  /** `&on=YYYY-MM-DD`: the day the Add sheet starts on. */
+  addDate?: string;
   children: ReactNode;
 }) {
   const ready = useLedger((s) => s.ready);
@@ -364,7 +367,7 @@ export function Layout({
         </main>
       </div>
       <TabBar path={path} />
-      <AddSheet open={adding} onClose={() => navigate(path)} />
+      <AddSheet open={adding} date={addDate} onClose={() => navigate(path)} />
       <SketchToolbar path={path} />
       <NotesPanel />
       <DoodleBurst />

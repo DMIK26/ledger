@@ -4,7 +4,7 @@ import { Money, usePrivacy } from '../app/Money';
 import { useLedger } from '../data/store';
 import { lastMonths, monthSeries } from '../domain/aggregates';
 import { budgetsForMonth, budgetStatus } from '../domain/budgets';
-import { fmtDate, monthKey, monthLabel, shiftMonth, todayISO } from '../domain/dates';
+import { fmtDate, monthKey, monthLabel, monthRangeLabel, shiftMonthKey, todayISO } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { navSummary } from '../domain/navSummary';
 import { PIN_KIND_LABEL } from '../domain/pins';
@@ -33,11 +33,7 @@ function useDismiss(open: boolean, close: () => void, root: React.RefObject<HTML
   }, [open, close, root]);
 }
 
-const shift = (month: string, n: number) => {
-  const [y, m] = month.split('-').map(Number);
-  const t = shiftMonth(y!, m!, n);
-  return `${t.y}-${String(t.m).padStart(2, '0')}`;
-};
+const shift = shiftMonthKey;
 
 /**
  * The month switcher: previous and next, and a popover of the last twelve months with a mini bar of
@@ -87,6 +83,9 @@ export function MonthSwitcher() {
         onClick={() => setOpen((o) => !o)}
       >
         {monthLabel(month)}
+        {monthRangeLabel(month) && (
+          <span className="month-range">{monthRangeLabel(month)}</span>
+        )}
       </button>
       <button
         type="button"
@@ -116,7 +115,7 @@ export function MonthSwitcher() {
                     type="button"
                     className="month-item"
                     aria-current={p.month === month ? 'true' : undefined}
-                    aria-label={`${monthLabel(p.month)}, ${fmtMoney(p.totalMinor, { currency })}, ${moodText}`}
+                    aria-label={`${monthLabel(p.month)}${monthRangeLabel(p.month) ? ` (${monthRangeLabel(p.month)})` : ''}, ${fmtMoney(p.totalMinor, { currency })}, ${moodText}`}
                     {...rv}
                     onClick={() => go(p.month)}
                   >

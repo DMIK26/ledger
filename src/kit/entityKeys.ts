@@ -1,3 +1,4 @@
+import { monthKey } from '../domain/dates';
 import { normalizeMerchantKey } from '../domain/categoriser';
 import type { Transaction } from '../domain/types';
 
@@ -19,7 +20,7 @@ export function txEntities(t: Transaction): string {
     merchantKey(t.merchant),
     entityKey('method', t.method),
     entityKey('day', t.date),
-    entityKey('month', t.date.slice(0, 7)),
+    entityKey('month', monthKey(t.date)),
     ...t.tags.map((tag) => entityKey('tag', tag)),
   ].join(' ');
 }

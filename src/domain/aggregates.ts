@@ -1,4 +1,4 @@
-import { daysInMonth, isoFromYMD, monthKey, parseISO, shiftMonth } from './dates';
+import { addDays, monthBounds, monthKey, monthProgress, parseISO, shiftMonthKey } from './dates';
 import type { CategoryId, ISODate, Transaction } from './types';
 
 export interface CategoryTotal {
@@ -24,20 +24,24 @@ export function categoryTotals(list: readonly Transaction[], month: string): Cat
 
 /** The last `n` month keys ending with today's month, oldest first. */
 export function lastMonths(today: ISODate, n: number): string[] {
-  const p = parseISO(today);
-  if (!p) return [];
+  if (!parseISO(today)) return [];
+  const current = monthKey(today);
   const out: string[] = [];
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const { y, m } = shiftMonth(p.y, p.m, -i);
-    out.push(isoFromYMD(y, m, 1).slice(0, 7));
-  }
+  for (let i = n - 1; i >= 0; i -= 1) out.push(shiftMonthKey(current, -i));
   return out;
 }
 
-export function previousMonth(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  const prev = shiftMonth(y ?? 2000, m ?? 1, -1);
-  return isoFromYMD(prev.y, prev.m, 1).slice(0, 7);
+export const previousMonth = (month: string): string => shiftMonthKey(month, -1);
+
+/**
+ * The same point in the month before: with today on day 5 of its month, day 5 of the previous one
+ * (or that month's last day when it is shorter).
+ */
+export function samePointLastMonth(today: ISODate): ISODate {
+  const { day } = monthProgress(today);
+  const prev = monthBounds(previousMonth(monthKey(today)));
+  const point = addDays(prev.start, day - 1);
+  return point > prev.end ? prev.end : point;
 }
 
 export interface MonthPoint {
@@ -63,7 +67,7 @@ export interface Kpis {
   month: string;
   spentMinor: number;
   entries: number;
-  /** Spent last month from the 1st up to the same day of the month. */
+  /** Spent last month from its first day up to the same point in the month. */
   lastMonthToDateMinor: number;
   /** Whole-percent change against that, or null when last month had nothing to compare. */
   changePct: number | null;
@@ -73,13 +77,12 @@ export interface Kpis {
 }
 
 export function kpis(list: readonly Transaction[], today: ISODate): Kpis {
-  const p = parseISO(today)!;
+  const { day } = monthProgress(today);
   const month = monthKey(today);
   const current = inMonth(list, month).filter((t) => t.date <= today);
   const spentMinor = sumMinor(current);
   const last = previousMonth(month);
-  const [ly, lm] = last.split('-').map(Number);
-  const cutoff = isoFromYMD(ly!, lm!, Math.min(p.d, daysInMonth(ly!, lm!)));
+  const cutoff = samePointLastMonth(today);
   const lastMonthToDateMinor = sumMinor(inMonth(list, last).filter((t) => t.date <= cutoff));
   const changePct =
     lastMonthToDateMinor > 0
@@ -92,8 +95,8 @@ export function kpis(list: readonly Transaction[], today: ISODate): Kpis {
     entries: current.length,
     lastMonthToDateMinor,
     changePct,
-    dailyAvgMinor: Math.round(spentMinor / p.d),
-    daysElapsed: p.d,
+    dailyAvgMinor: Math.round(spentMinor / day),
+    daysElapsed: day,
     topCategory: totals[0] ?? null,
   };
 }

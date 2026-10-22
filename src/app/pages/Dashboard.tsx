@@ -11,6 +11,7 @@ import {
   lastMonths,
   monthSeries,
   previousMonth,
+  samePointLastMonth,
 } from '../../domain/aggregates';
 import {
   budgetsForMonth,
@@ -21,7 +22,14 @@ import {
   whatIfMonthEnd,
 } from '../../domain/budgets';
 import { categoryById } from '../../domain/categories';
-import { daysInMonth, isoFromYMD, monthLabel, parseISO, todayISO } from '../../domain/dates';
+import {
+  fmtDate,
+  monthBounds,
+  monthKey,
+  monthLabel,
+  monthProgress,
+  todayISO,
+} from '../../domain/dates';
 import { fmtMoney } from '../../domain/money';
 import { Money, usePrivacy } from '../Money';
 import { QuickAdd } from '../QuickAdd';
@@ -34,6 +42,7 @@ import { usePins, useScopedTransactions, useView, useViewMonth } from '../../kit
 import { TxList } from '../TxList';
 import { Insights } from '../Insights';
 import { BackupReminder } from '../BackupReminder';
+import { CheckIn } from '../CheckIn';
 import { InstallBanner } from '../InstallBanner';
 import { LoadSampleButton, SampleBanner } from '../SampleData';
 
@@ -78,12 +87,11 @@ function BudgetCard({
   const currency = useLedger((s) => s.settings.currency);
   const setMonthBudgets = useLedger((s) => s.setMonthBudgets);
   usePrivacy(); // the slider's aria-valuetext uses fmtMoney
-  const month = today.slice(0, 7);
+  const month = monthKey(today);
   const mine = budgetsForMonth(budgets, month);
   const last = budgetsForMonth(budgets, previousMonth(month));
   const [dismissed, setDismissed] = useState(false);
-  const p = parseISO(today)!;
-  const dim = daysInMonth(p.y, p.m);
+  const { day, length: dim } = monthProgress(today);
   const left = daysLeft(today);
   const budget = pinned ? pinned.budget : mine.overall;
   const maxPerDay = Math.max(
@@ -96,7 +104,7 @@ function BudgetCard({
   const perDay = Math.round((maxPerDay * (pct ?? startPct)) / 100 / PER_DAY_STEP) * PER_DAY_STEP;
   const projected = projectMonthEnd(spent, today);
   const whatIf = whatIfMonthEnd(spent, today, perDay);
-  const endLabel = `${p.d === dim ? 'today' : `by ${dim} ${monthLabel(month).slice(0, 3)}`}`;
+  const endLabel = day === dim ? 'today' : `by ${fmtDate(monthBounds(month).end).slice(0, -5)}`;
 
   if (budget === null && pinned) {
     return (
@@ -168,7 +176,7 @@ function BudgetCard({
       <p className="muted small">
         <Money minor={spent} currency={currency} /> of <Money minor={budget} currency={currency} />{' '}
         spent.{' '}
-        {p.d < dim ? (
+        {day < dim ? (
           <>
             At this pace, <Money minor={projected} currency={currency} /> {endLabel}
             {projectedStatus.kind === 'over' ? (
@@ -260,10 +268,8 @@ export function Dashboard() {
 
   const today = todayISO();
   const month = useViewMonth();
-  const current = month === today.slice(0, 7);
-  const [y, m] = month.split('-').map(Number);
-  const first = isoFromYMD(y!, m!, 1);
-  const monthEnd = isoFromYMD(y!, m!, daysInMonth(y!, m!));
+  const current = month === monthKey(today);
+  const { start: first, end: monthEnd } = monthBounds(month);
   // A past month is shown as it ended; the current one up to today.
   const asOf = current ? today : monthEnd < today ? monthEnd : today;
   const k = useMemo(() => kpis(transactions, asOf), [transactions, asOf]);
@@ -271,8 +277,7 @@ export function Dashboard() {
   const monthEntries = useMemo(() => inMonth(toDate, month), [toDate, month]);
   const lastMonthEntries = useMemo(() => {
     const prev = previousMonth(month);
-    const [py, pm] = prev.split('-').map(Number);
-    const cutoff = isoFromYMD(py!, pm!, Math.min(parseISO(asOf)!.d, daysInMonth(py!, pm!)));
+    const cutoff = samePointLastMonth(asOf);
     return inMonth(transactions, prev).filter((t) => t.date <= cutoff);
   }, [transactions, month, asOf]);
   const donutMonth = preview ?? month;
@@ -340,6 +345,7 @@ export function Dashboard() {
       <SampleBanner />
       <BackupReminder />
       <QuickAdd followMonth />
+      <CheckIn />
       <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
         <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
           <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>

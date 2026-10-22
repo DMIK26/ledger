@@ -5,6 +5,7 @@ import { findDuplicate } from '../domain/duplicates';
 import { highlightSegments } from '../domain/highlight';
 import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
+import { repeatChips } from '../domain/repeat';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
 import { Icon } from './icons';
@@ -34,6 +35,8 @@ export function QuickAdd({
   const lastMethod = useLedger((s) => s.settings.lastMethod);
   const currency = useLedger((s) => s.settings.currency);
   const addFromParsed = useLedger((s) => s.addFromParsed);
+  const addRepeat = useLedger((s) => s.addRepeat);
+  const favourites = useLedger((s) => s.favourites);
   const viewMonth = useViewMonth();
   const setMonth = useView((s) => s.setMonth);
   const announce = useView((s) => s.announce);
@@ -65,6 +68,25 @@ export function QuickAdd({
     [text, today, lastMethod, rules],
   );
   const segments = useMemo(() => (parsed ? highlightSegments(parsed) : []), [parsed]);
+  const chips = useMemo(
+    () => repeatChips(favourites, transactions, today),
+    [favourites, transactions, today],
+  );
+
+  const repeat = async (index: number) => {
+    const item = chips[index];
+    if (!item || saving) return;
+    setSaving(true);
+    try {
+      await addRepeat(item);
+      if (followMonth && monthKey(today) !== viewMonth) {
+        setMonth(monthKey(today));
+        announce(`Saved to ${monthLabel(monthKey(today))}. Showing that month.`);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const date = dateOverride ?? parsed?.date ?? today;
   const method = methodOverride ?? parsed?.method ?? lastMethod;
@@ -251,6 +273,35 @@ export function QuickAdd({
         <p id="quick-add-help" className="muted small">
           Type what, how much and when. Press Enter to save, Escape to clear.
         </p>
+      )}
+      {!text && chips.length > 0 && (
+        <div className="repeat-row" role="group" aria-labelledby="repeat-label">
+          <span id="repeat-label" className="muted small">
+            Repeat for today
+          </span>
+          <ul className="repeat-chips">
+            {chips.map((c, i) => (
+              <li key={c.key}>
+                <button
+                  type="button"
+                  className="repeat-chip"
+                  data-testid="repeat-chip"
+                  aria-label={`Add ${c.merchant}, ${fmtMoney(c.amountMinor, { currency })}, for today`}
+                  disabled={saving}
+                  onClick={() => void repeat(i)}
+                >
+                  {c.favouriteId && (
+                    <span className="repeat-star" aria-hidden="true">
+                      <Icon name="star" size={14} />
+                    </span>
+                  )}
+                  <span className="repeat-name">{c.merchant}</span>
+                  <span className="amt">{fmtMoney(c.amountMinor, { currency })}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {parsed && (
         <ul className="chips" aria-label="What Ledger understood" id="quick-add-help">

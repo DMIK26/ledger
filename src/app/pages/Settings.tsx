@@ -3,7 +3,16 @@ import { InstallButton, InstallText } from '../InstallBanner';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { exportBackup, validateBackup, type BackupFile } from '../../data/backup';
 import { useLedger } from '../../data/store';
-import { fmtDate, MONTHS, todayISO } from '../../domain/dates';
+import {
+  fmtDate,
+  MAX_MONTH_START,
+  monthKey,
+  monthLabel,
+  monthRangeLabel,
+  MONTHS,
+  todayISO,
+} from '../../domain/dates';
+import { frequentEntries, MAX_FAVOURITES, repeatKey } from '../../domain/repeat';
 import { categoryById } from '../../domain/categories';
 import { CURRENCIES } from '../../domain/money';
 import { isValidPin } from '../../domain/pin';
@@ -160,9 +169,14 @@ function Privacy() {
   );
 }
 
+const ordinal = (n: number): string =>
+  `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+
 function MoneySettings() {
   const currency = useLedger((s) => s.settings.currency);
   const fyStartMonth = useLedger((s) => s.settings.fyStartMonth);
+  const monthStartDay = useLedger((s) => s.settings.monthStartDay);
+  const thisMonth = monthKey(todayISO());
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <section className="card" aria-labelledby="money-title">
@@ -197,6 +211,114 @@ function MoneySettings() {
           ))}
         </select>
       </div>
+      <div className="field-row">
+        <label htmlFor="month-start">Months start on the</label>
+        <select
+          id="month-start"
+          className="select"
+          aria-describedby="month-start-help"
+          value={monthStartDay}
+          onChange={(e) => void setSetting('monthStartDay', Number(e.target.value))}
+        >
+          {Array.from({ length: MAX_MONTH_START }, (_, i) => i + 1).map((d) => (
+            <option key={d} value={d}>
+              {ordinal(d)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="muted small" id="month-start-help" data-testid="month-start-help">
+        {monthStartDay === 1
+          ? 'Budgets and month totals follow calendar months. Paid on a fixed day? Start months on that day.'
+          : `${monthLabel(thisMonth)} runs ${monthRangeLabel(thisMonth)}. A month starting after the 15th is named after the month it ends in.`}
+      </p>
+    </section>
+  );
+}
+
+/** Pinned entries for the Repeat chips under quick add, plus suggestions from what is logged often. */
+function Favourites() {
+  const favourites = useLedger((s) => s.favourites);
+  const transactions = useLedger((s) => s.transactions);
+  const categories = useLedger((s) => s.categories);
+  const currency = useLedger((s) => s.settings.currency);
+  const saveFavourite = useLedger((s) => s.saveFavourite);
+  const removeFavourite = useLedger((s) => s.removeFavourite);
+  const moveFavourite = useLedger((s) => s.moveFavourite);
+  usePrivacy();
+  const pinned = new Set(favourites.map((f) => repeatKey(f)));
+  const suggestions = frequentEntries(transactions, todayISO())
+    .filter((f) => !pinned.has(f.key))
+    .slice(0, 5);
+  const full = favourites.length >= MAX_FAVOURITES;
+  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  return (
+    <section className="card" aria-labelledby="favourites-title">
+      <h2 id="favourites-title">Favourites</h2>
+      <p className="muted small">
+        Favourites come first in the Repeat row under quick add; one tap adds them for today. Save
+        one from Transactions too: select an entry, then Save as favourite.
+      </p>
+      {favourites.length > 0 && (
+        <ul className="rule-list" aria-label="Your favourites">
+          {favourites.map((f, i) => (
+            <li key={f.id} className="rule-row">
+              <span>
+                {f.merchant} <Money minor={f.amountMinor} currency={currency} />
+              </span>
+              <span className="muted">
+                {name(f.categoryId)}, {f.method}
+              </span>
+              <span className="btn-row">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  aria-label={`Move ${f.merchant} up`}
+                  disabled={i === 0}
+                  onClick={() => void moveFavourite(f.id, i - 1)}
+                >
+                  <span aria-hidden="true">↑</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  aria-label={`Remove ${f.merchant} from favourites`}
+                  onClick={() => void removeFavourite(f.id)}
+                >
+                  Remove
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {suggestions.length > 0 && (
+        <>
+          <h3 className="small">Logged often</h3>
+          <ul className="rule-list" aria-label="Suggested favourites">
+            {suggestions.map((f) => (
+              <li key={f.key} className="rule-row">
+                <span>
+                  {f.merchant} <Money minor={f.amountMinor} currency={currency} />
+                </span>
+                <span className="muted">{f.count} times in 90 days</span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={full}
+                  aria-label={`Save ${f.merchant} as a favourite`}
+                  onClick={() => void saveFavourite(f)}
+                >
+                  Save
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {favourites.length === 0 && suggestions.length === 0 && (
+        <p className="muted small">Nothing yet. Things you log three times in 90 days show up here.</p>
+      )}
     </section>
   );
 }
@@ -604,6 +726,7 @@ export function Settings({ view }: { view?: string | null }) {
       <Experience />
       <MoneySettings />
       <CategoryManager />
+      <Favourites />
       <LearnedRules />
       <Data />
       <SampleCard />

@@ -1,6 +1,6 @@
-import { categoryTotals, inMonth, previousMonth } from './aggregates';
+import { categoryTotals, inMonth, previousMonth, samePointLastMonth } from './aggregates';
 import { budgetStatus, projectMonthEnd } from './budgets';
-import { addDays, daysInMonth, isoFromYMD, monthKey, parseISO } from './dates';
+import { addDays, monthKey, monthProgress } from './dates';
 import { nextOccurrence, type RecurringItem } from './recurring';
 import type { CategoryId, ISODate, Transaction } from './types';
 
@@ -22,13 +22,13 @@ export function buildInsights(
   overallBudgetMinor: number | null,
   recurring: readonly RecurringItem[] = [],
 ): Insight[] {
-  const p = parseISO(today)!;
+  const p = monthProgress(today);
   const month = monthKey(today);
   const current = inMonth(list, month).filter((t) => t.date <= today);
   const out: Insight[] = [];
 
   const spent = current.reduce((s, t) => s + t.amountMinor, 0);
-  if (overallBudgetMinor !== null && spent > 0 && p.d < daysInMonth(p.y, p.m)) {
+  if (overallBudgetMinor !== null && spent > 0 && p.day < p.length) {
     const projected = projectMonthEnd(spent, today);
     const s = budgetStatus(projected, overallBudgetMinor);
     out.push(
@@ -39,8 +39,7 @@ export function buildInsights(
   }
 
   const last = previousMonth(month);
-  const [ly, lm] = last.split('-').map(Number);
-  const cutoff = isoFromYMD(ly!, lm!, Math.min(p.d, daysInMonth(ly!, lm!)));
+  const cutoff = samePointLastMonth(today);
   const before = new Map(
     categoryTotals(
       inMonth(list, last).filter((t) => t.date <= cutoff),
@@ -93,7 +92,7 @@ export function buildInsights(
 
   if (current.length > 0) {
     const daysWith = new Set(current.map((t) => t.date)).size;
-    const quiet = p.d - daysWith;
+    const quiet = p.day - daysWith;
     if (quiet >= 3) out.push({ kind: 'quiet-days', days: quiet });
   }
 

@@ -1,0 +1,111 @@
+import { useId, useMemo, useState } from 'react';
+import { useLedger } from '../data/store';
+import { categoryById } from '../domain/categories';
+import { fmtDate, parseISO, todayISO } from '../domain/dates';
+import { fmtMoney } from '../domain/money';
+import { parseQuickEntry } from '../domain/parser';
+import { usePrivacy } from './Money';
+
+export const MAX_LINES = 50;
+
+/** One entry per line, the quick-add way; a preview shows what each becomes before one undoable save. */
+export function Several({ initialDate, onDone }: { initialDate?: string; onDone: () => void }) {
+  const uid = useId();
+  const categories = useLedger((s) => s.categories);
+  const rules = useLedger((s) => s.rules);
+  const lastMethod = useLedger((s) => s.settings.lastMethod);
+  const currency = useLedger((s) => s.settings.currency);
+  const addMany = useLedger((s) => s.addMany);
+  usePrivacy();
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const today = todayISO();
+
+  const lines = useMemo(
+    () =>
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .slice(0, MAX_LINES)
+        .map((l) => parseQuickEntry(l, { today, lastMethod, rules }))
+        // Opened for a day (from the check-in): lines without a date go on that day.
+        .map((p) =>
+          initialDate && parseISO(initialDate) && p.dateSource === 'today'
+            ? { ...p, date: initialDate, upcoming: false }
+            : p,
+        ),
+    [text, today, lastMethod, rules, initialDate],
+  );
+  const good = lines.filter((p) => p.ok);
+  const tooMany = text.split('\n').filter((l) => l.trim()).length > MAX_LINES;
+
+  const save = async () => {
+    if (saving || good.length === 0) return;
+    setSaving(true);
+    try {
+      await addMany(lines);
+      onDone();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="several">
+      <div className="field">
+        <label htmlFor={`${uid}-lines`}>One entry per line</label>
+        <textarea
+          id={`${uid}-lines`}
+          className="input textarea several-input"
+          rows={5}
+          autoFocus
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder={'chai 20 cash\nauto 40+30 yesterday\nlunch 180 upi'}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <p className="muted small">
+          Each line works like quick add: what, how much and when. Sums are fine.
+        </p>
+      </div>
+      {lines.length > 0 && (
+        <ol className="several-preview" aria-label="What each line becomes">
+          {lines.map((p, i) => {
+            const problem = p.errors[0] ?? (p.amountMinor === null ? 'No amount' : null);
+            return (
+              <li key={i} className={problem ? 'several-bad' : undefined}>
+                <span className="several-merchant">{p.merchant}</span>
+                <span className="muted small">
+                  {fmtDate(p.date)} · {categoryById(categories, p.categoryId)?.name ?? 'Other'}
+                  {p.unsure ? ' (a guess)' : ''} · {p.method}
+                </span>
+                {problem ? (
+                  <span className="several-problem">{problem}, skipped</span>
+                ) : (
+                  <span className="amt">{fmtMoney(p.amountMinor!, { currency })}</span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {tooMany && <p className="warning">Only the first {MAX_LINES} lines are used.</p>}
+      <div className="btn-row">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={saving || good.length === 0}
+          onClick={() => void save()}
+        >
+          {good.length === 1 ? 'Save 1 entry' : `Save ${good.length} entries`}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}

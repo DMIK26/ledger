@@ -4,7 +4,7 @@ export type CategoryId = string;
 export const PAYMENT_METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer', 'Other'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export type TxSource = 'form' | 'quick' | 'import' | 'recurring' | 'legacy';
+export type TxSource = 'form' | 'quick' | 'import' | 'recurring' | 'legacy' | 'repeat' | 'keypad';
 
 export interface Transaction {
   id: string;
@@ -65,7 +65,15 @@ export interface Settings {
   doodles: boolean;
   /** Hand-drawn outlines on cards and buttons (never in print). */
   sketchStyle: boolean;
+  /** Day of the month a month starts on (1 to 28), for people paid on a fixed day. */
+  monthStartDay: number;
+  /** The missed-day check-in is hidden on this day ("Not now"); '' when it is not hidden. */
+  checkinHiddenOn: ISODate | '';
+  /** How the Add sheet opens: the full form, the keypad or several lines at once. */
+  addMode: AddMode;
 }
+
+export type AddMode = 'form' | 'keypad' | 'several';
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'system',
@@ -79,6 +87,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sounds: false,
   doodles: true,
   sketchStyle: false,
+  monthStartDay: 1,
+  checkinHiddenOn: '',
+  addMode: 'form',
 };
 
 export interface AuditEvent {

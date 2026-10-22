@@ -46,6 +46,11 @@ createdAt, updatedAt), Category, MerchantRule, Settings, AuditEvent, TrashItem. 
 v1: transactions (indexes by-date, by-category), categories, rules, settings (key/value), audit (auto id),
 trash (index by-deleted), budgets, recurring, notes, sketches, receipts (blobs).
 
+The settings store (key/value) also holds lists changed through Commands: `savedViews`,
+`recurringIgnored`, `sampleData`, and since Drop 8 `favourites` and `noSpendDays`. Month boundaries all
+go through `monthKey` / `monthBounds` in `src/domain/dates.ts`, which follow the month start day
+(Settings, set once at start-up like privacy in `money.ts`); never slice a date to get its month.
+
 New schema work is a **new entry** appended to `MIGRATIONS` in `src/data/migrations.ts`; never edit an old
 step. `DB_VERSION` is `MIGRATIONS.length`.
 

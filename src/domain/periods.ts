@@ -6,9 +6,12 @@ import {
   fyOf,
   isoFromYMD,
   monthLabel,
+  monthBounds,
+  monthKey,
   MONTHS,
   parseISO,
   shiftMonth,
+  shiftMonthKey,
 } from './dates';
 import type { ISODate } from './types';
 
@@ -23,14 +26,10 @@ export interface Period {
 
 const short = (m: number) => MONTHS[m - 1]!.slice(0, 3);
 
-function monthPeriod(y: number, m: number): Period {
-  const start = isoFromYMD(y, m, 1);
-  return {
-    kind: 'month',
-    start,
-    end: isoFromYMD(y, m, daysInMonth(y, m)),
-    label: monthLabel(start.slice(0, 7)),
-  };
+/** A month follows Settings > Month starts on; with a start day other than 1 it spans two months. */
+function monthPeriod(key: string): Period {
+  const { start, end } = monthBounds(key);
+  return { kind: 'month', start, end, label: monthLabel(key) };
 }
 
 /** Quarters follow the financial year: with an April start, Q1 is April to June. */
@@ -61,10 +60,7 @@ export function periodFor(
   offset = 0,
 ): Period {
   const p = parseISO(today)!;
-  if (kind === 'month') {
-    const t = shiftMonth(p.y, p.m, offset);
-    return monthPeriod(t.y, t.m);
-  }
+  if (kind === 'month') return monthPeriod(shiftMonthKey(monthKey(today), offset));
   if (kind === 'quarter') {
     const t = shiftMonth(p.y, p.m, offset * 3);
     return quarterPeriod(t.y, t.m, fyStart);

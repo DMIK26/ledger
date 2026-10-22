@@ -240,6 +240,25 @@ export const removeRecurring = (item: RecurringItem): Command => ({
   },
 });
 
+export const FAVOURITES_KEY = 'favourites';
+export const NO_SPEND_KEY = 'noSpendDays';
+
+/** Replaces one list kept in the settings store (favourites, no-spend days) as an undoable step. */
+export const setSettingsList = <T>(
+  key: string,
+  next: T[],
+  previous: T[],
+  label: string,
+): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put('settings', next, key);
+  },
+  revert: async (db) => {
+    await db.put('settings', previous, key);
+  },
+});
+
 export const IGNORED_RECURRING_KEY = 'recurringIgnored';
 
 /** Merchants the user said are not recurring, so detection stops suggesting them. */

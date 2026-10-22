@@ -1,4 +1,5 @@
 import { OTHER_ID } from './categories';
+import { INDIC_KEYWORDS_NFC } from './indic';
 import type { CategoryId } from './types';
 
 export type Confidence = 'rule' | 'keyword' | 'fuzzy' | 'none';
@@ -58,9 +59,23 @@ const PRIORITY = [
   'business',
 ];
 
+/**
+ * Lowercase words of a-z, 0-9, Devanagari and Telugu (Hindi and Telugu merchants keep their script);
+ * everything else becomes a space. Latin keys are unchanged from 1.0, so learned rules still match.
+ */
 export function normalizeMerchantKey(merchant: string): string {
-  return merchant.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
+  return merchant
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'\p{Script=Devanagari}\p{Script=Telugu}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
+
+const keywordsFor = (id: string): string[] => [
+  ...(KEYWORDS[id] ?? []),
+  ...(INDIC_KEYWORDS_NFC[id] ?? []),
+];
 
 function tokens(key: string): string[] {
   return key.split(' ').filter(Boolean);
@@ -100,7 +115,7 @@ export function categorise(merchant: string, rules: Record<string, CategoryId> =
   let best: { id: string; score: number } | null = null;
   for (const id of PRIORITY) {
     let score = 0;
-    for (const k of KEYWORDS[id] ?? []) {
+    for (const k of keywordsFor(id)) {
       if (k.includes(' ')) {
         if (` ${key} `.includes(` ${k} `)) score += 2;
       } else if (words.some((w) => w === k || w === `${k}s` || w === `${k}es`)) score += 2;
@@ -112,7 +127,7 @@ export function categorise(merchant: string, rules: Record<string, CategoryId> =
   for (const w of words) {
     if (w.length < 5) continue;
     for (const id of PRIORITY) {
-      for (const k of KEYWORDS[id] ?? []) {
+      for (const k of keywordsFor(id)) {
         if (k.length >= 5 && !k.includes(' ') && withinOneEdit(w, k)) {
           return { categoryId: id, confidence: 'fuzzy' };
         }

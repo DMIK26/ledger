@@ -27,12 +27,14 @@ function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
 export function App() {
   const { path, query } = useRoute();
   const adding = query.get('action') === 'add';
+  const addDate = adding ? (query.get('on') ?? undefined) : undefined;
   // Re-mount the page when its address changes (apart from opening the Add sheet).
   const pageQuery = new URLSearchParams(query);
   pageQuery.delete('action');
+  pageQuery.delete('on');
   const key = `${path}?${pageQuery.toString()}`;
   return (
-    <Layout path={path} adding={adding}>
+    <Layout path={path} adding={adding} addDate={addDate}>
       <Page key={key} path={path} query={pageQuery} />
     </Layout>
   );

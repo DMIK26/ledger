@@ -3,7 +3,8 @@ import { DEFAULT_CATEGORIES } from '../domain/categories';
 import { categorise, normalizeMerchantKey } from '../domain/categoriser';
 import type { SavedView } from '../domain/filters';
 import { budgetsForMonth, toBudgetRows, type MonthBudgets } from '../domain/budgets';
-import { addDays } from '../domain/dates';
+import { addDays, setMonthStartDay } from '../domain/dates';
+import { MAX_FAVOURITES, repeatKey, type Favourite, type RepeatItem } from '../domain/repeat';
 import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
 import type { ImportPlan } from '../domain/csvImport';
 import type { RecurringItem } from '../domain/recurring';
@@ -26,8 +27,9 @@ import {
   type Settings,
   type Transaction,
   type TrashItem,
+  type TxSource,
 } from '../domain/types';
-import { loadSettings, type BackupFile } from './backup';
+import { loadSettings, mergeDays, mergeFavourites, type BackupFile } from './backup';
 import { CommandBus, purgeTrash } from './bus';
 import {
   addTransaction,
@@ -49,6 +51,9 @@ import {
   setReceipt,
   setRule,
   setViews,
+  setSettingsList,
+  FAVOURITES_KEY,
+  NO_SPEND_KEY,
   putNote,
   removeNote,
   putSketch,
@@ -100,6 +105,10 @@ export interface LedgerState {
   sketches: Sketch[];
   /** What the sample data added, while it is loaded; null otherwise. */
   sample: SampleMarker | null;
+  /** Entries pinned for one-tap repeating, in the user's order. */
+  favourites: Favourite[];
+  /** Days the user marked as having no spending, so they count as logged. */
+  noSpendDays: ISODate[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -119,7 +128,18 @@ export interface LedgerState {
     categoryId?: CategoryId,
     extra?: { date?: ISODate; method?: PaymentMethod },
   ) => Promise<void>;
-  addEntry: (draft: EntryDraft, receipt?: Blob | null) => Promise<void>;
+  addEntry: (draft: EntryDraft, receipt?: Blob | null, source?: TxSource) => Promise<void>;
+  /** Adds a repeat chip's entry (a favourite or a frequent one), for today unless a date is given. */
+  addRepeat: (item: RepeatItem, date?: ISODate) => Promise<void>;
+  /** Adds several parsed lines as one undoable step. Lines that are not ok are skipped. */
+  addMany: (entries: ParsedEntry[]) => Promise<number>;
+  /** Copies entries to today (new ids, no receipt), as one undoable step. */
+  copyToToday: (ids: string[]) => Promise<void>;
+  saveFavourite: (item: Omit<RepeatItem, 'key'>) => Promise<boolean>;
+  removeFavourite: (id: string) => Promise<void>;
+  moveFavourite: (id: string, toIndex: number) => Promise<void>;
+  /** Marks days as having no spending (undoable). */
+  markNoSpend: (dates: ISODate[]) => Promise<void>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
@@ -222,6 +242,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       return db;
     };
 
+    /** Favourites and no-spend days a backup adds (never removes), as commands. */
+    const listMerges = (file: BackupFile): Command[] => {
+      const out: Command[] = [];
+      const favs = mergeFavourites(get().favourites, file.data.favourites ?? []);
+      if (favs.length !== get().favourites.length)
+        out.push(setSettingsList(FAVOURITES_KEY, favs, get().favourites, 'Restored favourites'));
+      const days = mergeDays(get().noSpendDays, file.data.noSpendDays ?? []);
+      if (days.length !== get().noSpendDays.length)
+        out.push(setSettingsList(NO_SPEND_KEY, days, get().noSpendDays, 'Restored no-spend days'));
+      return out;
+    };
+
     const refresh = async (): Promise<void> => {
       const d = requireDb();
       const [
@@ -236,6 +268,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         notes,
         sketches,
         sample,
+        favourites,
+        noSpend,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -248,6 +282,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.getAll('notes'),
         d.getAll('sketches'),
         d.get('settings', SAMPLE_KEY),
+        d.get('settings', FAVOURITES_KEY),
+        d.get('settings', NO_SPEND_KEY),
       ]);
       notes.sort((a, b) => a.createdAt - b.createdAt);
       recurring.sort((a, b) => a.merchant.localeCompare(b.merchant));
@@ -266,6 +302,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         notes,
         sketches,
         sample: (sample as SampleMarker | undefined) ?? null,
+        favourites: Array.isArray(favourites) ? (favourites as Favourite[]) : [],
+        noSpendDays: Array.isArray(noSpend) ? (noSpend as ISODate[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -288,6 +326,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       notes: [],
       sketches: [],
       sample: null,
+      favourites: [],
+      noSpendDays: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -311,6 +351,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             }
             await purgeTrash(db);
             const settings = await loadSettings(db);
+            setMonthStartDay(settings.monthStartDay);
             const lock = ((await db.get('settings', LOCK_KEY)) as LockConfig | undefined) ?? null;
             const reset = await db.get('settings', LOCK_RESET_KEY);
             applyBoot(settings);
@@ -379,14 +420,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (method && method !== settings.lastMethod) await get().setSetting('lastMethod', method);
       },
 
-      addEntry: async (draft, receipt) => {
+      addEntry: async (draft, receipt, source = 'form') => {
         const { settings, rules } = get();
         const now = Date.now();
         const tx: Transaction = {
           id: newId(),
           ...draft,
           currency: settings.currency,
-          source: 'form',
+          source,
           unsure: false,
           hasReceipt: receipt ? true : undefined,
           createdAt: now,
@@ -434,6 +475,140 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         }
         const label = `Edited ${after.merchant}`;
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+      },
+
+      addRepeat: async (item, date) => {
+        const now = Date.now();
+        const tx: Transaction = {
+          id: newId(),
+          date: date ?? todayISO(),
+          amountMinor: item.amountMinor,
+          currency: get().settings.currency,
+          merchant: item.merchant,
+          categoryId: item.categoryId,
+          method: item.method,
+          notes: '',
+          tags: [...item.tags],
+          source: 'repeat',
+          unsure: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await get().run(addTransaction(tx), `Added ${tx.merchant}`);
+      },
+
+      addMany: async (entries) => {
+        const { settings } = get();
+        const ok = entries.filter((p) => p.ok && p.amountMinor !== null && p.amountMinor > 0);
+        if (ok.length === 0) return 0;
+        const now = Date.now();
+        const steps = ok.map((p, i) =>
+          addTransaction({
+            id: newId(),
+            date: p.date,
+            amountMinor: p.amountMinor!,
+            currency: settings.currency,
+            merchant: p.merchant,
+            categoryId: p.categoryId,
+            method: p.method,
+            notes: '',
+            tags: [],
+            raw: p.raw,
+            source: 'quick',
+            unsure: p.unsure,
+            // Keeps the typed order within a day.
+            createdAt: now + i,
+            updatedAt: now + i,
+          }),
+        );
+        const label = `Added ${ok.length} ${ok.length === 1 ? 'entry' : 'entries'}`;
+        await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+        return ok.length;
+      },
+
+      copyToToday: async (ids) => {
+        const list = get().transactions.filter((t) => ids.includes(t.id));
+        if (list.length === 0) return;
+        const today = todayISO();
+        const now = Date.now();
+        const steps = list.map((t, i) =>
+          addTransaction({
+            ...t,
+            id: newId(),
+            date: today,
+            source: 'repeat',
+            raw: undefined,
+            hasReceipt: undefined,
+            recurringId: undefined,
+            unsure: false,
+            createdAt: now + i,
+            updatedAt: now + i,
+          }),
+        );
+        const label = `Copied ${list.length} ${list.length === 1 ? 'entry' : 'entries'} to today`;
+        await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+      },
+
+      saveFavourite: async (item) => {
+        const previous = get().favourites;
+        const key = repeatKey(item);
+        const existing = previous.find((f) => repeatKey(f) === key);
+        if (existing) {
+          set({ notice: `${existing.merchant} is already a favourite` });
+          return false;
+        }
+        if (previous.length >= MAX_FAVOURITES) {
+          set({ notice: `Up to ${MAX_FAVOURITES} favourites. Remove one in Settings first.` });
+          return false;
+        }
+        const fav: Favourite = {
+          id: newId(),
+          merchant: item.merchant,
+          amountMinor: item.amountMinor,
+          categoryId: item.categoryId,
+          method: item.method,
+          tags: [...item.tags],
+          createdAt: Date.now(),
+        };
+        await get().run(
+          setSettingsList(FAVOURITES_KEY, [...previous, fav], previous, `Saved ${fav.merchant} as a favourite`),
+        );
+        return true;
+      },
+
+      removeFavourite: async (id) => {
+        const previous = get().favourites;
+        const fav = previous.find((f) => f.id === id);
+        if (!fav) return;
+        await get().run(
+          setSettingsList(
+            FAVOURITES_KEY,
+            previous.filter((f) => f.id !== id),
+            previous,
+            `Removed ${fav.merchant} from favourites`,
+          ),
+        );
+      },
+
+      moveFavourite: async (id, toIndex) => {
+        const previous = get().favourites;
+        const from = previous.findIndex((f) => f.id === id);
+        const to = Math.max(0, Math.min(previous.length - 1, toIndex));
+        if (from < 0 || from === to) return;
+        const next = [...previous];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved!);
+        await get().run(setSettingsList(FAVOURITES_KEY, next, previous, 'Reordered favourites'));
+      },
+
+      markNoSpend: async (dates) => {
+        const previous = get().noSpendDays;
+        const add = [...new Set(dates)].filter((d) => !previous.includes(d));
+        if (add.length === 0) return;
+        const next = [...previous, ...add].sort();
+        const label =
+          add.length === 1 ? 'Marked a day with no spending' : `Marked ${add.length} days with no spending`;
+        await get().run(setSettingsList(NO_SPEND_KEY, next, previous, label));
       },
 
       bulkDelete: async (ids) => {
@@ -739,6 +914,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ...(file.data.sketches ?? [])
             .filter((k) => !haveSketches.has(k.id))
             .map((k) => putSketch(k, undefined, 'Restored a drawing')),
+          ...listMerges(file),
         ];
         const replace = replaceEverything(before, after);
         await get().run(
@@ -766,7 +942,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const newNotes = (file.data.notes ?? []).filter((n) => !haveNotes.has(n.id));
         const haveSketches = new Set(get().sketches.map((k) => k.id));
         const newSketches = (file.data.sketches ?? []).filter((k) => !haveSketches.has(k.id));
+        const lists = listMerges(file);
         if (
+          lists.length === 0 &&
           newTx.length === 0 &&
           newCats.length === 0 &&
           newRules.length === 0 &&
@@ -789,6 +967,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ...newRecurring.map((r) => putRecurring(r, undefined, label)),
           ...newNotes.map((n) => putNote(n, undefined, label)),
           ...newSketches.map((k) => putSketch(k, undefined, label)),
+          ...lists,
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;
@@ -903,7 +1082,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       setSetting: async (key, value) => {
         await requireDb().put('settings', value, key);
         const settings = { ...get().settings, [key]: value };
-        set({ settings });
+        if (key === 'monthStartDay') {
+          // Before anything re-renders. Month totals are memoised on the entry list, so a new list
+          // makes every page work its months out again.
+          setMonthStartDay(value as number);
+          set({ settings, transactions: [...get().transactions] });
+        } else set({ settings });
         applyBoot(settings);
       },
 

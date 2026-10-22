@@ -1,4 +1,5 @@
 import { normalizeMerchantKey } from './categoriser';
+import { nativeDigits } from './indic';
 import type { ParsedEntry, TokenKind } from './parser';
 
 export type HighlightKind = TokenKind | 'category';
@@ -16,14 +17,15 @@ export function highlightSegments(
   parsed: Pick<ParsedEntry, 'raw' | 'text' | 'tokens' | 'merchant' | 'confidence'>,
 ): Segment[] {
   const { raw } = parsed;
-  if (parsed.text !== raw) return raw ? [{ text: raw, kind: null }] : [];
+  // Native digits become 0-9 one for one, so the spans still line up; spoken number words do not.
+  if (parsed.text !== nativeDigits(raw)) return raw ? [{ text: raw, kind: null }] : [];
   const kinds: Array<HighlightKind | null> = new Array<HighlightKind | null>(raw.length).fill(null);
   for (const t of parsed.tokens) {
     for (let i = Math.max(0, t.start); i < Math.min(raw.length, t.end); i += 1) kinds[i] = t.kind;
   }
   if (parsed.confidence !== 'none') {
     const words = new Set(normalizeMerchantKey(parsed.merchant).split(' ').filter(Boolean));
-    const re = /[\p{L}\p{N}']+/gu;
+    const re = /[\p{L}\p{M}\p{N}']+/gu;
     for (let m = re.exec(raw); m; m = re.exec(raw)) {
       const start = m.index;
       const end = start + m[0].length;

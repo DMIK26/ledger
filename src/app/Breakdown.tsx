@@ -2,7 +2,7 @@ import { useLedger } from '../data/store';
 import { categoryTotals } from '../domain/aggregates';
 import { normalizeMerchantKey } from '../domain/categoriser';
 import { categoryById } from '../domain/categories';
-import { fmtDate } from '../domain/dates';
+import { fmtDate, monthKey } from '../domain/dates';
 import { samePin, type Pin } from '../domain/pins';
 import type { Transaction } from '../domain/types';
 import { entityKey, merchantKey } from '../kit/entityKeys';
@@ -148,9 +148,9 @@ export function Breakdown({
         />
       );
     } else {
-      const month = entries[0]?.date.slice(0, 7) ?? range.from.slice(0, 7);
+      const month = monthKey(entries[0]?.date ?? range.from);
       const before = new Map(
-        categoryTotals(compareEntries, compareEntries[0]?.date.slice(0, 7) ?? '').map((c) => [
+        categoryTotals(compareEntries, compareEntries[0] ? monthKey(compareEntries[0].date) : '').map((c) => [
           c.categoryId,
           c.totalMinor,
         ]),

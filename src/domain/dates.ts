@@ -66,8 +66,67 @@ export function weekdayOf(iso: ISODate): number {
   return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay();
 }
 
+/**
+ * The day a "month" starts on, for people paid on a fixed day (Settings > Month starts on). 1 means
+ * calendar months. Set once from settings, like privacy in money.ts, so every month calculation agrees.
+ */
+let monthStartDay = 1;
+export const MAX_MONTH_START = 28;
+
+export function setMonthStartDay(day: number): void {
+  monthStartDay = Number.isInteger(day) ? Math.min(MAX_MONTH_START, Math.max(1, day)) : 1;
+}
+export const getMonthStartDay = (): number => monthStartDay;
+
+const keyOf = (y: number, m: number): string => `${String(y).padStart(4, '0')}-${pad2(m)}`;
+
+/**
+ * The month a date belongs to, as 'YYYY-MM'. With a start day of 1 that is the calendar month. Otherwise
+ * a month runs from the start day to the day before it next month, and is named after the month it
+ * starts in when the start day is 1 to 15, or the month it ends in when it is 16 to 28 (salary on the
+ * 25th of October pays for "November").
+ */
 export function monthKey(iso: ISODate): string {
-  return iso.slice(0, 7);
+  if (monthStartDay === 1) return iso.slice(0, 7);
+  const p = parseISO(iso);
+  if (!p) return iso.slice(0, 7);
+  const begins = p.d >= monthStartDay ? { y: p.y, m: p.m } : shiftMonth(p.y, p.m, -1);
+  const named = monthStartDay <= 15 ? begins : shiftMonth(begins.y, begins.m, 1);
+  return keyOf(named.y, named.m);
+}
+
+/** Moves a 'YYYY-MM' month key by whole months. */
+export function shiftMonthKey(key: string, delta: number): string {
+  const [y, m] = key.split('-').map(Number);
+  const s = shiftMonth(y ?? 2000, m ?? 1, delta);
+  return keyOf(s.y, s.m);
+}
+
+/** First and last day of a month, following the month start day. */
+export function monthBounds(key: string): { start: ISODate; end: ISODate } {
+  const [y = 2000, m = 1] = key.split('-').map(Number);
+  if (monthStartDay === 1) return { start: isoFromYMD(y, m, 1), end: isoFromYMD(y, m, daysInMonth(y, m)) };
+  const begins = monthStartDay <= 15 ? { y, m } : shiftMonth(y, m, -1);
+  const next = shiftMonth(begins.y, begins.m, 1);
+  return {
+    start: isoFromYMD(begins.y, begins.m, monthStartDay),
+    end: addDays(isoFromYMD(next.y, next.m, monthStartDay), -1),
+  };
+}
+
+/** Day number within its month (1 on the start day) and how many days that month has. */
+export function monthProgress(iso: ISODate): { day: number; length: number } {
+  const { start, end } = monthBounds(monthKey(iso));
+  return { day: diffDays(iso, start) + 1, length: diffDays(end, start) + 1 };
+}
+
+/** "25 Oct to 24 Nov" when months do not start on the 1st; empty otherwise. */
+export function monthRangeLabel(key: string): string {
+  if (monthStartDay === 1) return '';
+  const { start, end } = monthBounds(key);
+  const a = mustParse(start);
+  const b = mustParse(end);
+  return `${a.d} ${MONTHS[a.m - 1]!.slice(0, 3)} to ${b.d} ${MONTHS[b.m - 1]!.slice(0, 3)}`;
 }
 
 export function shiftMonth(y: number, m: number, delta: number): { y: number; m: number } {

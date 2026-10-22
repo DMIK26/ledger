@@ -15,6 +15,8 @@ interface Props {
   editing?: { id: string; draft: EntryDraft; hasReceipt?: boolean };
   /** Show the "Describe it" field that fills the form from a quick-add sentence. */
   describe?: boolean;
+  /** A new entry's starting date (the check-in opens Add for a missed day). */
+  initialDate?: string;
   autoFocus?: boolean;
   submitLabel: string;
   onDone: () => void;
@@ -23,6 +25,7 @@ interface Props {
 export function EntryForm({
   editing,
   describe = false,
+  initialDate,
   autoFocus = false,
   submitLabel,
   onDone,
@@ -43,7 +46,9 @@ export function EntryForm({
   const [merchant, setMerchant] = useState(start?.merchant ?? '');
   const [amount, setAmount] = useState<number | null>(start?.amountMinor ?? null);
   const [amountKey, setAmountKey] = useState(0);
-  const [date, setDate] = useState(start?.date ?? todayISO());
+  const [date, setDate] = useState(
+    start?.date ?? (initialDate && parseISO(initialDate) ? initialDate : todayISO()),
+  );
   const [categoryId, setCategoryId] = useState(start?.categoryId ?? 'other');
   const [categoryTouched, setCategoryTouched] = useState(editing !== undefined);
   const [method, setMethod] = useState<PaymentMethod>(start?.method ?? lastMethod);

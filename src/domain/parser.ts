@@ -1,7 +1,11 @@
+import { CALC_NUMBER, CALC_OPERATOR, evaluateAmount } from './calc';
 import { categorise, type Confidence } from './categoriser';
 import {
   addDays, daysInMonth, diffDays, isoFromYMD, MONTHS, parseISO, shiftMonth, weekdayOf,
 } from './dates';
+import {
+  alternation, B_END, B_START, CASH_WORDS, DATE_WORDS, nativeDigits, RUPEE_PREFIXES, RUPEE_WORDS,
+} from './indic';
 import { parseAmountToMinor } from './money';
 import { replaceNumberWords } from './numberWords';
 import type { CategoryId, ISODate, PaymentMethod } from './types';
@@ -109,6 +113,9 @@ function mostRecentWeekday(today: ISODate, target: number, strictlyBefore: boole
   return addDays(today, -delta);
 }
 
+/** Hindi and Telugu (and their Roman spellings) for today, yesterday and the day before. */
+const INDIC_DATE = new RegExp(`${B_START}(${alternation(Object.keys(DATE_WORDS))})${B_END}`, 'iu');
+
 function detectDate(text: string): DateHit | null {
   let m: RegExpExecArray | null;
 
@@ -159,6 +166,12 @@ function detectDate(text: string): DateHit | null {
     const d = Number(group(m, 2));
     const offset = group(m, 1).toLowerCase() === 'this' ? 0 : -1;
     return { ...spanOf(m), source: 'day', resolve: (t) => resolveDayInMonthOffset(d, offset, t) };
+  }
+
+  m = INDIC_DATE.exec(text);
+  if (m) {
+    const back = DATE_WORDS[group(m, 1).toLowerCase().replace(/\s+/g, ' ')] ?? 0;
+    return { ...spanOf(m), source: 'relative', resolve: (t) => ({ date: addDays(t, -back) }) };
   }
 
   m = new RegExp(
@@ -227,6 +240,7 @@ function detectDate(text: string): DateHit | null {
 const METHOD_PATTERNS: Array<[RegExp, PaymentMethod]> = [
   [/\b(?:upi|gpay|google\s*pay|phone\s*pe|phonepe|paytm|bhim)\b/i, 'UPI'],
   [/\bcash\b/i, 'Cash'],
+  [new RegExp(`${B_START}(?:${alternation(CASH_WORDS)})${B_END}`, 'iu'), 'Cash'],
   [/\b(?:credit\s*card|debit\s*card|card|credit|debit)\b/i, 'Card'],
   [/\b(?:net\s*banking|netbanking|neft|imps|rtgs|bank\s*transfer|bank|transfer)\b/i, 'Bank transfer'],
 ];
@@ -244,18 +258,35 @@ function overlaps(a: Span, spans: readonly Span[]): boolean {
 }
 
 interface NumberWord extends Span {
+  /** Index of the first and last whitespace-separated word it covers. */
   index: number;
+  last: number;
   digits: string;
   isInteger: boolean;
   marked: boolean;
   kilo: boolean;
+  /** Set for a sum such as "250+120/2": its worked-out value in minor units. */
+  value?: number;
 }
 
-const NUMBER_WORD = /^(?:₹|rs\.?|inr)?(\d[\d,]*(?:\.\d+)?)(k)?(\/-|rs\.?|inr)?$/i;
-const MARKER_WORD = /^(?:₹|rs\.?|inr|rupees?)$/i;
-const PREFIX_MARKER = /^(?:₹|rs\.?|inr)$/i;
+const PREFIXES = `₹|rs\\.?|inr|(?:${alternation(RUPEE_PREFIXES)})\\.?`;
+const NUMBER_WORD = new RegExp(
+  `^(?:${PREFIXES})?(\\d[\\d,]*(?:\\.\\d+)?)(k)?(\\/-|rs\\.?|inr)?$`,
+  'iu',
+);
+const MARKED_START = new RegExp(`^(?:${PREFIXES})`, 'iu');
+const MARKER_WORD = new RegExp(`^(?:₹|rs\\.?|inr|rupees?|${alternation(RUPEE_WORDS)})$`, 'iu');
+const PREFIX_MARKER = new RegExp(`^(?:₹|rs\\.?|inr|${alternation(RUPEE_PREFIXES)})$`, 'iu');
+/** A sum typed as the amount, optionally after a rupee sign: "250+120/2", "₹3 x 45", "2k+500". */
+const SUM = new RegExp(
+  `(?<![\\p{L}\\p{M}\\p{N}.,])(?:(₹|rs\\.?|inr)\\s?)?(${CALC_NUMBER}(?:\\s*${CALC_OPERATOR}\\s*${CALC_NUMBER})+)(?![\\p{L}\\p{M}\\p{N}])`,
+  'giu',
+);
 
-function findNumbers(text: string, taken: Span[]): { numbers: NumberWord[]; markers: Span[] } {
+function findNumbers(
+  text: string,
+  taken: Span[],
+): { numbers: NumberWord[]; markers: Span[]; errors: string[] } {
   const words = [...text.matchAll(/\S+/g)].map((m, index) => ({
     index,
     start: m.index ?? 0,
@@ -264,17 +295,40 @@ function findNumbers(text: string, taken: Span[]): { numbers: NumberWord[]; mark
   }));
   const numbers: NumberWord[] = [];
   const markers: Span[] = [];
+  const errors: string[] = [];
+  const sums: Span[] = [];
+  for (const m of text.matchAll(SUM)) {
+    const span = spanOf(m);
+    if (overlaps(span, taken)) continue;
+    const covered = words.filter((w) => w.start < span.end && span.start < w.end);
+    const result = evaluateAmount(group(m, 2));
+    sums.push(span);
+    if (!result.ok) {
+      errors.push(result.error);
+      continue;
+    }
+    numbers.push({
+      ...span,
+      index: covered[0]?.index ?? 0,
+      last: covered[covered.length - 1]?.index ?? 0,
+      digits: '',
+      isInteger: false,
+      marked: group(m, 1) !== '',
+      kilo: false,
+      value: result.minor,
+    });
+  }
   for (const w of words) {
-    if (overlaps(w, taken)) continue;
+    if (overlaps(w, taken) || overlaps(w, sums)) continue;
     const m = NUMBER_WORD.exec(w.token);
     if (m) {
       const digits = group(m, 1);
-      const marked =
-        /^(?:₹|rs|inr)/i.test(w.token) || group(m, 3) !== '' || w.token.startsWith('₹');
+      const marked = MARKED_START.test(w.token) || group(m, 3) !== '';
       numbers.push({
         start: w.start,
         end: w.end,
         index: w.index,
+        last: w.index,
         digits,
         isInteger: /^\d+$/.test(digits) && !/k$/i.test(w.token),
         marked,
@@ -283,18 +337,19 @@ function findNumbers(text: string, taken: Span[]): { numbers: NumberWord[]; mark
     }
   }
   for (const w of words) {
-    if (overlaps(w, taken) || !MARKER_WORD.test(w.token)) continue;
+    if (overlaps(w, taken) || overlaps(w, sums) || !MARKER_WORD.test(w.token)) continue;
     const next = numbers.find((n) => n.index === w.index + 1);
-    const prev = numbers.find((n) => n.index === w.index - 1);
+    const prev = numbers.find((n) => n.last === w.index - 1);
     if (PREFIX_MARKER.test(w.token) && next) next.marked = true;
     else if (prev) prev.marked = true;
     else if (next) next.marked = true;
     markers.push({ start: w.start, end: w.end });
   }
-  return { numbers, markers };
+  return { numbers, markers, errors };
 }
 
 function numberToMinor(n: NumberWord): number | null {
+  if (n.value !== undefined) return n.value;
   const minor = parseAmountToMinor(n.digits);
   if (minor === null) return null;
   return n.kilo ? minor * 1000 : minor;
@@ -333,7 +388,7 @@ function buildMerchant(text: string, taken: Span[]): string {
 }
 
 export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
-  const text = replaceNumberWords(input);
+  const text = replaceNumberWords(nativeDigits(input));
   const taken: Span[] = [];
   const tokens: Token[] = [];
   const errors: string[] = [];
@@ -366,11 +421,15 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
   const methodHit = detectMethod(text, taken);
   if (methodHit) claim('method', methodHit.span);
 
-  const { numbers, markers } = findNumbers(text, taken);
+  const scan = findNumbers(text, taken);
+  const { numbers, markers } = scan;
+  errors.push(...scan.errors);
   let amountMinor: number | null = null;
   let chosen: NumberWord | undefined;
   const marked = numbers.filter((n) => n.marked);
+  const sums = numbers.filter((n) => n.value !== undefined);
   if (marked.length > 0) chosen = marked[0];
+  else if (sums.length > 0) chosen = sums[0];
   else {
     chosen = numbers.reduce<NumberWord | undefined>((best, n) => {
       const value = numberToMinor(n) ?? -1;

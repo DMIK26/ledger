@@ -10,6 +10,8 @@ import {
 import type { RecurringItem } from '../domain/recurring';
 import type { Note } from '../domain/notes';
 import type { Sketch } from '../domain/sketch';
+import type { Favourite } from '../domain/repeat';
+import { FAVOURITES_KEY, NO_SPEND_KEY } from './commands';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -28,8 +30,25 @@ export interface BackupFile {
     /** Added in Drop 6. */
     notes?: Note[];
     sketches?: Sketch[];
+    /** Added in Drop 8. */
+    favourites?: Favourite[];
+    noSpendDays?: string[];
   };
 }
+
+const listOf = async <T>(db: Db, key: string): Promise<T[]> => {
+  const v = await db.get('settings', key);
+  return Array.isArray(v) ? (v as T[]) : [];
+};
+
+/** Merges two favourite lists: everything in `have`, then what `extra` adds that is not already there. */
+export function mergeFavourites(have: Favourite[], extra: Favourite[]): Favourite[] {
+  const ids = new Set(have.map((f) => f.id));
+  return [...have, ...extra.filter((f) => !ids.has(f.id))];
+}
+
+export const mergeDays = (have: string[], extra: string[]): string[] =>
+  [...new Set([...have, ...extra])].sort();
 
 export async function loadSettings(db: Db): Promise<Settings> {
   const settings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
@@ -54,6 +73,8 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       recurring: await db.getAll('recurring'),
       notes: await db.getAll('notes'),
       sketches: await db.getAll('sketches'),
+      favourites: await listOf<Favourite>(db, FAVOURITES_KEY),
+      noSpendDays: await listOf<string>(db, NO_SPEND_KEY),
     },
   };
 }
@@ -122,6 +143,30 @@ export function validateBackup(json: unknown): BackupFile | null {
     )
   )
     return null;
+  const { favourites, noSpendDays } = json.data;
+  if (
+    favourites !== undefined &&
+    !(
+      Array.isArray(favourites) &&
+      favourites.every(
+        (f) =>
+          isObj(f) &&
+          typeof f.id === 'string' &&
+          typeof f.merchant === 'string' &&
+          Number.isInteger(f.amountMinor) &&
+          typeof f.categoryId === 'string',
+      )
+    )
+  )
+    return null;
+  if (
+    noSpendDays !== undefined &&
+    !(
+      Array.isArray(noSpendDays) &&
+      noSpendDays.every((d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
+    )
+  )
+    return null;
   return json as unknown as BackupFile;
 }
 
@@ -182,6 +227,13 @@ export async function importBackup(
     }
   }
   for (const r of file.data.rules) await t.objectStore('rules').put(r);
+  // Favourites and no-spend days are only ever added to, like notes.
+  const favs = (await t.objectStore('settings').get(FAVOURITES_KEY)) as Favourite[] | undefined;
+  await t
+    .objectStore('settings')
+    .put(mergeFavourites(favs ?? [], file.data.favourites ?? []), FAVOURITES_KEY);
+  const days = (await t.objectStore('settings').get(NO_SPEND_KEY)) as string[] | undefined;
+  await t.objectStore('settings').put(mergeDays(days ?? [], file.data.noSpendDays ?? []), NO_SPEND_KEY);
   if (mode === 'replace') {
     for (const [key, value] of Object.entries(file.data.settings)) {
       await t.objectStore('settings').put(value, key);

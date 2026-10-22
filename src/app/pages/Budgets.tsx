@@ -13,7 +13,7 @@ import {
   type MonthBudgets,
   type Segment,
 } from '../../domain/budgets';
-import { daysInMonth, isoFromYMD, monthLabel, todayISO } from '../../domain/dates';
+import { monthBounds, monthLabel, todayISO } from '../../domain/dates';
 import { pinnedCategories } from '../../domain/pins';
 import { usePins, useScopedTransactions, useViewMonth } from '../../kit/view';
 import type { Category } from '../../domain/types';
@@ -150,8 +150,7 @@ export function Budgets() {
 
   const now = todayISO();
   const month = useViewMonth();
-  const [vy, vm] = month.split('-').map(Number);
-  const monthEnd = isoFromYMD(vy!, vm!, daysInMonth(vy!, vm!));
+  const monthEnd = monthBounds(month).end;
   // Spent so far for the current month; the whole month for a past one.
   const today = monthEnd < now ? monthEnd : now;
   const mine = budgetsForMonth(budgets, month);

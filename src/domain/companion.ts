@@ -1,7 +1,7 @@
 import { categoryTotals, inMonth, kpis } from './aggregates';
 import { budgetStatus, projectMonthEnd } from './budgets';
 import { categoryById } from './categories';
-import { daysInMonth, fmtDate, monthKey, parseISO } from './dates';
+import { fmtDate, monthBounds, monthKey, monthProgress } from './dates';
 import type { Insight } from './insights';
 import { fmtMoney } from './money';
 import { nextOccurrence, type RecurringItem } from './recurring';
@@ -116,8 +116,8 @@ export function answer(q: Question, ctx: AskContext): Answer {
           anchor: 'budget:overall',
         };
       const current = monthKey(ctx.today) === ctx.month;
-      const p = parseISO(ctx.today)!;
-      if (current && p.d < daysInMonth(p.y, p.m)) {
+      const p = monthProgress(ctx.today);
+      if (current && p.day < p.length) {
         const end = budgetStatus(projectMonthEnd(spent, ctx.today), ctx.overallBudgetMinor);
         return {
           text:
@@ -162,10 +162,7 @@ export function answer(q: Question, ctx: AskContext): Answer {
   }
 }
 
-function lastDay(month: string): ISODate {
-  const [y, m] = month.split('-').map(Number);
-  return `${month}-${String(daysInMonth(y!, m!)).padStart(2, '0')}`;
-}
+const lastDay = (month: string): ISODate => monthBounds(month).end;
 
 /** One auto-annotation per page: an arrow and a short handwritten caption at something worth noticing. */
 export function autoAnnotation(

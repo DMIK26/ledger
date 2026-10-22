@@ -1,11 +1,35 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLedger } from '../data/store';
+import type { AddMode } from '../domain/types';
 import { EntryForm } from './EntryForm';
 import { Icon } from './icons';
+import { Keypad } from './Keypad';
+import { Several } from './Several';
 
-/** The Add dialog: centred on desktop, a bottom sheet under 900px. Opened by `?action=add`. */
-export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+const MODES: Array<{ id: AddMode; label: string }> = [
+  { id: 'form', label: 'Form' },
+  { id: 'keypad', label: 'Keypad' },
+  { id: 'several', label: 'Several' },
+];
+
+/**
+ * The Add dialog: centred on desktop, a bottom sheet under 900px. Opened by `?action=add` (with
+ * `&on=YYYY-MM-DD` to start on a date). Three ways in: the full form, the keypad, several lines.
+ * The last one used is remembered.
+ */
+export function AddSheet({
+  open,
+  onClose,
+  date,
+}: {
+  open: boolean;
+  onClose: () => void;
+  date?: string;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const [round, setRound] = useState(0);
+  const mode = useLedger((s) => s.settings.addMode);
+  const setSetting = useLedger((s) => s.setSetting);
 
   useEffect(() => {
     const d = ref.current;
@@ -46,7 +70,30 @@ export function AddSheet({ open, onClose }: { open: boolean; onClose: () => void
             <Icon name="close" />
           </button>
         </div>
-        {open && <EntryForm key={round} describe autoFocus submitLabel="Save" onDone={onClose} />}
+        <div className="segmented add-modes" role="group" aria-label="Add with">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={mode === m.id}
+              onClick={() => void setSetting('addMode', m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {open && mode === 'form' && (
+          <EntryForm
+            key={round}
+            describe
+            autoFocus
+            initialDate={date}
+            submitLabel="Save"
+            onDone={onClose}
+          />
+        )}
+        {open && mode === 'keypad' && <Keypad key={round} initialDate={date} onDone={onClose} />}
+        {open && mode === 'several' && <Several key={round} initialDate={date} onDone={onClose} />}
       </div>
     </dialog>
   );

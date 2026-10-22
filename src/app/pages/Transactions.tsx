@@ -205,7 +205,11 @@ function BulkBar({
   const bulkDelete = useLedger((s) => s.bulkDelete);
   const bulkSetCategory = useLedger((s) => s.bulkSetCategory);
   const bulkAddTag = useLedger((s) => s.bulkAddTag);
+  const copyToToday = useLedger((s) => s.copyToToday);
+  const saveFavourite = useLedger((s) => s.saveFavourite);
+  const transactions = useLedger((s) => s.transactions);
   const [tag, setTag] = useState('');
+  const single = ids.length === 1 ? transactions.find((t) => t.id === ids[0]) : undefined;
 
   return (
     <section className="bulk-bar" aria-label="Bulk actions">
@@ -255,6 +259,20 @@ function BulkBar({
           Tag
         </button>
       </form>
+      <button type="button" className="btn" onClick={() => void copyToToday(ids).then(onDone)}>
+        <Icon name="copy" />
+        Copy to today
+      </button>
+      {single && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void saveFavourite(single).then(onDone)}
+        >
+          <Icon name="star" />
+          Save as favourite
+        </button>
+      )}
       <button type="button" className="btn" onClick={() => void bulkDelete(ids).then(onDone)}>
         <Icon name="trash" />
         Delete

@@ -174,3 +174,63 @@ Empty-state card above a table that has rows; two total rows; cut-off legend nam
 colour; ".00" on every axis label; a dead strip under the bar chart; privacy blur missing on some amounts
 (tables, KPI sub-lines, budget card, axis labels); date text left in the merchant name and the entry saved on
 the wrong day; "Film" filed under Food & Dining; a "Download App" button that cannot install on a phone.
+
+## 11. After 1.0: approved roadmap (owner approval, 22 Oct 2026)
+
+Research and sources: the project doc `claude/feature-roadmap.md`. Owner decision: **no automatic capture
+of any kind** (no bank SMS reading, message paste, share target, iPhone Shortcut, statement import, UPI
+reference matching or icon shortcuts). Everything stays on the device with no network calls.
+
+### Drop 8: never miss a log
+
+- **Missed-day check-in** (Dashboard): days in the last 7 (not today, not before the first entry) with no
+  entry and not marked are listed: "Nothing logged on Tue 20 Oct. No spend, or forgot?" Each day offers
+  "No spend" (marks it, undoable) and "Add" (opens Add for that date); "All no spend" marks them all; "Not
+  now" hides the card until tomorrow.
+- **Repeat**: under quick add, up to six chips (pinned favourites first, then entries logged three or more
+  times in 90 days with the same merchant, amount, category and method). One tap adds it for today
+  (undoable). Settings > Favourites pins, unpins and reorders; a transaction can be saved as a favourite.
+  Transactions gets "Copy to today" for selected entries (one undo).
+- **Maths**: amounts accept `+ - x * / × ÷` ("250+120/2", "3 x 45", "2k+500"), in quick add, the amount
+  field and the keypad; multiplication and division before addition and subtraction; results round to the
+  paisa; dates keep priority ("18/9" is a date); a result at or below zero, or a division by zero, is an error.
+- **Keypad** in the Add sheet: amount display, digits, decimal point, the four operators and delete; then
+  tap a category to save (two taps for "amount, category"); optional "What for", date and method; hardware
+  keys work. Privacy mode masks the display.
+- **Several at once** in the Add sheet: one entry per line, a preview of what each line becomes, lines with
+  problems listed and skipped, "Save N entries" as one undoable step.
+- **Telugu and Hindi quick add**: Telugu and Devanagari digits; rupee words (రూ, రూపాయలు, रु, रुपये,
+  rupaye); cash words (నగదు, नकद, nagadu, naqad); date words (నిన్న, మొన్న, ఈరోజు, कल, परसों, आज and
+  their Roman spellings ninna, monna, eeroju, kal, parson, aaj); common spending words in both scripts and
+  in Roman letters (chai, paalu, kooragayalu, sabzi, kiraya, bijli, dawai, battalu and so on) map to the
+  default categories. The merchant keeps the user's own script.
+- **Kind streaks**: a day counts when it has an entry or is marked no spend. The Dashboard shows "Logged
+  26 of the last 30 days" and the current run; every 7 logged days earn a rest day (up to 2 saved) that
+  keeps the run going. No guilt copy, no emoji.
+- **Month start day** (Settings, 1 to 28, default 1): budgets, the Dashboard, the month switcher, insights
+  and month reports use the chosen cycle. A cycle starting on day 1 to 15 is named after the month it
+  starts in, 16 to 28 after the month it ends in (salary on 25 Oct funds "November"). The month switcher
+  shows the dates when the start is not 1.
+- Subcategories move to Drop 12 (they touch every chart and report).
+
+### Later drops (scope agreed, details written when each starts)
+
+- **Drop 9, the whole money picture**: income and a cash-flow view; accounts and transfers; cash-in-hand
+  check; credit cards (cycle, due date, interest apart from spending); udhaar ledger with a reminder message
+  sent through the share sheet; loans and EMIs with a payment slider; foreign-currency entries with a typed rate.
+- **Drop 10, plan ahead**: safe to spend today (daily allowance with rollover); fixed, flexible and
+  non-monthly budgets; sinking funds with due dates and snooze; goals with on-track status; pacing chart and
+  at-risk flags; month-end forecast, rollover and plan reset; calendar view.
+- **Drop 11, interactive**: command palette; swipe review mode and the two-of-three learning rule; chart
+  scrubbing (pointer and keys); guess-first recap; treemap and money-flow chart; compare modes; story recap
+  shared as an image with privacy respected; Splitwise-style splits; customisable dashboard; bottom sheets
+  with snap points; swipe rows, range select, column choice, per-entry history; sketchbook that fills as you
+  log; the pencil's optional wry one-liners.
+- **Drop 12, insight**: plain-words search; rules editor tested on history; saved reports with relative
+  dates; in-app nudges (unusual amount, likely duplicate, subscription price rise); merchant pages; trips,
+  projects and festival funds; weekly digest; 50/30/20 view; subcategories.
+- **Drop 13, reach and polish (v1.1.0)**: Personal and Shop spaces with a simple profit and loss; passkey
+  unlock if it works in an iPhone home-screen app; one-tap backup to Files on iPhone and a weekly file
+  backup on Chrome; app badge for bills due; Telugu and Hindi interface; accessibility and performance pass.
+- Not doing: automatic capture, bank linking, AI chat, maps, push or email alerts, widgets, ads, analytics,
+  cloud sync.

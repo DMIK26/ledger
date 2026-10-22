@@ -1,5 +1,5 @@
 import { previousMonth } from './aggregates';
-import { daysInMonth, isoFromYMD, monthKey, parseISO, shiftMonth } from './dates';
+import { monthKey, monthProgress, shiftMonthKey } from './dates';
 import type { Budget, CategoryId, ISODate, Transaction } from './types';
 
 /** Budgets move in steps of ₹500 (50,000 paise) when dragged or suggested. */
@@ -65,14 +65,14 @@ export function budgetStatus(spentMinor: number, budgetMinor: number): BudgetSta
 
 /** Days in today's month after today. */
 export function daysLeft(today: ISODate): number {
-  const p = parseISO(today)!;
-  return daysInMonth(p.y, p.m) - p.d;
+  const { day, length } = monthProgress(today);
+  return length - day;
 }
 
 /** Month-end total if spending continues at this month's daily average so far. */
 export function projectMonthEnd(spentMinor: number, today: ISODate): number {
-  const p = parseISO(today)!;
-  return Math.round((spentMinor / p.d) * daysInMonth(p.y, p.m));
+  const { day, length } = monthProgress(today);
+  return Math.round((spentMinor / day) * length);
 }
 
 /** Month-end total if from tomorrow on you spend `perDayMinor` each day. */
@@ -85,11 +85,8 @@ export function whatIfMonthEnd(spentMinor: number, today: ISODate, perDayMinor: 
  * nothing count as zero), rounded up to ₹500. The overall suggestion is the rounded-up average total.
  */
 export function suggestBudgets(list: readonly Transaction[], today: ISODate): MonthBudgets {
-  const p = parseISO(today)!;
-  const months = [1, 2, 3].map((i) => {
-    const { y, m } = shiftMonth(p.y, p.m, -i);
-    return isoFromYMD(y, m, 1).slice(0, 7);
-  });
+  const current = monthKey(today);
+  const months = [1, 2, 3].map((i) => shiftMonthKey(current, -i));
   const sums: Record<CategoryId, number> = {};
   let total = 0;
   for (const t of list) {

@@ -1,6 +1,6 @@
 # Handoff: where the build stands
 
-Updated 21 Oct 2026. **All seven drops are complete and published** at
+Updated 22 Oct 2026. Drop 8 is built and waiting to be published (see below). **Drops 1 to 7 are complete and published** at
 https://dmik26.github.io/ledger/, tagged **v1.0.0**. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
@@ -35,6 +35,44 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
+
+## Drop 8: never miss a log (22 Oct 2026, awaiting publish)
+
+The owner approved the roadmap in `docs/REQUIREMENTS.md` section 11 (Drops 8 to 13; no automatic
+capture). Drop 8 is built:
+
+- **Check-in** (`src/domain/habit.ts`, `src/app/CheckIn.tsx`): under quick add on the Dashboard, days in the
+  last week with nothing logged ("No spend, or forgot?"), each with No spend and Add (opens Add on that
+  day through `?action=add&on=YYYY-MM-DD`); All no spend; Not now hides it until tomorrow. No-spend days
+  live in the settings store under `noSpendDays` (a Command, so undoable) and are in backups.
+- **Habit line**: "Logged 26 of the last 30 days. 12 days in a row, with a rest day." Every 7 logged days
+  earn a rest day, up to 2 saved; today never counts against you.
+- **Repeat** (`src/domain/repeat.ts`): under quick add, favourites first, then anything logged 3+ times in
+  90 days with the same merchant, amount, category and method; one tap adds it for today. Favourites
+  (up to 12) live under `favourites` in the settings store and in backups; Settings > Favourites pins,
+  reorders and removes; Transactions: select one entry, Save as favourite. Select entries, Copy to today.
+- **Maths** (`src/domain/calc.ts`): `+ - x * / × ÷` and `k` in quick add, the amount field ("= ₹310"
+  while typing) and the keypad; paise-exact, times and divide first; dates win ("18/9" stays a date).
+- **Add sheet** has Form, Keypad and Several (remembered in `settings.addMode`). Keypad: amount, then tap a
+  category to save (source `keypad`); hardware keys work. Several: one entry per line, preview, one undo.
+- **Telugu and Hindi** (`src/domain/indic.ts`): native digits, rupee, cash and date words in both scripts
+  and Roman spellings, everyday spending words; merchant keys keep Devanagari and Telugu (Latin keys
+  unchanged, so old learned rules still match).
+- **Month start day** (Settings > Money, 1 to 28): `monthKey` in `src/domain/dates.ts` follows it (set
+  from settings like privacy), plus `monthBounds`, `monthProgress`, `monthRangeLabel`, `shiftMonthKey`.
+  KPIs, budgets, projections, insights, the pencil, Reports' month and the month switcher (which then
+  shows the dates) follow it. Starts 1 to 15 are named after the starting month, 16 to 28 after the ending one.
+- Moved to Drop 12: subcategories (they touch every chart and report).
+
+Verified: lint, typecheck, 315 unit tests (32 files), build with budgets (JavaScript 162 of 170 KB,
+CSS 10 of 16 KB, precache 998 of 1100 KB), Playwright 74 passed and 14 skipped with `CI=1` (new
+`e2e/drop8.spec.ts`: check-in, keypad, several lines with Hindi and Telugu, month start 25 and 19), and
+screenshots of the new screens on a Pixel 7 size and desktop dark. Not verified: Telugu and Hindi
+rendering on real phones (the test browser here lacks a good Telugu font), and typing Indic text with
+real phone keyboards.
+
+Watch the size budget: 8 KB of JavaScript is left for Drops 9 to 13. Drop 9 should load Reports,
+Recurring and Settings on demand (code splitting) before adding more.
 
 ## After 1.0: voice quick add on iPhone (22 Oct 2026)
 
