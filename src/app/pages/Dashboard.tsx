@@ -278,6 +278,16 @@ export function Dashboard() {
   const donutMonth = preview ?? month;
   const totals = useMemo(() => categoryTotals(toDate, donutMonth), [toDate, donutMonth]);
   const series = useMemo(() => monthSeries(toDate, lastMonths(asOf, 6)), [toDate, asOf]);
+  // Hovering a bar previews that month in the donut. The legend keeps one fixed set of rows (this
+  // month's categories, then any other category in the six bars), so the card never changes height
+  // under the pointer; a changing height moved the bars under a still mouse and looped the preview.
+  const legendIds = useMemo(() => {
+    const ids = categoryTotals(toDate, month).map((t) => t.categoryId);
+    const seen = new Set(ids);
+    for (const c of categories)
+      if (!seen.has(c.id) && series.some((p) => (p.byCategory[c.id] ?? 0) > 0)) ids.push(c.id);
+    return ids;
+  }, [toDate, month, series, categories]);
   const mine = budgetsForMonth(budgets, month);
   const recent = transactions.slice(0, 6);
   const top = k.topCategory ? categoryById(categories, k.topCategory.categoryId) : undefined;
@@ -436,6 +446,7 @@ export function Dashboard() {
             }
             selected={donutPath[0]?.slice(2) ?? null}
             legend={donutPath.length === 0}
+            legendIds={legendIds}
             onSelect={(id) => withTransition(() => setDonutPath([`c:${id}`]))}
           />
           {donutPath.length > 0 && (

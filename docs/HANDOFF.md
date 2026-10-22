@@ -36,6 +36,18 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
+## After 1.0: Dashboard flicker fix (22 Oct 2026)
+
+- Root cause: hovering a bar previews that month in the donut, and the donut's legend listed only
+  the previewed month's categories. The card changed height under a still mouse, the bar moved away,
+  the preview ended, the height changed back, and the loop ran 40 to 90 times a second (empty ring,
+  jumping page, tooltips flashing). Fix: `Donut` takes `legendIds`, a fixed row set from the Dashboard
+  (this month's categories, then any other category in the six bars); rows with nothing show a dash.
+- Also: in Total mode, bar segments no longer highlight the category under the pointer (which faded
+  the rest of the donut); they still light up when a category is hovered elsewhere.
+- Tests: `src/charts/Donut.test.tsx`, `e2e/stability.spec.ts` (fails on the old code with 65 preview
+  changes in 1.2 s; passes with 1).
+
 ## After 1.0: sample data (21 Oct 2026, awaiting publish)
 
 - "Load sample data" on the empty Dashboard and Transactions pages and in Settings > Sample data:

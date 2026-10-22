@@ -221,7 +221,11 @@ export function MonthBars({
                   <rect
                     key={c.id}
                     className="bar-seg"
-                    data-hl={key}
+                    // Hovering a segment highlights its category only when categories are shown.
+                    // In Total mode a bar is the month (it previews the donut instead), so it must
+                    // not highlight, and dim the donut around, whichever category is under the
+                    // pointer. The category stays in data-entity so donut hovers still light it.
+                    data-hl={mode === 'category' ? key : undefined}
                     data-entity={`${key} ${entityKey('month', p.month)}`}
                     x={x0}
                     y={top}

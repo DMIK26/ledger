@@ -23,6 +23,12 @@ interface Props {
   onSelect: (categoryId: string) => void;
   /** Hide the legend (when a breakdown takes its place). */
   legend?: boolean;
+  /**
+   * The legend's rows, in order. Giving a fixed set keeps the legend (and so the card) the same height
+   * while `totals` changes, for example while another month is previewed; rows with nothing show a
+   * dash. Without it the legend lists `totals`.
+   */
+  legendIds?: readonly string[];
 }
 
 /**
@@ -38,6 +44,7 @@ export function Donut({
   selected = null,
   onSelect,
   legend = true,
+  legendIds,
 }: Props) {
   usePrivacy(); // slice labels are built with fmtMoney, so re-render when privacy changes
   const highlight = useHighlight();
@@ -52,6 +59,8 @@ export function Donut({
   const shape = arc<PieArcDatum<CategoryTotal>>().cornerRadius(2);
   const activeTotal = totals.find((t) => t.categoryId === active);
   const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const byId = new Map(totals.map((t) => [t.categoryId, t.totalMinor]));
+  const rows = legendIds ?? totals.map((t) => t.categoryId);
 
   return (
     <div className="donut">
@@ -120,35 +129,42 @@ export function Donut({
           />
         </div>
       </div>
-      {total === 0 ? (
-        <p className="muted small">Nothing spent in this month.</p>
-      ) : (
-        legend && (
-          <ul className="legend" aria-label="Categories">
-            {totals.map((t) => {
-              const c = categoryById(categories, t.categoryId);
-              const key = entityKey('category', t.categoryId);
-              return (
-                <li key={t.categoryId}>
-                  <button
-                    type="button"
-                    className="legend-item"
-                    data-active={active === t.categoryId ? '' : undefined}
-                    data-hl={key}
-                    data-entity={key}
-                    onClick={() => onSelect(t.categoryId)}
-                  >
-                    <span className="dot" style={{ background: c?.color ?? 'var(--faint)' }} />
-                    <span className="legend-name">{name(t.categoryId)}</span>
-                    <Money minor={t.totalMinor} currency={currency} />
-                    <span className="legend-pct">{Math.round((t.totalMinor / total) * 100)}%</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )
+      {legend && rows.length > 0 && (
+        <ul className="legend" aria-label="Categories">
+          {rows.map((id) => {
+            const c = categoryById(categories, id);
+            const key = entityKey('category', id);
+            const value = byId.get(id) ?? 0;
+            return (
+              <li key={id}>
+                <button
+                  type="button"
+                  className="legend-item"
+                  data-active={active === id ? '' : undefined}
+                  data-hl={key}
+                  data-entity={key}
+                  disabled={value === 0}
+                  onClick={() => onSelect(id)}
+                >
+                  <span className="dot" style={{ background: c?.color ?? 'var(--faint)' }} />
+                  <span className="legend-name">{name(id)}</span>
+                  {value > 0 ? (
+                    <Money minor={value} currency={currency} />
+                  ) : (
+                    <span className="muted" aria-label="nothing">
+                      –
+                    </span>
+                  )}
+                  <span className="legend-pct">
+                    {value > 0 ? `${Math.round((value / total) * 100)}%` : ''}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
+      {legend && rows.length === 0 && <p className="muted small">Nothing spent in this month.</p>}
     </div>
   );
 }
