@@ -63,7 +63,8 @@ describe('quick add', () => {
       amountMinor: 50000,
       method: 'UPI',
     });
-    expect(input).toHaveValue('');
+    // The field clears after the save has finished, a moment after the entry reaches the store.
+    await waitFor(() => expect(input).toHaveValue(''));
     expect(await screen.findByTestId('tx-footer')).toHaveTextContent('1 transaction');
   });
 
