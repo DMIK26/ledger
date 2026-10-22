@@ -97,4 +97,52 @@ describe('voice quick add', () => {
     await go('#/');
     expect(screen.queryByRole('button', { name: 'Speak an entry' })).toBeNull();
   });
+
+  it('in an iPhone home-screen app the mic opens the keyboard, whose own mic works there', async () => {
+    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = class {};
+    Object.defineProperty(navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 Version/18.5 Mobile/15E148 Safari/604.1',
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'standalone', { value: true, configurable: true });
+    try {
+      await go('#/');
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Speak an entry' }));
+      expect(screen.getByLabelText('Quick add')).toHaveFocus();
+      expect(screen.getByText(/Tap the mic on your keyboard/)).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(navigator, 'userAgent', { value: 'jsdom', configurable: true });
+      Object.defineProperty(navigator, 'standalone', { value: false, configurable: true });
+    }
+  });
+
+  it('typing while listening stops listening, so the words heard cannot overwrite it', async () => {
+    let stops = 0;
+    class Rec {
+      lang = '';
+      interimResults = false;
+      continuous = false;
+      maxAlternatives = 1;
+      onresult: ((e: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((e: unknown) => void) | null = null;
+      start() {}
+      stop() {
+        stops += 1;
+        this.onend?.();
+      }
+      abort() {}
+    }
+    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = Rec;
+    await go('#/');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Speak an entry' }));
+    await user.type(screen.getByLabelText('Quick add'), 'x');
+    expect(stops).toBe(1);
+    expect(screen.getByRole('button', { name: 'Speak an entry' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
 });

@@ -36,6 +36,19 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
+## After 1.0: voice quick add on iPhone (22 Oct 2026)
+
+- Safari offers the speech API inside a home-screen (installed) app but it always fails there
+  (WebKit bug 225298), and the old error text blamed microphone permission. In the installed app on
+  iPhone the mic button now focuses quick add and says to use the keyboard's own mic, which works.
+- Safari in a tab repeats the whole phrase in each result ("chai", "chai 20", "chai 20 cash"), which
+  was joined into "chai chai 20 chai 20 cash". `src/domain/transcript.ts` merges results properly and
+  drops dictation's full stop.
+- Safari often never ends listening: it now stops 1.5 s after the last words, never runs past 12 s,
+  and the button resets even if the browser never reports the end. Typing stops listening.
+- Tests: `src/domain/transcript.test.ts`, `src/app/voice.test.ts`, two more in `src/app/drop7.test.tsx`.
+  Not verified on a real iPhone.
+
 ## After 1.0: Dashboard flicker fix (22 Oct 2026)
 
 - Root cause: hovering a bar previews that month in the donut, and the donut's legend listed only

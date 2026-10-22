@@ -8,7 +8,7 @@ import { parseQuickEntry } from '../domain/parser';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
 import { Icon } from './icons';
-import { listen, speechSupported } from './voice';
+import { listen, voiceMode } from './voice';
 import { useView, useViewMonth } from '../kit/view';
 
 function dateLabel(date: string, today: string): string {
@@ -46,7 +46,8 @@ export function QuickAdd({
   const [attempted, setAttempted] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [voice] = useState(speechSupported);
+  const [voice] = useState(voiceMode);
+  const [keyboardTip, setKeyboardTip] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const stopListening = useRef<(() => void) | null>(null);
@@ -119,6 +120,12 @@ export function QuickAdd({
   useEffect(() => () => stopListening.current?.(), []);
 
   const toggleVoice = () => {
+    if (voice === 'keyboard') {
+      // An iPhone home-screen app cannot use the speech API; the keyboard's own mic can.
+      input.current?.focus();
+      setKeyboardTip(true);
+      return;
+    }
     if (listening) {
       stopListening.current?.();
       return;
@@ -136,7 +143,6 @@ export function QuickAdd({
         setListening(false);
         setVoiceError(error);
         stopListening.current = null;
-        input.current?.focus();
       },
     );
   };
@@ -175,7 +181,7 @@ export function QuickAdd({
       <h2>
         <label htmlFor="quick-add-input">Quick add</label>
       </h2>
-      <div className={voice ? 'qa-field qa-has-mic' : 'qa-field'}>
+      <div className={voice !== 'none' ? 'qa-field qa-has-mic' : 'qa-field'}>
         <div className="qa-mirror" ref={mirror} aria-hidden="true">
           {segments.map((s, i) =>
             s.kind ? (
@@ -200,6 +206,9 @@ export function QuickAdd({
           aria-describedby="quick-add-help"
           value={text}
           onChange={(e) => {
+            // Typing takes over from listening, so the words heard do not overwrite it.
+            if (listening) stopListening.current?.();
+            setKeyboardTip(false);
             setText(e.target.value);
             setAttempted(false);
             setConfirmDuplicate(false);
@@ -210,7 +219,7 @@ export function QuickAdd({
           onKeyUp={syncScroll}
           onSelect={syncScroll}
         />
-        {voice && (
+        {voice !== 'none' && (
           <button
             type="button"
             className="btn btn-ghost btn-icon qa-mic"
@@ -222,6 +231,11 @@ export function QuickAdd({
           </button>
         )}
       </div>
+      {keyboardTip && !text && (
+        <p className="muted small" role="status">
+          Tap the mic on your keyboard and say something like “chai twenty cash”.
+        </p>
+      )}
       {listening && (
         <p className="muted small" role="status">
           Listening. Say something like “chai twenty cash”. Your browser&rsquo;s speech service may
