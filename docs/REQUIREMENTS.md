@@ -213,11 +213,46 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   shows the dates when the start is not 1.
 - Subcategories move to Drop 12 (they touch every chart and report).
 
+### Drop 9: the whole money picture
+
+- **Money page** (`#/money`, in the sidebar and the More sheet) with three views: Overview, Udhaar, Loans.
+  The month switcher works on it. Spending pages stay spending-only: income, transfers, fees and udhaar
+  never count as spending, in budgets, KPIs, charts or reports.
+- **Income**: "Money in" entries (amount, what, date, kind: Salary, Business, Interest, Gift, Refund,
+  Other, and the account it went to). Quick add recognises money in ("salary 40k", "got 500 from Rahul",
+  "refund 299 credited"), shows a "Money in" chip that can be switched back to spending, and saves it as
+  income. Words that only signal income (got, received, credited, earned) are dropped from the name.
+- **Cash flow** (Overview): for the month on screen, In, Out (spending plus interest and fees) and Left,
+  with six months of in and out bars.
+- **Accounts**: bank, cash, wallet and credit card, each with an opening balance on a date (for a card,
+  what is owed). Each payment method can belong to one account (default: UPI and Bank transfer to the
+  first bank, Cash to cash, Card to the first card), so existing entries count without editing; the Add form
+  can pick another account. Balances = opening + money in + transfers in + udhaar received - spending -
+  fees - transfers out - udhaar paid, counting from the opening date. Archive instead of delete once
+  anything uses an account.
+- **Transfers** move money between accounts and are never spending; paying a card is a transfer to it.
+- **Cash check**: on a cash account, type what is in your wallet; Ledger shows the difference and either
+  records it as spending ("Cash not logged", Other) or corrects the balance only.
+- **Credit cards**: statement day and due day (1 to 28) and an optional limit. Shows owed now, the last
+  statement's amount, what is left to pay after payments since, the due date and "due in N days" or
+  "overdue". Interest and fees are entered as fees: they raise what is owed and show in cash flow, never
+  in spending (like YNAB, Oct 2026). A card due within 7 days shows on the Dashboard and as a badge.
+- **Udhaar**: people and entries (I lent, I borrowed, they paid me back, I paid back), a running balance
+  per person ("Rahul owes you", "You owe Priya"), settle up in one tap, optional account. "Remind" opens the
+  share sheet (or copies) with a short polite message including the amount; it is off in privacy mode.
+- **Loans and EMIs**: amount, yearly interest rate, months, first EMI date and an optional EMI from the
+  bank. Shows the EMI, the full schedule (interest and principal each month), EMIs paid so far, what is
+  left to repay, the next EMI and a slider: "pay this much more each month" shows the months saved and
+  the interest saved. The schedule is a plan; EMIs paid are tracked as recurring payments as before.
+- **Foreign currency**: the Add form takes an amount in another currency and a rate you type (rupees per
+  unit); the entry is stored in rupees with the original amount and rate kept and shown on the row.
+  Currencies: INR, USD, EUR, GBP, AED, SGD, AUD, CAD.
+- **Size**: Budgets, Reports, Recurring, Settings and Money load on first visit (still cached for
+  offline). The size check measures JavaScript loaded at start-up (170 KB) and all JavaScript (300 KB).
+- Money stays integer paise; interest maths rounds to the paisa; privacy mode hides every new amount.
+
 ### Later drops (scope agreed, details written when each starts)
 
-- **Drop 9, the whole money picture**: income and a cash-flow view; accounts and transfers; cash-in-hand
-  check; credit cards (cycle, due date, interest apart from spending); udhaar ledger with a reminder message
-  sent through the share sheet; loans and EMIs with a payment slider; foreign-currency entries with a typed rate.
 - **Drop 10, plan ahead**: safe to spend today (daily allowance with rollover); fixed, flexible and
   non-monthly budgets; sinking funds with due dates and snooze; goals with on-track status; pacing chart and
   at-risk flags; month-end forecast, rollover and plan reset; calendar view.

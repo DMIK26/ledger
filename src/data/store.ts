@@ -5,6 +5,18 @@ import type { SavedView } from '../domain/filters';
 import { budgetsForMonth, toBudgetRows, type MonthBudgets } from '../domain/budgets';
 import { addDays, setMonthStartDay } from '../domain/dates';
 import { MAX_FAVOURITES, repeatKey, type Favourite, type RepeatItem } from '../domain/repeat';
+import {
+  accountForMethod,
+  balances,
+  cashCheck,
+  type Account,
+  type AccountKind,
+  type Flow,
+  type IncomeKind,
+} from '../domain/accounts';
+import { findPerson, type Person, type UdhaarEntry, type UdhaarKind } from '../domain/udhaar';
+import type { Loan } from '../domain/loans';
+import type { ForeignAmount } from '../domain/fx';
 import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
 import type { ImportPlan } from '../domain/csvImport';
 import type { RecurringItem } from '../domain/recurring';
@@ -54,6 +66,8 @@ import {
   setSettingsList,
   FAVOURITES_KEY,
   NO_SPEND_KEY,
+  putRow,
+  removeRow,
   putNote,
   removeNote,
   putSketch,
@@ -66,7 +80,9 @@ import {
   VIEWS_KEY,
   type Command,
 } from './commands';
-import { DB_NAME, openLedgerDB, type Db } from './db';
+import { DB_NAME, openLedgerDB, type Db, type LedgerDB } from './db';
+
+type LedgerRow<S extends 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans'> = LedgerDB[S]['value'];
 
 /** What the add and edit forms produce. */
 export interface EntryDraft {
@@ -77,7 +93,44 @@ export interface EntryDraft {
   method: PaymentMethod;
   notes: string;
   tags: string[];
+  /** The account it came out of, when picked (otherwise its method's account). */
+  accountId?: string;
+  foreign?: ForeignAmount;
 }
+
+/** What the money-in form produces. */
+export interface IncomeDraft {
+  date: ISODate;
+  amountMinor: number;
+  label: string;
+  incomeKind: IncomeKind;
+  accountId?: string;
+  raw?: string;
+}
+
+export interface AccountDraft {
+  name: string;
+  kind: AccountKind;
+  openingMinor: number;
+  openingDate: ISODate;
+  methods: PaymentMethod[];
+  statementDay?: number;
+  dueDay?: number;
+  limitMinor?: number;
+}
+
+export interface UdhaarDraft {
+  /** An existing person, or a name (a new person is added when nobody has it). */
+  personId?: string;
+  personName?: string;
+  kind: UdhaarKind;
+  date: ISODate;
+  amountMinor: number;
+  note: string;
+  accountId?: string;
+}
+
+export type LoanDraft = Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>;
 
 /** `undefined` leaves the receipt as it is, `null` removes it, a Blob replaces it. */
 export type ReceiptChange = Blob | null | undefined;
@@ -109,6 +162,12 @@ export interface LedgerState {
   favourites: Favourite[];
   /** Days the user marked as having no spending, so they count as logged. */
   noSpendDays: ISODate[];
+  /** Drop 9: accounts, money in / transfers / fees, people and udhaar, loans. */
+  accounts: Account[];
+  flows: Flow[];
+  people: Person[];
+  udhaar: UdhaarEntry[];
+  loans: Loan[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -140,6 +199,41 @@ export interface LedgerState {
   moveFavourite: (id: string, toIndex: number) => Promise<void>;
   /** Marks days as having no spending (undoable). */
   markNoSpend: (dates: ISODate[]) => Promise<void>;
+  saveAccount: (draft: AccountDraft, id?: string) => Promise<string>;
+  /** Archives an account (kept in balances, hidden from pickers) or brings it back. */
+  setAccountArchived: (id: string, archived: boolean) => Promise<void>;
+  /** Deletes an account nothing refers to. Returns false (and archives nothing) when something does. */
+  deleteAccount: (id: string) => Promise<boolean>;
+  addIncome: (draft: IncomeDraft) => Promise<void>;
+  /** Quick add's money in: the account follows the method, like spending does. */
+  addIncomeFromParsed: (
+    parsed: ParsedEntry,
+    extra?: { date?: ISODate; method?: PaymentMethod; incomeKind?: IncomeKind },
+  ) => Promise<void>;
+  addTransfer: (input: {
+    fromId: string;
+    toId: string;
+    amountMinor: number;
+    date: ISODate;
+    label?: string;
+  }) => Promise<void>;
+  addFee: (input: { accountId: string; amountMinor: number; date: ISODate; label: string }) => Promise<void>;
+  deleteFlow: (id: string) => Promise<void>;
+  /**
+   * A cash count: records the difference as spending ("Cash not logged") or only corrects the balance.
+   * Returns the difference found.
+   */
+  resolveCashCheck: (
+    accountId: string,
+    countedMinor: number,
+    mode: 'spending' | 'adjust',
+  ) => Promise<number>;
+  saveUdhaar: (draft: UdhaarDraft) => Promise<void>;
+  deleteUdhaar: (id: string) => Promise<void>;
+  /** Removes a person and all their entries, as one undoable step. */
+  deletePerson: (id: string) => Promise<void>;
+  saveLoan: (draft: LoanDraft, id?: string) => Promise<void>;
+  deleteLoan: (id: string) => Promise<void>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
@@ -254,6 +348,26 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       return out;
     };
 
+    /** Drop 9 rows a merged backup adds: accounts, money in and transfers, people, udhaar, loans. */
+    const rowMerges = (file: BackupFile): Command[] => {
+      const out: Command[] = [];
+      const add = <S extends 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans'>(
+        store: S,
+        have: readonly { id: string }[],
+        incoming: readonly LedgerRow<S>[] | undefined,
+      ) => {
+        const ids = new Set(have.map((x) => x.id));
+        for (const row of incoming ?? [])
+          if (!ids.has(row.id)) out.push(putRow(store, row, undefined, 'Imported'));
+      };
+      add('accounts', get().accounts, file.data.accounts);
+      add('flows', get().flows, file.data.flows);
+      add('people', get().people, file.data.people);
+      add('udhaar', get().udhaar, file.data.udhaar);
+      add('loans', get().loans, file.data.loans);
+      return out;
+    };
+
     const refresh = async (): Promise<void> => {
       const d = requireDb();
       const [
@@ -270,6 +384,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         sample,
         favourites,
         noSpend,
+        accounts,
+        flows,
+        people,
+        udhaar,
+        loans,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -284,7 +403,17 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.get('settings', SAMPLE_KEY),
         d.get('settings', FAVOURITES_KEY),
         d.get('settings', NO_SPEND_KEY),
+        d.getAll('accounts'),
+        d.getAll('flows'),
+        d.getAll('people'),
+        d.getAll('udhaar'),
+        d.getAll('loans'),
       ]);
+      accounts.sort((a, b) => a.order - b.order);
+      flows.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+      people.sort((a, b) => a.name.localeCompare(b.name));
+      udhaar.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+      loans.sort((a, b) => a.createdAt - b.createdAt);
       notes.sort((a, b) => a.createdAt - b.createdAt);
       recurring.sort((a, b) => a.merchant.localeCompare(b.merchant));
       trash.sort((a, b) => b.deletedAt - a.deletedAt);
@@ -304,6 +433,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         sample: (sample as SampleMarker | undefined) ?? null,
         favourites: Array.isArray(favourites) ? (favourites as Favourite[]) : [],
         noSpendDays: Array.isArray(noSpend) ? (noSpend as ISODate[]) : [],
+        accounts,
+        flows,
+        people,
+        udhaar,
+        loans,
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -328,6 +462,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       sample: null,
       favourites: [],
       noSpendDays: [],
+      accounts: [],
+      flows: [],
+      people: [],
+      udhaar: [],
+      loans: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -609,6 +748,242 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const label =
           add.length === 1 ? 'Marked a day with no spending' : `Marked ${add.length} days with no spending`;
         await get().run(setSettingsList(NO_SPEND_KEY, next, previous, label));
+      },
+
+      saveAccount: async (draft, id) => {
+        const now = Date.now();
+        const previous = id ? get().accounts.find((a) => a.id === id) : undefined;
+        const next: Account = previous
+          ? { ...previous, ...draft, name: draft.name.trim(), updatedAt: now }
+          : {
+              id: newId(),
+              ...draft,
+              name: draft.name.trim(),
+              order: get().accounts.length,
+              createdAt: now,
+              updatedAt: now,
+            };
+        // A payment method belongs to one account: picking it here takes it from the others.
+        const steps: Command[] = [];
+        for (const other of get().accounts) {
+          if (other.id === next.id) continue;
+          const kept = other.methods.filter((m) => !next.methods.includes(m));
+          if (kept.length !== other.methods.length)
+            steps.push(putRow('accounts', { ...other, methods: kept, updatedAt: now }, other, 'Moved methods'));
+        }
+        const label = previous ? `Updated ${next.name}` : `Added ${next.name}`;
+        steps.unshift(putRow('accounts', next, previous, label));
+        await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+        return next.id;
+      },
+
+      setAccountArchived: async (id, archived) => {
+        const a = get().accounts.find((x) => x.id === id);
+        if (!a || Boolean(a.archived) === archived) return;
+        const label = archived ? `Archived ${a.name}` : `Brought back ${a.name}`;
+        await get().run(
+          putRow('accounts', { ...a, archived: archived || undefined, updatedAt: Date.now() }, a, label),
+        );
+      },
+
+      deleteAccount: async (id) => {
+        const { accounts, flows, udhaar, transactions } = get();
+        const a = accounts.find((x) => x.id === id);
+        if (!a) return false;
+        const used =
+          flows.some((f) => f.accountId === id || f.toAccountId === id) ||
+          udhaar.some((u) => u.accountId === id) ||
+          transactions.some((t) => t.accountId === id);
+        if (used) return false;
+        await get().run(removeRow('accounts', a, `Deleted ${a.name}`));
+        return true;
+      },
+
+      addIncome: async (draft) => {
+        const now = Date.now();
+        const flow: Flow = {
+          id: newId(),
+          kind: 'income',
+          date: draft.date,
+          amountMinor: draft.amountMinor,
+          label: draft.label.trim() || 'Money in',
+          incomeKind: draft.incomeKind,
+          accountId: draft.accountId,
+          raw: draft.raw,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await get().run(putRow('flows', flow, undefined, `Added ${flow.label}`), `Money in: ${flow.label}`);
+      },
+
+      addIncomeFromParsed: async (parsed, extra = {}) => {
+        if (!parsed.ok || parsed.amountMinor === null) return;
+        const method = extra.method ?? parsed.method;
+        await get().addIncome({
+          date: extra.date ?? parsed.date,
+          amountMinor: parsed.amountMinor,
+          label: parsed.merchant,
+          incomeKind: extra.incomeKind ?? parsed.incomeKind,
+          accountId: accountForMethod(get().accounts, method)?.id,
+          raw: parsed.raw,
+        });
+      },
+
+      addTransfer: async ({ fromId, toId, amountMinor, date, label }) => {
+        const { accounts } = get();
+        const from = accounts.find((a) => a.id === fromId);
+        const to = accounts.find((a) => a.id === toId);
+        if (!from || !to || fromId === toId || amountMinor <= 0) return;
+        const now = Date.now();
+        const text = label?.trim() || (to.kind === 'card' ? `Paid ${to.name}` : `${from.name} to ${to.name}`);
+        const flow: Flow = {
+          id: newId(),
+          kind: 'transfer',
+          date,
+          amountMinor,
+          label: text,
+          accountId: fromId,
+          toAccountId: toId,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await get().run(putRow('flows', flow, undefined, text));
+      },
+
+      addFee: async ({ accountId, amountMinor, date, label }) => {
+        if (amountMinor <= 0) return;
+        const now = Date.now();
+        const flow: Flow = {
+          id: newId(),
+          kind: 'fee',
+          date,
+          amountMinor,
+          label: label.trim() || 'Interest or fee',
+          accountId,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await get().run(putRow('flows', flow, undefined, `Added ${flow.label}`));
+      },
+
+      deleteFlow: async (id) => {
+        const f = get().flows.find((x) => x.id === id);
+        if (f) await get().run(removeRow('flows', f, `Deleted ${f.label}`));
+      },
+
+      resolveCashCheck: async (accountId, countedMinor, mode) => {
+        const { accounts, transactions, flows, udhaar, settings } = get();
+        const account = accounts.find((a) => a.id === accountId);
+        if (!account) return 0;
+        const today = todayISO();
+        const expected = balances(accounts, { transactions, flows, udhaar }, today)[accountId] ?? 0;
+        const { differenceMinor } = cashCheck(expected, countedMinor);
+        if (differenceMinor === 0) {
+          set({ notice: `${account.name} matches. Nothing to change.` });
+          return 0;
+        }
+        const now = Date.now();
+        if (mode === 'spending' && differenceMinor < 0) {
+          const tx: Transaction = {
+            id: newId(),
+            date: today,
+            amountMinor: -differenceMinor,
+            currency: settings.currency,
+            merchant: 'Cash not logged',
+            categoryId: OTHER_ID,
+            method: 'Cash',
+            accountId,
+            notes: 'From a cash check',
+            tags: [],
+            source: 'form',
+            unsure: false,
+            createdAt: now,
+            updatedAt: now,
+          };
+          await get().run(addTransaction(tx), 'Recorded the difference as spending');
+        } else {
+          const flow: Flow = {
+            id: newId(),
+            kind: 'adjust',
+            date: today,
+            amountMinor: differenceMinor,
+            label: 'Cash check',
+            accountId,
+            createdAt: now,
+            updatedAt: now,
+          };
+          await get().run(putRow('flows', flow, undefined, `Corrected ${account.name}`));
+        }
+        return differenceMinor;
+      },
+
+      saveUdhaar: async (draft) => {
+        if (draft.amountMinor <= 0) return;
+        const now = Date.now();
+        const steps: Command[] = [];
+        let person = draft.personId ? get().people.find((p) => p.id === draft.personId) : undefined;
+        if (!person && draft.personName?.trim()) {
+          person = findPerson(get().people, draft.personName);
+          if (!person) {
+            person = { id: newId(), name: draft.personName.trim().replace(/\s+/g, ' '), createdAt: now };
+            steps.push(putRow('people', person, undefined, `Added ${person.name}`));
+          }
+        }
+        if (!person) return;
+        const entry: UdhaarEntry = {
+          id: newId(),
+          personId: person.id,
+          kind: draft.kind,
+          date: draft.date,
+          amountMinor: draft.amountMinor,
+          note: draft.note.trim(),
+          accountId: draft.accountId,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const words: Record<UdhaarKind, string> = {
+          lent: `Lent to ${person.name}`,
+          borrowed: `Borrowed from ${person.name}`,
+          'got-back': `${person.name} paid back`,
+          'paid-back': `Paid back ${person.name}`,
+        };
+        const label = words[draft.kind];
+        steps.push(putRow('udhaar', entry, undefined, label));
+        await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+      },
+
+      deleteUdhaar: async (id) => {
+        const e = get().udhaar.find((x) => x.id === id);
+        if (e) await get().run(removeRow('udhaar', e, 'Deleted an udhaar entry'));
+      },
+
+      deletePerson: async (id) => {
+        const person = get().people.find((p) => p.id === id);
+        if (!person) return;
+        const label = `Removed ${person.name}`;
+        const steps: Command[] = [
+          ...get()
+            .udhaar.filter((e) => e.personId === id)
+            .map((e) => removeRow('udhaar', e, label)),
+          removeRow('people', person, label),
+        ];
+        await get().run(composite(label, steps), label);
+      },
+
+      saveLoan: async (draft, id) => {
+        const now = Date.now();
+        const previous = id ? get().loans.find((l) => l.id === id) : undefined;
+        const next: Loan = previous
+          ? { ...previous, ...draft, name: draft.name.trim(), updatedAt: now }
+          : { id: newId(), ...draft, name: draft.name.trim(), createdAt: now, updatedAt: now };
+        await get().run(
+          putRow('loans', next, previous, previous ? `Updated ${next.name}` : `Added ${next.name}`),
+        );
+      },
+
+      deleteLoan: async (id) => {
+        const l = get().loans.find((x) => x.id === id);
+        if (l) await get().run(removeRow('loans', l, `Deleted ${l.name}`));
       },
 
       bulkDelete: async (ids) => {
@@ -896,6 +1271,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           rules: await d.getAll('rules'),
           budgets: await d.getAll('budgets'),
           recurring: await d.getAll('recurring'),
+          accounts: await d.getAll('accounts'),
+          flows: await d.getAll('flows'),
+          people: await d.getAll('people'),
+          udhaar: await d.getAll('udhaar'),
+          loans: await d.getAll('loans'),
         };
         const after = {
           transactions: file.data.transactions,
@@ -903,6 +1283,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           rules: file.data.rules,
           budgets: file.data.budgets ?? [],
           recurring: file.data.recurring ?? [],
+          accounts: file.data.accounts ?? [],
+          flows: file.data.flows ?? [],
+          people: file.data.people ?? [],
+          udhaar: file.data.udhaar ?? [],
+          loans: file.data.loans ?? [],
         };
         // Notes and drawings are never removed by a restore; the backup's missing ones are added.
         const haveNotes = new Set(get().notes.map((n) => n.id));
@@ -943,7 +1328,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const haveSketches = new Set(get().sketches.map((k) => k.id));
         const newSketches = (file.data.sketches ?? []).filter((k) => !haveSketches.has(k.id));
         const lists = listMerges(file);
+        const rows = rowMerges(file);
         if (
+          rows.length === 0 &&
           lists.length === 0 &&
           newTx.length === 0 &&
           newCats.length === 0 &&
@@ -968,6 +1355,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ...newNotes.map((n) => putNote(n, undefined, label)),
           ...newSketches.map((k) => putSketch(k, undefined, label)),
           ...lists,
+          ...rows,
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return newTx.length;

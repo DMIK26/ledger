@@ -1,9 +1,7 @@
+import { Suspense } from 'react';
 import { Layout } from './Layout';
 import { Dashboard } from './pages/Dashboard';
-import { Settings } from './pages/Settings';
-import { Recurring } from './pages/Recurring';
-import { Reports } from './pages/Reports';
-import { Budgets } from './pages/Budgets';
+import { Budgets, MoneyPage, Recurring, Reports, Settings } from './pages/lazy';
 import { filtersFromQuery, Transactions } from './pages/Transactions';
 import { useRoute, type RoutePath } from './router';
 
@@ -19,6 +17,8 @@ function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
       return <Recurring />;
     case '/settings':
       return <Settings view={query.get('view')} />;
+    case '/money':
+      return <MoneyPage view={query.get('view')} />;
     default:
       return <Dashboard />;
   }
@@ -35,7 +35,15 @@ export function App() {
   const key = `${path}?${pageQuery.toString()}`;
   return (
     <Layout path={path} adding={adding} addDate={addDate}>
-      <Page key={key} path={path} query={pageQuery} />
+      <Suspense
+        fallback={
+          <p className="muted page-loading" aria-busy="true">
+            Opening…
+          </p>
+        }
+      >
+        <Page key={key} path={path} query={pageQuery} />
+      </Suspense>
     </Layout>
   );
 }

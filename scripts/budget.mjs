@@ -4,7 +4,8 @@ import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 
 const BUDGET = {
-  jsGzipKB: 170, // all JavaScript loaded on start, gzipped
+  jsGzipKB: 170, // JavaScript loaded on start (the entry and what it preloads), gzipped
+  allJsGzipKB: 300, // every page's JavaScript, gzipped
   cssGzipKB: 16,
   precacheKB: 1100, // everything stored for offline use
 };
@@ -12,10 +13,16 @@ const BUDGET = {
 const dist = 'dist';
 const assets = join(dist, 'assets');
 const files = readdirSync(assets);
-const gz = (ext) =>
-  files
-    .filter((f) => f.endsWith(ext))
-    .reduce((s, f) => s + gzipSync(readFileSync(join(assets, f))).length, 0) / 1024;
+const gzOf = (list) =>
+  list.reduce((s, f) => s + gzipSync(readFileSync(join(assets, f))).length, 0) / 1024;
+const gz = (ext) => gzOf(files.filter((f) => f.endsWith(ext)));
+
+// What the page loads on start: the module script plus every modulepreload link in index.html.
+const html = readFileSync(join(dist, 'index.html'), 'utf8');
+const startup = [
+  ...html.matchAll(/<script[^>]+type="module"[^>]+src="[^"]*assets\/([^"]+\.js)"/g),
+  ...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="[^"]*assets\/([^"]+\.js)"/g),
+].map((m) => m[1]);
 
 const sw = readFileSync(join(dist, 'sw.js'), 'utf8');
 const precached = [...sw.matchAll(/url:"([^"]+)"/g)].map((m) => m[1]);
@@ -29,7 +36,8 @@ const precacheKB =
   }, 0) / 1024;
 
 const rows = [
-  ['JavaScript (gzip)', gz('.js'), BUDGET.jsGzipKB],
+  ['JavaScript at start-up (gzip)', gzOf([...new Set(startup)]), BUDGET.jsGzipKB],
+  ['All JavaScript (gzip)', gz('.js'), BUDGET.allJsGzipKB],
   ['CSS (gzip)', gz('.css'), BUDGET.cssGzipKB],
   ['Offline precache', precacheKB, BUDGET.precacheKB],
 ];

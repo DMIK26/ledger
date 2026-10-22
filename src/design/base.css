@@ -3722,3 +3722,289 @@ g.mood-face {
 .several-merchant {
   overflow-wrap: anywhere;
 }
+
+/* Drop 9: the Money page */
+.page-loading {
+  padding: var(--s4) 0;
+}
+
+.page-views {
+  margin-bottom: var(--s1);
+}
+
+.qa-income {
+  --mark: var(--green);
+}
+
+.chip-income {
+  border-bottom: 2px solid var(--green);
+}
+
+.cashflow-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--s3);
+  margin: 0;
+}
+
+.cashflow-figures dt {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.cashflow-figures dd {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.cashflow-bars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cashflow-bars li {
+  display: grid;
+  grid-template-columns: 3em 1fr;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.cashflow-month {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cashflow-pair {
+  display: grid;
+  gap: 2px;
+}
+
+.cashflow-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.cashflow-in {
+  background: var(--green);
+}
+
+.cashflow-out {
+  background: var(--accent);
+}
+
+.cashflow-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.cashflow-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.cashflow-key .cashflow-swatch:nth-of-type(2) {
+  margin-left: var(--s2);
+}
+
+.money-list,
+.account-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.money-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.money-row:last-child {
+  border-bottom: 0;
+}
+
+.money-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-row,
+.person-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.account-row:last-child,
+.person-row:last-child {
+  border-bottom: 0;
+}
+
+.account-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--s2) 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+.account-balance {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.account-archived .account-head {
+  color: var(--muted);
+}
+
+.account-panel {
+  display: grid;
+  gap: var(--s3);
+  padding: 0 0 var(--s4);
+}
+
+.account-total {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin: 0;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.card-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--s3);
+  margin: 0;
+}
+
+.card-facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.card-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.method-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s4);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.method-picks legend {
+  width: 100%;
+  margin-bottom: var(--s1);
+  font-size: 14px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.foreign-toggle {
+  font-size: 14px;
+}
+
+.loan {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.loan h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.loan-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--fill);
+  overflow: hidden;
+}
+
+.loan-progress span {
+  display: block;
+  height: 100%;
+  background: var(--green);
+}
+
+.loan p {
+  margin: 0;
+}
+
+.range {
+  width: 100%;
+  min-height: 44px;
+  accent-color: var(--accent);
+}
+
+.loan-schedule summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.loan-paid td {
+  color: var(--muted);
+}
+
+.tx-foreign {
+  display: block;
+  font-weight: 400;
+}
+
+.card-due {
+  display: grid;
+  gap: var(--s2);
+}

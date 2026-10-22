@@ -106,6 +106,25 @@ test('privacy hides every amount on every page', async ({ page }) => {
   await quickAdd(page, 'shawarma 1234.56 on 18th oct upi');
   await quickAdd(page, 'gone 7654.32 upi');
   await page.getByRole('button', { name: /^Delete gone/i }).click();
+  // Money page amounts: money in, an account, udhaar and a loan.
+  await quickAdd(page, 'salary 1234.56 upi');
+  await page.goto('./#/money');
+  await page.getByRole('button', { name: 'Add account' }).click();
+  await page.getByLabel('Name').fill('HDFC');
+  await page.getByLabel('Balance on that date').fill('7654.32');
+  await page.getByRole('button', { name: 'Add account' }).last().click();
+  await page.goto('./#/money?view=udhaar');
+  await page.getByRole('button', { name: 'Add entry' }).click();
+  await page.getByLabel('Person').fill('Rahul');
+  await page.getByLabel('Amount').fill('1234.56');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await page.goto('./#/money?view=loans');
+  await page.getByRole('button', { name: 'Add loan' }).click();
+  await page.getByLabel('Name').fill('Bike');
+  await page.getByLabel('Amount borrowed').fill('7654.32');
+  await page.getByLabel('Interest, % a year').fill('10');
+  await page.getByLabel('Months').fill('12');
+  await page.getByRole('button', { name: 'Add loan' }).last().click();
   await page.getByRole('button', { name: 'Privacy mode' }).click();
 
   const routes = [
@@ -116,11 +135,18 @@ test('privacy hides every amount on every page', async ({ page }) => {
     '#/reports',
     '#/recurring',
     '#/settings',
+    '#/money',
+    '#/money?view=udhaar',
+    '#/money?view=loans',
     '#/transactions?action=add',
   ];
   for (const r of routes) {
     await page.goto(`./${r}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('.page-loading')).toHaveCount(0);
+    if (r === '#/money') await page.getByRole('button', { name: /^HDFC/ }).click();
+    if (r === '#/money?view=udhaar') await page.getByRole('button', { name: /^Rahul/ }).click();
+    if (r === '#/money?view=loans') await page.locator('summary', { hasText: 'Schedule' }).click();
     if (r === '#/transactions') await page.getByRole('button', { name: /^Edit Shawarma/ }).click();
     const all = await page.evaluate(() => {
       const attrs = [...document.querySelectorAll('*')]

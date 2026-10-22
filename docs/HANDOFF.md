@@ -1,6 +1,6 @@
 # Handoff: where the build stands
 
-Updated 22 Oct 2026. Drop 8 is built and waiting to be published (see below). **Drops 1 to 7 are complete and published** at
+Updated 22 Oct 2026. Drop 9 is built and waiting to be published (see below). **Drops 1 to 8 are complete and published** at
 https://dmik26.github.io/ledger/, tagged **v1.0.0**. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
@@ -36,7 +36,33 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 8: never miss a log (22 Oct 2026, awaiting publish)
+## Drop 9: the whole money picture (22 Oct 2026, awaiting publish)
+
+- **Money page** (`#/money`, `src/app/pages/Money.tsx`, `src/app/money/*`): Overview (cash flow, money in,
+  accounts with transfers, fees and cash checks), Udhaar, Loans. In the sidebar and the More sheet; the
+  month switcher works there; a badge shows cards due within a week.
+- **Data** (schema v2, a new migration): stores `accounts`, `flows` (income, transfer, fee, adjust),
+  `people`, `udhaar`, `loans`; generic `putRow`/`removeRow` Commands, so every step undoes. Spending stays
+  in `transactions` and nothing new is counted as spending anywhere. Backups carry all five; merge adds
+  what is missing, a full restore replaces them like everything else.
+- **Domain**: `accounts.ts` (balances from the opening date, method-to-account mapping, card statement,
+  due date and lateness, cash flow, cash check, income kinds), `udhaar.ts` (balances, settle, reminder
+  text), `loans.ts` (EMI, schedule, status, prepay), `fx.ts` (rates with four decimals, conversion).
+- **Quick add** spots money in ("salary 40k", "got 500 from Rahul", "refund 299 credited") with a chip
+  to switch it back. The Add form has "From account" (once accounts exist) and "Paid in another
+  currency"; rows show the original amount. The Dashboard lists cards due within a week.
+- **Size**: Budgets, Reports, Recurring, Settings and Money load on first visit (`src/app/pages/lazy.tsx`;
+  tests use `lazy.eager.tsx` through an alias in `vite.config.ts`). `scripts/budget.mjs` now checks
+  start-up JavaScript (152 of 170 KB), all JavaScript (182 of 300 KB), CSS 11 of 16 KB and the offline
+  precache (1058 of 1100 KB, so the next drops will need that limit raised or fonts trimmed).
+- e2e page sweeps (privacy, axe, phone sizes, sideways scroll) include the three Money views and wait for
+  lazy pages (`.page-loading` gone).
+
+Verified: lint, typecheck, 351 unit tests (35 files), build with budgets, Playwright 80 passed and 14
+skipped with `CI=1` (new `e2e/drop9.spec.ts`), and screenshots of the Money views on a Pixel 7 size and
+desktop dark. Not verified on real phones: the share sheet for udhaar reminders (falls back to copying).
+
+## Drop 8: never miss a log (22 Oct 2026, published)
 
 The owner approved the roadmap in `docs/REQUIREMENTS.md` section 11 (Drops 8 to 13; no automatic
 capture). Drop 8 is built:

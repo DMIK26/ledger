@@ -51,6 +51,8 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
               method: tx.method,
               notes: tx.notes,
               tags: tx.tags,
+              accountId: tx.accountId,
+              foreign: tx.foreign,
             },
           }}
           autoFocus
@@ -146,7 +148,16 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           {tx.method}
         </button>
       </span>
-      <Money className="tx-amount" minor={tx.amountMinor} currency={tx.currency} />
+      <span className="tx-amount">
+        <Money minor={tx.amountMinor} currency={tx.currency} />
+        {tx.foreign && (
+          <Money
+            className="tx-foreign muted small"
+            minor={tx.foreign.amountMinor}
+            currency={tx.foreign.currency}
+          />
+        )}
+      </span>
       <span className="tx-actions">
         {tx.hasReceipt && actions.onReceipt && (
           <button

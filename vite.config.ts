@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { readFileSync } from 'node:fs';
@@ -73,6 +74,13 @@ export default defineConfig({
     }),
   ],
   test: {
+    // Pages load on demand in the app; tests import them directly so a page renders in one pass.
+    alias: [
+      {
+        find: /^\.\/pages\/lazy$/,
+        replacement: fileURLToPath(new URL('./src/app/pages/lazy.eager.tsx', import.meta.url)),
+      },
+    ],
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],

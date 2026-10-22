@@ -51,6 +51,13 @@ The settings store (key/value) also holds lists changed through Commands: `saved
 go through `monthKey` / `monthBounds` in `src/domain/dates.ts`, which follow the month start day
 (Settings, set once at start-up like privacy in `money.ts`); never slice a date to get its month.
 
+Schema v2 (Drop 9) adds `accounts`, `flows` (income, transfers, fees, cash-check adjustments), `people`,
+`udhaar` and `loans`. Spending stays in `transactions`; money in, transfers, fees, udhaar and loans never
+reach spending totals. Rows in these stores change through `putRow` / `removeRow` Commands.
+
+Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`); tests swap in
+`lazy.eager.tsx` through an alias in `vite.config.ts`.
+
 New schema work is a **new entry** appended to `MIGRATIONS` in `src/data/migrations.ts`; never edit an old
 step. `DB_VERSION` is `MIGRATIONS.length`.
 

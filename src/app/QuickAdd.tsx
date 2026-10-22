@@ -6,6 +6,7 @@ import { highlightSegments } from '../domain/highlight';
 import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
 import { repeatChips } from '../domain/repeat';
+import { INCOME_KINDS, type IncomeKind } from '../domain/accounts';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
 import { Icon } from './icons';
@@ -36,6 +37,7 @@ export function QuickAdd({
   const currency = useLedger((s) => s.settings.currency);
   const addFromParsed = useLedger((s) => s.addFromParsed);
   const addRepeat = useLedger((s) => s.addRepeat);
+  const addIncomeFromParsed = useLedger((s) => s.addIncomeFromParsed);
   const favourites = useLedger((s) => s.favourites);
   const viewMonth = useViewMonth();
   const setMonth = useView((s) => s.setMonth);
@@ -46,6 +48,8 @@ export function QuickAdd({
   const [category, setCategory] = useState<string | undefined>(undefined);
   const [dateOverride, setDateOverride] = useState<string | undefined>(undefined);
   const [methodOverride, setMethodOverride] = useState<PaymentMethod | undefined>(undefined);
+  const [kindOverride, setKindOverride] = useState<'expense' | 'income' | undefined>(undefined);
+  const [incomeKind, setIncomeKind] = useState<IncomeKind | undefined>(undefined);
   const [attempted, setAttempted] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,8 +100,10 @@ export function QuickAdd({
   const canSave =
     parsed !== null && parsed.amountMinor !== null && parsed.amountMinor > 0 && errors.length === 0;
 
+  const kind = kindOverride ?? parsed?.kind ?? 'expense';
+  const isIncome = kind === 'income';
   const duplicate =
-    parsed && parsed.amountMinor !== null
+    !isIncome && parsed && parsed.amountMinor !== null
       ? findDuplicate(
           { date, amountMinor: parsed.amountMinor, merchant: parsed.merchant },
           transactions,
@@ -109,6 +115,8 @@ export function QuickAdd({
     setCategory(undefined);
     setDateOverride(undefined);
     setMethodOverride(undefined);
+    setKindOverride(undefined);
+    setIncomeKind(undefined);
     setAttempted(false);
     setConfirmDuplicate(false);
   };
@@ -123,10 +131,16 @@ export function QuickAdd({
     }
     setSaving(true);
     try {
-      await addFromParsed({ ...parsed, ok: true, errors: [] }, category, {
-        date: dateOverride,
-        method: methodOverride,
-      });
+      if (isIncome)
+        await addIncomeFromParsed(
+          { ...parsed, ok: true, errors: [] },
+          { date: dateOverride, method: methodOverride, incomeKind },
+        );
+      else
+        await addFromParsed({ ...parsed, ok: true, errors: [] }, category, {
+          date: dateOverride,
+          method: methodOverride,
+        });
       // Saved into another month: follow it there, so the new entry is on screen.
       const savedMonth = monthKey(dateOverride ?? parsed.date);
       if (followMonth && savedMonth !== viewMonth) {
@@ -184,7 +198,7 @@ export function QuickAdd({
   };
 
   const categoryValue = category ?? (parsed?.unsure ? '' : (parsed?.categoryId ?? ''));
-  const showUnsure = parsed?.unsure === true && category === undefined;
+  const showUnsure = !isIncome && parsed?.unsure === true && category === undefined;
   const color = categories.find((c) => c.id === (category ?? parsed?.categoryId))?.color;
   const upcoming = date > today;
 
@@ -235,6 +249,7 @@ export function QuickAdd({
             setAttempted(false);
             setConfirmDuplicate(false);
             setDateOverride(undefined);
+            setKindOverride(undefined);
           }}
           onKeyDown={onKeyDown}
           onScroll={syncScroll}
@@ -339,25 +354,58 @@ export function QuickAdd({
               Saves to {monthLabel(monthKey(date))}
             </li>
           )}
-          <li className="chip chip-category" data-testid="chip-category">
-            {color && !showUnsure && <span className="dot" style={{ background: color }} />}
-            <label className="visually-hidden" htmlFor="quick-add-category">
-              Category
-            </label>
-            <select
-              id="quick-add-category"
-              className="select"
-              value={categoryValue}
-              onChange={(e) => setCategory(e.target.value || undefined)}
-            >
-              {showUnsure && <option value="">Pick a category</option>}
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </li>
+          {(isIncome || parsed.kind === 'income') && (
+            <li className="chip chip-income" data-testid="chip-income">
+              <button
+                type="button"
+                className="chip-button"
+                aria-pressed={isIncome}
+                onClick={() => setKindOverride(isIncome ? 'expense' : 'income')}
+              >
+                {isIncome ? 'Money in' : 'Spending'}
+              </button>
+            </li>
+          )}
+          {isIncome && (
+            <li className="chip chip-category" data-testid="chip-income-kind">
+              <label className="visually-hidden" htmlFor="quick-add-income-kind">
+                Kind of money in
+              </label>
+              <select
+                id="quick-add-income-kind"
+                className="select"
+                value={incomeKind ?? parsed.incomeKind}
+                onChange={(e) => setIncomeKind(e.target.value as IncomeKind)}
+              >
+                {(Object.keys(INCOME_KINDS) as IncomeKind[]).map((k) => (
+                  <option key={k} value={k}>
+                    {INCOME_KINDS[k]}
+                  </option>
+                ))}
+              </select>
+            </li>
+          )}
+          {!isIncome && (
+            <li className="chip chip-category" data-testid="chip-category">
+              {color && !showUnsure && <span className="dot" style={{ background: color }} />}
+              <label className="visually-hidden" htmlFor="quick-add-category">
+                Category
+              </label>
+              <select
+                id="quick-add-category"
+                className="select"
+                value={categoryValue}
+                onChange={(e) => setCategory(e.target.value || undefined)}
+              >
+                {showUnsure && <option value="">Pick a category</option>}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </li>
+          )}
           <li className="chip chip-method" data-testid="chip-method">
             <label className="visually-hidden" htmlFor="quick-add-method">
               Paid by

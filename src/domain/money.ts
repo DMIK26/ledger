@@ -13,6 +13,10 @@ export const CURRENCIES: Record<string, CurrencyInfo> = {
   USD: { symbol: '$', locale: 'en-US' },
   EUR: { symbol: '€', locale: 'en-IE' },
   GBP: { symbol: '£', locale: 'en-GB' },
+  AED: { symbol: 'AED', locale: 'en-AE' },
+  SGD: { symbol: 'S$', locale: 'en-SG' },
+  AUD: { symbol: 'A$', locale: 'en-AU' },
+  CAD: { symbol: 'CA$', locale: 'en-CA' },
 };
 
 const FALLBACK: CurrencyInfo = { symbol: '₹', locale: 'en-IN' };

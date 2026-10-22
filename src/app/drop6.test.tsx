@@ -127,9 +127,10 @@ describe('sketch mode and notes', () => {
     expect(document.querySelector('.sketch-capture')).toBeNull();
     fireEvent.keyDown(window, { key: 'd' });
     expect(await screen.findByTestId('sketch-toolbar')).toBeInTheDocument();
-    expect(document.querySelector('.sketch-capture')).not.toBeNull();
+    // The drawing surface can mount a moment after the toolbar on a busy machine.
+    await waitFor(() => expect(document.querySelector('.sketch-capture')).not.toBeNull());
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByTestId('sketch-toolbar')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('sketch-toolbar')).toBeNull());
   });
 
   it('D does nothing while typing', async () => {

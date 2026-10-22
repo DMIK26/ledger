@@ -43,6 +43,7 @@ import { TxList } from '../TxList';
 import { Insights } from '../Insights';
 import { BackupReminder } from '../BackupReminder';
 import { CheckIn } from '../CheckIn';
+import { CardDue } from '../money/CardDue';
 import { InstallBanner } from '../InstallBanner';
 import { LoadSampleButton, SampleBanner } from '../SampleData';
 
@@ -434,6 +435,7 @@ export function Dashboard() {
         today={asOf}
         pinned={pinnedBudget}
       />
+      {current && <CardDue />}
       {current && <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />}
       <div className="chart-row">
         <section className="card chart-card" aria-labelledby="donut-title">

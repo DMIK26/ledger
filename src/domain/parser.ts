@@ -1,4 +1,5 @@
 import { CALC_NUMBER, CALC_OPERATOR, evaluateAmount } from './calc';
+import { incomeKindFor, type IncomeKind } from './accounts';
 import { categorise, type Confidence } from './categoriser';
 import {
   addDays, daysInMonth, diffDays, isoFromYMD, MONTHS, parseISO, shiftMonth, weekdayOf,
@@ -10,7 +11,7 @@ import { parseAmountToMinor } from './money';
 import { replaceNumberWords } from './numberWords';
 import type { CategoryId, ISODate, PaymentMethod } from './types';
 
-export type TokenKind = 'amount' | 'date' | 'method';
+export type TokenKind = 'amount' | 'date' | 'method' | 'income';
 export interface Token {
   kind: TokenKind;
   start: number;
@@ -43,6 +44,9 @@ export interface ParsedEntry {
   confidence: Confidence;
   /** True when no rule or keyword matched and the category is a placeholder. */
   unsure: boolean;
+  /** Money in ("salary 40k", "got 500 from Rahul") rather than spending. */
+  kind: 'expense' | 'income';
+  incomeKind: IncomeKind;
   tokens: Token[];
   errors: string[];
   /** True when the entry can be saved as it stands. */
@@ -355,6 +359,10 @@ function numberToMinor(n: NumberWord): number | null {
   return n.kilo ? minor * 1000 : minor;
 }
 
+const INCOME_VERB = /\b(?:received|recieved|got|credited|earned)\b/i;
+const INCOME_NOUN =
+  /\b(?:salary|bonus|stipend|wages|payslip|paycheck|income|dividends?|refunds?|refunded|cashback)\b/i;
+
 const FILLER = /\b(?:on|for|at|to|paid|spent|via|using|by|with|rupees?|rs|inr)\b/gi;
 
 function titleCase(s: string): string {
@@ -421,6 +429,11 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
   const methodHit = detectMethod(text, taken);
   if (methodHit) claim('method', methodHit.span);
 
+  // Money in: a verb that only says so is taken out of the name; a noun (salary, refund) stays in it.
+  const incomeVerb = INCOME_VERB.exec(text);
+  if (incomeVerb && !overlaps(spanOf(incomeVerb), taken)) claim('income', spanOf(incomeVerb));
+  const isIncome = Boolean(incomeVerb) || INCOME_NOUN.test(text);
+
   const scan = findNumbers(text, taken);
   const { numbers, markers } = scan;
   errors.push(...scan.errors);
@@ -477,6 +490,8 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
     categoryId: found.categoryId,
     confidence: found.confidence,
     unsure: found.confidence === 'none',
+    kind: isIncome ? 'income' : 'expense',
+    incomeKind: incomeKindFor(text),
     tokens: tokens.sort((a, b) => a.start - b.start),
     errors,
     ok: errors.length === 0 && amountMinor !== null && amountMinor > 0,

@@ -9,6 +9,9 @@ const PAGES = [
   '#/reports',
   '#/recurring',
   '#/settings',
+  '#/money',
+  '#/money?view=udhaar',
+  '#/money?view=loans',
   '#/transactions?action=add',
   '#/transactions?view=trash',
   '#/settings?view=activity',
@@ -40,6 +43,7 @@ test('no serious or critical accessibility problems on any page', async ({ page 
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);
     await page.getByRole('heading', { level: 1 }).waitFor();
+    await expect(page.locator('.page-loading')).toHaveCount(0);
     const result = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       .analyze();
@@ -64,6 +68,7 @@ for (const width of [360, 390, 430]) {
     for (const hash of PAGES) {
       await page.goto(`./${hash}`);
       await page.getByRole('heading', { level: 1 }).waitFor();
+    await expect(page.locator('.page-loading')).toHaveCount(0);
       const report = await page.evaluate(() => {
         const problems: string[] = [];
         if (document.documentElement.scrollWidth > window.innerWidth + 1)
@@ -182,6 +187,7 @@ test('dark theme keeps contrast on every page', async ({ page }, info) => {
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);
     await page.getByRole('heading', { level: 1 }).waitFor();
+    await expect(page.locator('.page-loading')).toHaveCount(0);
     const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
     const bad = result.violations.map(
       (v) =>

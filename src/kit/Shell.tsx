@@ -7,6 +7,7 @@ import { budgetsForMonth, budgetStatus } from '../domain/budgets';
 import { fmtDate, monthKey, monthLabel, monthRangeLabel, shiftMonthKey, todayISO } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { navSummary } from '../domain/navSummary';
+import { cardsDueSoon, cashFlow } from '../domain/accounts';
 import { PIN_KIND_LABEL } from '../domain/pins';
 import { useRoving } from './roving';
 import { useScopedTransactions, useView, useViewMonth } from './view';
@@ -271,12 +272,21 @@ export function useNavInfo() {
   const recurring = useLedger((s) => s.recurring);
   const lastBackupAt = useLedger((s) => s.settings.lastBackupAt);
   const currency = useLedger((s) => s.settings.currency);
+  const accounts = useLedger((s) => s.accounts);
+  const flows = useLedger((s) => s.flows);
+  const udhaar = useLedger((s) => s.udhaar);
+  const all = useLedger((s) => s.transactions);
   usePrivacy();
   const today = todayISO();
   const s = useMemo(
     () => navSummary(transactions, budgets, recurring, today),
     [transactions, budgets, recurring, today],
   );
+  const cardsDue = useMemo(
+    () => cardsDueSoon(accounts, { transactions: all, flows, udhaar }, today).length,
+    [accounts, all, flows, udhaar, today],
+  );
+  const flow = useMemo(() => cashFlow(all, flows, monthKey(today), today), [all, flows, today]);
   const money = (m: number) => fmtMoney(m, { currency });
   const label = monthLabel(monthKey(today));
   return {
@@ -287,6 +297,10 @@ export function useNavInfo() {
           ? { count: s.overCategories, text: `${s.overCategories} over budget` }
           : null,
       '/recurring': s.dueSoon > 0 ? { count: s.dueSoon, text: `${s.dueSoon} due this week` } : null,
+      '/money':
+        cardsDue > 0
+          ? { count: cardsDue, text: `${cardsDue} card ${cardsDue === 1 ? 'payment' : 'payments'} due` }
+          : null,
     } as Record<string, { count: number; text: string } | null>,
     peeks: {
       '/': `${money(s.monthMinor)} spent in ${label} so far`,
@@ -300,6 +314,7 @@ export function useNavInfo() {
             ? `${money(s.budgetLeftMinor)} left of this month's budget`
             : `Over this month's budget by ${money(-s.budgetLeftMinor)}`,
       '/reports': `${label} so far: ${money(s.monthMinor)}`,
+      '/money': `${money(flow.inMinor)} in, ${money(flow.outMinor)} out in ${label}`,
       '/recurring': s.next
         ? `Next: ${s.next.merchant}, ${money(s.next.amountMinor)} on ${fmtDate(s.next.date)}`
         : 'Nothing due in the next week',

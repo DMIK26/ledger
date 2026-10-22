@@ -27,13 +27,14 @@ interface NavItem {
 export const NAV: NavItem[] = [
   { path: '/', label: 'Dashboard', icon: 'home' },
   { path: '/transactions', label: 'Transactions', icon: 'list' },
+  { path: '/money', label: 'Money', icon: 'coins' },
   { path: '/budgets', label: 'Budgets', icon: 'wallet' },
   { path: '/reports', label: 'Reports', icon: 'chart' },
   { path: '/recurring', label: 'Recurring', icon: 'repeat' },
   { path: '/settings', label: 'Settings', icon: 'gear' },
 ];
 
-const MORE: RoutePath[] = ['/budgets', '/recurring', '/settings'];
+const MORE: RoutePath[] = ['/money', '/budgets', '/recurring', '/settings'];
 
 export const titleFor = (path: RoutePath): string =>
   NAV.find((n) => n.path === path)?.label ?? 'Ledger';
@@ -358,7 +359,7 @@ export function Layout({
       <div className="main">
         <TopBar title={title} path={path} />
         <div className="context-bar">
-          {(path === '/' || path === '/budgets') && <MonthSwitcher />}
+          {(path === '/' || path === '/budgets' || path === '/money') && <MonthSwitcher />}
           <PinBar />
         </div>
         <main id="main" tabIndex={-1} className="content">

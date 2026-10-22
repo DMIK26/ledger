@@ -10,6 +10,9 @@ import type {
 import type { RecurringItem } from '../domain/recurring';
 import type { Note } from '../domain/notes';
 import type { Sketch } from '../domain/sketch';
+import type { Account, Flow } from '../domain/accounts';
+import type { Person, UdhaarEntry } from '../domain/udhaar';
+import type { Loan } from '../domain/loans';
 import { MIGRATIONS } from './migrations';
 
 export interface LedgerDB extends DBSchema {
@@ -28,6 +31,12 @@ export interface LedgerDB extends DBSchema {
   notes: { key: string; value: Note };
   sketches: { key: string; value: Sketch };
   receipts: { key: string; value: Blob };
+  /** Drop 9 (schema v2). */
+  accounts: { key: string; value: Account };
+  flows: { key: string; value: Flow; indexes: { 'by-date': string } };
+  people: { key: string; value: Person };
+  udhaar: { key: string; value: UdhaarEntry; indexes: { 'by-person': string } };
+  loans: { key: string; value: Loan };
 }
 
 export type Db = IDBPDatabase<LedgerDB>;

@@ -90,9 +90,10 @@ test('categories reorder by dragging the handle', async ({ page }) => {
 });
 
 test('no page scrolls sideways', async ({ page }) => {
-  for (const r of ['#/', '#/transactions', '#/budgets', '#/reports', '#/recurring', '#/settings']) {
+  for (const r of ['#/', '#/transactions', '#/budgets', '#/reports', '#/recurring', '#/settings', '#/money']) {
     await page.goto(`./${r}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.locator('.page-loading')).toHaveCount(0);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );

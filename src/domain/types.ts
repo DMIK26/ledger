@@ -1,3 +1,5 @@
+import type { ForeignAmount } from './fx';
+
 export type ISODate = string; // 'YYYY-MM-DD', a local calendar date
 export type CategoryId = string;
 
@@ -25,6 +27,10 @@ export interface Transaction {
   recurringId?: string;
   /** True when a receipt image is stored under this entry's id in the receipts store. */
   hasReceipt?: boolean;
+  /** The account it was paid from, when picked; otherwise the account its method belongs to. */
+  accountId?: string;
+  /** Paid in another currency: the original amount and the rate typed (amountMinor is in rupees). */
+  foreign?: ForeignAmount;
   createdAt: number;
   updatedAt: number;
 }

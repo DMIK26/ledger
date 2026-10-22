@@ -7,6 +7,9 @@ import { parseQuickEntry } from '../domain/parser';
 import { parseTags } from '../domain/tags';
 import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { AmountInput } from './AmountInput';
+import { accountForMethod } from '../domain/accounts';
+import { convertMinor, FX_CURRENCIES, parseRate, rateAsMinor, rateInput } from '../domain/fx';
+import { fmtMoney } from '../domain/money';
 import { usePrivacy } from './Money';
 import { prepareReceipt, useObjectUrl } from './receiptImage';
 
@@ -53,6 +56,22 @@ export function EntryForm({
   const [categoryTouched, setCategoryTouched] = useState(editing !== undefined);
   const [method, setMethod] = useState<PaymentMethod>(start?.method ?? lastMethod);
   const [tags, setTags] = useState((start?.tags ?? []).join(', '));
+  const accounts = useLedger((s) => s.accounts);
+  const currency = useLedger((s) => s.settings.currency);
+  const [accountId, setAccountId] = useState(start?.accountId ?? '');
+  const [foreignOn, setForeignOn] = useState(Boolean(start?.foreign));
+  const [fxCurrency, setFxCurrency] = useState<string>(start?.foreign?.currency ?? 'USD');
+  const [fxAmount, setFxAmount] = useState<number | null>(start?.foreign?.amountMinor ?? null);
+  const [fxRate, setFxRate] = useState(start?.foreign ? rateInput(start.foreign.rate4) : '');
+  const rate4 = parseRate(fxRate);
+  // In another currency the rupee amount is worked out from the amount and the rate typed.
+  const effective = foreignOn
+    ? fxAmount !== null && rate4 !== null
+      ? convertMinor(fxAmount, rate4)
+      : null
+    : amount;
+  const openAccounts = accounts.filter((a) => !a.archived || a.id === accountId);
+  const methodAccount = accountForMethod(accounts, method);
   const [notes, setNotes] = useState(start?.notes ?? '');
   const [receipt, setReceipt] = useState<Blob | null>(null);
   const [receiptChanged, setReceiptChanged] = useState(false);
@@ -95,23 +114,29 @@ export function EntryForm({
 
   const draft = (): EntryDraft => ({
     date,
-    amountMinor: amount ?? 0,
+    amountMinor: effective ?? 0,
     merchant: merchant.trim(),
     categoryId,
     method,
     notes: notes.trim(),
     tags: parseTags(tags),
+    accountId: accountId || undefined,
+    foreign:
+      foreignOn && fxAmount !== null && rate4 !== null
+        ? { currency: fxCurrency, amountMinor: fxAmount, rate4 }
+        : undefined,
   });
 
   const duplicate =
-    amount !== null && amount > 0 && parseISO(date)
-      ? findDuplicate({ date, amountMinor: amount, merchant }, transactions, editing?.id)
+    effective !== null && effective > 0 && parseISO(date)
+      ? findDuplicate({ date, amountMinor: effective, merchant }, transactions, editing?.id)
       : null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const problems: string[] = [];
-    if (amount === null || amount <= 0) problems.push('Enter an amount above zero');
+    if (foreignOn && rate4 === null) problems.push('Enter the rate, rupees for one unit');
+    else if (effective === null || effective <= 0) problems.push('Enter an amount above zero');
     if (!merchant.trim()) problems.push('Say what it was for');
     if (!parseISO(date)) problems.push('Pick a valid date');
     setErrors(problems);
@@ -163,20 +188,73 @@ export function EntryForm({
           <p className="muted small">Fills in the fields below. Adjust anything before saving.</p>
         </div>
       )}
+      <label className="check foreign-toggle">
+        <input
+          type="checkbox"
+          checked={foreignOn}
+          onChange={(e) => {
+            setForeignOn(e.target.checked);
+            setConfirmDuplicate(false);
+          }}
+        />
+        Paid in another currency
+      </label>
       <div className="form-grid">
-        <div className="field">
-          <label htmlFor={f('amount')}>Amount</label>
-          <AmountInput
-            key={amountKey}
-            id={f('amount')}
-            initialMinor={amount}
-            onChange={(v) => {
-              setAmount(v);
-              setConfirmDuplicate(false);
-            }}
-            invalid={errors.length > 0 && (amount === null || amount <= 0)}
-          />
-        </div>
+        {foreignOn ? (
+          <>
+            <div className="field">
+              <label htmlFor={f('fx-currency')}>Currency</label>
+              <select
+                id={f('fx-currency')}
+                className="select input"
+                value={fxCurrency}
+                onChange={(e) => setFxCurrency(e.target.value)}
+              >
+                {FX_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor={f('fx-amount')}>Amount in {fxCurrency}</label>
+              <AmountInput id={f('fx-amount')} initialMinor={fxAmount} onChange={setFxAmount} />
+            </div>
+            <div className="field">
+              <label htmlFor={f('fx-rate')}>Rate, rupees for 1 {fxCurrency}</label>
+              <input
+                id={f('fx-rate')}
+                className="input"
+                inputMode="decimal"
+                autoComplete="off"
+                placeholder="83.25"
+                value={fxRate}
+                onChange={(e) => setFxRate(e.target.value)}
+              />
+              {effective !== null && rate4 !== null && (
+                <span className="amt-sum small" aria-live="polite" data-testid="fx-result">
+                  = {fmtMoney(effective, { currency })} at{' '}
+                  {fmtMoney(rateAsMinor(rate4), { currency })}
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="field">
+            <label htmlFor={f('amount')}>Amount</label>
+            <AmountInput
+              key={amountKey}
+              id={f('amount')}
+              initialMinor={amount}
+              onChange={(v) => {
+                setAmount(v);
+                setConfirmDuplicate(false);
+              }}
+              invalid={errors.length > 0 && (amount === null || amount <= 0)}
+            />
+          </div>
+        )}
         <div className="field">
           <label htmlFor={f('merchant')}>What for</label>
           <input
@@ -235,6 +313,28 @@ export function EntryForm({
             ))}
           </select>
         </div>
+        {openAccounts.length > 0 && (
+          <div className="field">
+            <label htmlFor={f('account')}>From account</label>
+            <select
+              id={f('account')}
+              className="select input"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              <option value="">
+                {methodAccount ? `${methodAccount.name} (${method})` : `No account for ${method}`}
+              </option>
+              {openAccounts
+                .filter((a) => a.id !== methodAccount?.id || accountId === a.id)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label htmlFor={f('tags')}>Tags</label>
           <input

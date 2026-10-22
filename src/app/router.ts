@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 export const ROUTES = [
   '/',
   '/transactions',
+  '/money',
   '/budgets',
   '/reports',
   '/recurring',

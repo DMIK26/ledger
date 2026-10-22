@@ -3,7 +3,10 @@ import type { RecurringItem } from '../domain/recurring';
 import type { Note } from '../domain/notes';
 import type { Sketch } from '../domain/sketch';
 import type { Budget, Category, MerchantRule, Transaction, TrashItem } from '../domain/types';
-import type { Db } from './db';
+import type { Account, Flow } from '../domain/accounts';
+import type { Loan } from '../domain/loans';
+import type { Person, UdhaarEntry } from '../domain/udhaar';
+import type { Db, LedgerDB } from './db';
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
 export interface Command {
@@ -240,6 +243,37 @@ export const removeRecurring = (item: RecurringItem): Command => ({
   },
 });
 
+/** The Drop 9 stores, each a plain list of rows with an id. */
+export type RowStore = 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans';
+type RowOf<S extends RowStore> = LedgerDB[S]['value'];
+
+/** Adds or replaces one row; undo puts back the previous version (or removes a new row). */
+export const putRow = <S extends RowStore>(
+  store: S,
+  next: RowOf<S>,
+  previous: RowOf<S> | undefined,
+  label: string,
+): Command => ({
+  label,
+  apply: async (db) => {
+    await db.put(store, next);
+  },
+  revert: async (db) => {
+    if (previous) await db.put(store, previous);
+    else await db.delete(store, next.id);
+  },
+});
+
+export const removeRow = <S extends RowStore>(store: S, row: RowOf<S>, label: string): Command => ({
+  label,
+  apply: async (db) => {
+    await db.delete(store, row.id);
+  },
+  revert: async (db) => {
+    await db.put(store, row);
+  },
+});
+
 export const FAVOURITES_KEY = 'favourites';
 export const NO_SPEND_KEY = 'noSpendDays';
 
@@ -283,9 +317,25 @@ export interface LedgerSnapshot {
   rules: MerchantRule[];
   budgets: Budget[];
   recurring: RecurringItem[];
+  accounts: Account[];
+  flows: Flow[];
+  people: Person[];
+  udhaar: UdhaarEntry[];
+  loans: Loan[];
 }
 
-const SNAPSHOT_STORES = ['transactions', 'categories', 'rules', 'budgets', 'recurring'] as const;
+const SNAPSHOT_STORES = [
+  'transactions',
+  'categories',
+  'rules',
+  'budgets',
+  'recurring',
+  'accounts',
+  'flows',
+  'people',
+  'udhaar',
+  'loans',
+] as const;
 
 async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
   const t = db.transaction([...SNAPSHOT_STORES], 'readwrite');
@@ -295,6 +345,11 @@ async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
   for (const x of s.rules) void t.objectStore('rules').put(x);
   for (const x of s.budgets) void t.objectStore('budgets').put(x);
   for (const x of s.recurring) void t.objectStore('recurring').put(x);
+  for (const x of s.accounts) void t.objectStore('accounts').put(x);
+  for (const x of s.flows) void t.objectStore('flows').put(x);
+  for (const x of s.people) void t.objectStore('people').put(x);
+  for (const x of s.udhaar) void t.objectStore('udhaar').put(x);
+  for (const x of s.loans) void t.objectStore('loans').put(x);
   await t.done;
 }
 

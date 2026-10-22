@@ -11,6 +11,9 @@ import type { RecurringItem } from '../domain/recurring';
 import type { Note } from '../domain/notes';
 import type { Sketch } from '../domain/sketch';
 import type { Favourite } from '../domain/repeat';
+import type { Account, Flow } from '../domain/accounts';
+import type { Person, UdhaarEntry } from '../domain/udhaar';
+import type { Loan } from '../domain/loans';
 import { FAVOURITES_KEY, NO_SPEND_KEY } from './commands';
 import { DB_VERSION, type Db } from './db';
 
@@ -33,6 +36,12 @@ export interface BackupFile {
     /** Added in Drop 8. */
     favourites?: Favourite[];
     noSpendDays?: string[];
+    /** Added in Drop 9. */
+    accounts?: Account[];
+    flows?: Flow[];
+    people?: Person[];
+    udhaar?: UdhaarEntry[];
+    loans?: Loan[];
   };
 }
 
@@ -75,6 +84,11 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       sketches: await db.getAll('sketches'),
       favourites: await listOf<Favourite>(db, FAVOURITES_KEY),
       noSpendDays: await listOf<string>(db, NO_SPEND_KEY),
+      accounts: await db.getAll('accounts'),
+      flows: await db.getAll('flows'),
+      people: await db.getAll('people'),
+      udhaar: await db.getAll('udhaar'),
+      loans: await db.getAll('loans'),
     },
   };
 }
@@ -167,6 +181,25 @@ export function validateBackup(json: unknown): BackupFile | null {
     )
   )
     return null;
+  // Drop 9 lists: rows with an id, and whole-number amounts where they carry money.
+  const rowsOk = (v: unknown, money: boolean): boolean =>
+    v === undefined ||
+    (Array.isArray(v) &&
+      v.every(
+        (r) =>
+          isObj(r) &&
+          typeof r.id === 'string' &&
+          (!money || Number.isInteger(r.amountMinor ?? r.principalMinor ?? r.openingMinor)),
+      ));
+  const d = json.data;
+  if (
+    !rowsOk(d.accounts, true) ||
+    !rowsOk(d.flows, true) ||
+    !rowsOk(d.people, false) ||
+    !rowsOk(d.udhaar, true) ||
+    !rowsOk(d.loans, true)
+  )
+    return null;
   return json as unknown as BackupFile;
 }
 
@@ -186,9 +219,21 @@ export async function importBackup(
       'recurring',
       'notes',
       'sketches',
+      'accounts',
+      'flows',
+      'people',
+      'udhaar',
+      'loans',
     ],
     'readwrite',
   );
+  for (const name of ['accounts', 'flows', 'people', 'udhaar', 'loans'] as const) {
+    if (mode === 'replace') await t.objectStore(name).clear();
+    for (const row of (file.data[name] ?? []) as Array<{ id: string }>) {
+      if (mode === 'replace' || !(await t.objectStore(name).get(row.id)))
+        await t.objectStore(name).put(row as never);
+    }
+  }
   for (const n of file.data.notes ?? []) {
     if (!(await t.objectStore('notes').get(n.id))) await t.objectStore('notes').put(n);
   }

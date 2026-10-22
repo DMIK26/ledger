@@ -28,4 +28,14 @@ export const MIGRATIONS: Migration[] = [
     db.createObjectStore('sketches', { keyPath: 'id' });
     db.createObjectStore('receipts');
   },
+  // v2 (Drop 9): accounts, money in, transfers and fees, udhaar, loans. Spending stays in transactions.
+  (db) => {
+    db.createObjectStore('accounts', { keyPath: 'id' });
+    const flows = db.createObjectStore('flows', { keyPath: 'id' });
+    flows.createIndex('by-date', 'date');
+    db.createObjectStore('people', { keyPath: 'id' });
+    const udhaar = db.createObjectStore('udhaar', { keyPath: 'id' });
+    udhaar.createIndex('by-person', 'personId');
+    db.createObjectStore('loans', { keyPath: 'id' });
+  },
 ];
