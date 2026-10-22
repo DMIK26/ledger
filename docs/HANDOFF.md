@@ -1,7 +1,8 @@
 # Handoff: where the build stands
 
-Updated 22 Oct 2026. Drop 9 is built and waiting to be published (see below). **Drops 1 to 8 are complete and published** at
-https://dmik26.github.io/ledger/, tagged **v1.0.0**. Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
+Updated 22 Oct 2026. **Drops 1 to 9 are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 10 is built and verified here; it goes live
+once Dhaarmik commits and pushes it with GitHub Desktop.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
@@ -36,7 +37,45 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 9: the whole money picture (22 Oct 2026, awaiting publish)
+## Drop 10: plan ahead (22 Oct 2026, built, awaiting publish)
+
+- **Dashboard**: "Safe to spend today" (budget, or money in without one, less spending before today, bills
+  still to come, entries logged for later days and what goals need this month, shared over the days left
+  including today, less today's spending; "How it is worked out" shows the sum). "Close October" in the
+  first 7 days of a month (spent, against budget, in and out, top category, carried rollover, optional
+  note pinned to the month as `month:YYYY-MM`). "Budgets to watch" lists categories over budget or
+  heading over it. The budget card's "at this pace" now uses the forecast. All three show for the
+  current month with nothing pinned.
+- **Budgets** (`?view=` budgets, goals, wishlist): categories grouped Fixed, Flexible, Non-monthly with
+  subtotals and a type picker per row (defaults: Housing fixed, Education non-monthly), "Roll over" per
+  category ("plus ₹800 carried"), a Pace chart (spending added up against a straight line to the plan),
+  at-risk text in rows, and "Reset plan" (clears the month's budgets as one undo, then offers
+  suggestions).
+- **Goals and funds**: target, date, monthly amount (missing at the start of the month over the months
+  left, snoozed months skipped), on track / ahead / at risk against an even plan, a drawn jar, put aside
+  (logged only, never moves account money), snooze this month, "Paid" for a fund (a yearly one restarts
+  next year and keeps anything extra).
+- **Wishlist**: 7 or 30 day wait; Buy (logs the expense today with the last method and marks it bought,
+  one undo) or Skip; "Saved by waiting" adds up skipped prices.
+- **Net worth** (Money > Overview): accounts less cards, assets you value yourself (gold, FD, mutual
+  funds, stocks, PF and PPF, property, other; dated values, 0 when sold), udhaar both ways and loans left
+  (a loan counts from a month before its first EMI); breakdown and month ends from the first month with
+  anything in it.
+- **Domain**: `plan.ts` (budget kinds, bills left, forecast, safe to spend, rollover, pacing, at risk,
+  month review), `goals.ts`, `wishlist.ts`, `networth.ts`. The pace insight uses the forecast, so a fixed
+  cost such as rent is no longer stretched over the month (one Drop 4 test was updated for this).
+- **Data**: schema v3 adds `goals`, `wishlist`, `assets`; the settings list `closedMonths`; categories
+  gain optional `budgetKind` and `rollover`; transactions gain the source `wishlist`. Backups carry all
+  of it (merge adds missing rows and closed months; restore replaces the three stores).
+- **Size**: start-up JavaScript 157 of 170 KB, all JavaScript 194 of 300 KB, CSS 12 of 16 KB, offline
+  precache 1108 KB, under the new 1,300 KB limit.
+
+Verified: lint, typecheck, 391 unit tests (38 files), build with budgets, Playwright 86 passed and 14
+skipped with `CI=1` (new `e2e/drop10.spec.ts`; the privacy, axe, phone-size and sideways sweeps now cover
+Goals and Wishlist and the Drop 10 amounts), screenshots on desktop and a Pixel 7 size. Not verified on
+real phones yet.
+
+## Drop 9: the whole money picture (22 Oct 2026, published)
 
 - **Money page** (`#/money`, `src/app/pages/Money.tsx`, `src/app/money/*`): Overview (cash flow, money in,
   accounts with transfers, fees and cash checks), Udhaar, Loans. In the sidebar and the More sheet; the

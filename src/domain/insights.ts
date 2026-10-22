@@ -1,8 +1,9 @@
 import { categoryTotals, inMonth, previousMonth, samePointLastMonth } from './aggregates';
-import { budgetStatus, projectMonthEnd } from './budgets';
+import { budgetStatus } from './budgets';
+import { forecastMonthEnd } from './plan';
 import { addDays, monthKey, monthProgress } from './dates';
 import { nextOccurrence, type RecurringItem } from './recurring';
-import type { CategoryId, ISODate, Transaction } from './types';
+import type { Category, CategoryId, ISODate, Transaction } from './types';
 
 export type Insight =
   | { kind: 'pace-over'; projectedMinor: number; overMinor: number }
@@ -21,6 +22,7 @@ export function buildInsights(
   today: ISODate,
   overallBudgetMinor: number | null,
   recurring: readonly RecurringItem[] = [],
+  categories: readonly Pick<Category, 'id' | 'budgetKind'>[] = [],
 ): Insight[] {
   const p = monthProgress(today);
   const month = monthKey(today);
@@ -29,7 +31,8 @@ export function buildInsights(
 
   const spent = current.reduce((s, t) => s + t.amountMinor, 0);
   if (overallBudgetMinor !== null && spent > 0 && p.day < p.length) {
-    const projected = projectMonthEnd(spent, today);
+    // The month-end forecast: flexible spending at its rate, plus bills still to come.
+    const projected = forecastMonthEnd({ transactions: list, categories, recurring, today }).totalMinor;
     const s = budgetStatus(projected, overallBudgetMinor);
     out.push(
       s.kind === 'over'

@@ -68,11 +68,12 @@ function Text({ insight, currency }: { insight: Insight; currency: string }) {
 export function Insights({ overallBudgetMinor }: { overallBudgetMinor: number | null }) {
   const transactions = useScopedTransactions();
   const recurring = useLedger((s) => s.recurring);
+  const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
   const [today] = useState(todayISO);
   const insights = useMemo(
-    () => buildInsights(transactions, today, overallBudgetMinor, recurring),
-    [transactions, today, overallBudgetMinor, recurring],
+    () => buildInsights(transactions, today, overallBudgetMinor, recurring, categories),
+    [transactions, today, overallBudgetMinor, recurring, categories],
   );
   if (insights.length === 0) return null;
   return (

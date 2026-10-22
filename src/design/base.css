@@ -4008,3 +4008,345 @@ g.mood-face {
   display: grid;
   gap: var(--s2);
 }
+
+/* Drop 10: plan ahead */
+.safe-math summary,
+.goal-history summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.safe-math dl {
+  display: grid;
+  gap: var(--s1);
+  margin: 0;
+}
+
+.safe-math dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.safe-math dt {
+  color: var(--muted);
+}
+
+.safe-math dd {
+  margin: 0;
+}
+
+.safe-math .safe-total {
+  padding-top: var(--s2);
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.safe-math .safe-total dt {
+  color: var(--text);
+}
+
+.month-close .btn-row {
+  flex-wrap: wrap;
+}
+
+.month-close textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.risk-row {
+  grid-template-columns: 1fr auto;
+}
+
+.budget-group + .budget-group {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--border);
+}
+
+.budget-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.budget-group-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.budget-group-hint {
+  margin: 0;
+}
+
+.budget-extra {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s4);
+}
+
+.input-small {
+  width: auto;
+  min-height: 44px;
+  padding-block: 0;
+}
+
+.risk-chip {
+  padding: 2px var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pace-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+.pace-chart {
+  display: block;
+  overflow: visible;
+}
+
+.pace-axis {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.pace-ideal {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.pace-actual {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.pace-dot {
+  fill: var(--text);
+}
+
+.pace-actual.pace-over {
+  stroke: var(--accent-ink);
+}
+
+.pace-dot.pace-over {
+  fill: var(--accent-ink);
+}
+
+.pace-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.pace-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--text);
+}
+
+.pace-swatch-over {
+  border-top-color: var(--accent-ink);
+}
+
+.pace-swatch-ideal {
+  margin-left: var(--s2);
+  border-top: 2px dashed var(--faint);
+}
+
+.goal {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--s3);
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.goal h3 {
+  margin: 0;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.goal-main {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.goal-main p {
+  margin: 0;
+}
+
+.goal-main .btn-row {
+  flex-wrap: wrap;
+}
+
+.jar {
+  width: 56px;
+  height: auto;
+}
+
+.jar-glass {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.jar-lid {
+  fill: var(--fill);
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+
+.jar-fill {
+  fill: var(--green);
+}
+
+.goal-state {
+  padding: 2px var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.goal-state-ahead,
+.goal-state-done,
+.goal-state-paid {
+  border-color: var(--green);
+}
+
+.goal-state-at-risk {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.put-aside {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: end;
+  gap: var(--s2) var(--s3);
+}
+
+.put-aside .btn-row,
+.put-aside .errors {
+  grid-column: 1 / -1;
+}
+
+.wish-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.wish-row:last-child {
+  border-bottom: 0;
+}
+
+.wish-name {
+  font-weight: 500;
+}
+
+.wish-actions {
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+}
+
+.networth-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--s3);
+  margin: 0;
+}
+
+.networth-parts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.networth-parts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.networth-sub {
+  margin: var(--s2) 0 0;
+  font-size: 15px;
+}
+
+.asset-row {
+  display: grid;
+  gap: var(--s2);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+
+.asset-row:last-child {
+  border-bottom: 0;
+}
+
+.asset-row .money-row {
+  border-bottom: 0;
+}
+
+.networth-history {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.networth-history li {
+  display: grid;
+  grid-template-columns: 3em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.networth-track {
+  display: block;
+  height: 8px;
+}
+
+.networth-bar {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--green);
+}
+
+.networth-neg {
+  background: var(--accent);
+}
+
+.networth-value {
+  min-width: 5em;
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

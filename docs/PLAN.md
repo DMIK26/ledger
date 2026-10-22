@@ -14,11 +14,11 @@ always the source of truth.
 | 6. Doodle Studio (done and published, 21 Oct 2026) | Companion, sketch layer, notes and stamps, category doodles, auto-annotations, ask-the-pencil, sketch style | Stroke simplification and shape snap tested; anchored notes survive resize and month change; Reduced motion disables wobble and tracking |
 | 7. Mobile and release (done, published and tagged v1.0.0, 21 Oct 2026) | Audit at 360/390/430px, install flows, update toast, offline checks, performance pass at 5,000 records, accessibility pass (axe), docs, tag v1.0.0 | Lighthouse budgets met; no horizontal overflow; every control 44px+; inputs 16px+ |
 | 8. Never miss a log (done and published, 22 Oct 2026) | Missed-day check-in, repeat chips and favourites, copy to today, maths in amounts, keypad, several at once, Telugu and Hindi quick add, kind streaks, month start day | Check-in marks no-spend days and undoes; maths and Indic phrases tested in the parser; a keypad entry saves in two taps; several lines save as one undo; month start 25 moves budgets and KPIs to the 25th-to-24th cycle |
-| 9. The whole money picture (done, 22 Oct 2026) | Income, accounts, transfers, cards, udhaar, loans, foreign currency | Balances reconcile; transfers never count as spending |
-| 10. Plan ahead | Safe to spend, flex budgets, sinking funds, goals, pacing, forecast, calendar | Daily allowance rolls over correctly across a month |
-| 11. Interactive | Command palette, review mode, scrubbing, guess-first, treemap, Sankey, recap, splits, custom dashboard | Every gesture has a keyboard path; privacy holds in shared images |
-| 12. Insight | Search, rules editor, nudges, merchant pages, trips, digest, subcategories | Search phrases tested; subcategories roll up in every chart |
-| 13. Reach and polish (v1.1.0) | Spaces, passkey unlock, backups, badge, Telugu and Hindi interface, audits | Tag v1.1.0 |
+| 9. The whole money picture (done and published, 22 Oct 2026) | Income, accounts, transfers, cards, udhaar, loans, foreign currency | Balances reconcile; transfers never count as spending |
+| 10. Plan ahead (done, 22 Oct 2026; publish with GitHub Desktop) | Safe to spend, budget types, forecast, pacing and at-risk flags, rollover, plan reset, goals and funds, wishlist, net worth, close the month | Daily allowance rolls over correctly across a month; net worth adds up from its parts |
+| 11. Interactive | Calendar view, command palette, review mode, scrubbing, guess-first, treemap, Sankey, recap, splits, custom dashboard | Every gesture has a keyboard path; privacy holds in shared images |
+| 12. Insight | Search, rules editor, nudges, merchant pages, trips, digest, subcategories, tax summary, spent for whom, warranties | Search phrases tested; subcategories roll up in every chart |
+| 13. Reach and polish (v1.1.0) | Spaces, passkey unlock, backups (also password-protected), badge, Telugu and Hindi interface, audits | Tag v1.1.0 |
 
 ## Working rules
 

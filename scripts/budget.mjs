@@ -7,7 +7,7 @@ const BUDGET = {
   jsGzipKB: 170, // JavaScript loaded on start (the entry and what it preloads), gzipped
   allJsGzipKB: 300, // every page's JavaScript, gzipped
   cssGzipKB: 16,
-  precacheKB: 1100, // everything stored for offline use
+  precacheKB: 1300, // everything stored for offline use (raised from 1,100 in Drop 10)
 };
 
 const dist = 'dist';

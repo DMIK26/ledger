@@ -251,21 +251,49 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   offline). The size check measures JavaScript loaded at start-up (170 KB) and all JavaScript (300 KB).
 - Money stays integer paise; interest maths rounds to the paisa; privacy mode hides every new amount.
 
+### Drop 10: plan ahead (owner approval with additions, 22 Oct 2026)
+
+- **Safe to spend today** (Dashboard): the month's budget (or, without one, the money in this month) less
+  spending before today, bills still to come this month (recurring payments due after today) and what goals
+  need set aside this month, shared over the days left including today, less what was spent today. Spending
+  less one day raises the next days' amount by itself. Without a budget or money in, it says how to start.
+- **Budget types**: each category is fixed, flexible or non-monthly (defaults: Housing & Utilities fixed,
+  Education non-monthly, the rest flexible), changed on Budgets. Budgets groups categories by type with
+  subtotals.
+- **Month-end forecast**: spending so far, plus flexible spending at its daily rate for the days left, plus
+  bills still to come. Used by the budget card and the pace insight.
+- **Pacing chart** (Budgets): spending added up day by day against a straight line to the budget, with
+  categories at risk (heading over their budget at this rate) flagged on Budgets and the Dashboard.
+- **Rollover** (per category, off by default): what is left of a category's budget, or what went over,
+  carries into next month's budget for that category; shown as "plus ₹800 carried".
+- **Plan reset** (Budgets): clears this month's budgets in one undoable step and offers suggestions.
+- **Goals and funds** (Budgets > Goals): a save-up goal (keep it) or a fund for a known cost (insurance,
+  school fees, Diwali; can repeat yearly) with a target and a date. Ledger shows the monthly amount needed,
+  what is put aside (logged by you; it does not move account money), on track, ahead or at risk, a drawn
+  jar, snooze this month, and "Paid" for a fund (a yearly one starts again for next year).
+- **Wishlist** (Budgets > Wishlist): things you want, with a 7 or 30 day wait. When the wait is over: Buy
+  (adds the expense) or Skip; skipped items add up as "saved by waiting".
+- **Net worth** (Money > Overview): gold, FDs, mutual funds, stocks, PF, property and other assets with
+  values you update; net worth = accounts (cards owed taken off) + assets + udhaar owed to you - udhaar you
+  owe - loans left to repay; a breakdown and the last twelve month ends.
+- **Close the month** (Dashboard, the first 7 days of a month): last month's spending against budget, in
+  and out, top category, carried budget, an optional note, and "Close" (undoable).
+- The offline storage budget rises to 1,300 KB. The calendar view moves to Drop 11.
+
 ### Later drops (scope agreed, details written when each starts)
 
-- **Drop 10, plan ahead**: safe to spend today (daily allowance with rollover); fixed, flexible and
-  non-monthly budgets; sinking funds with due dates and snooze; goals with on-track status; pacing chart and
-  at-risk flags; month-end forecast, rollover and plan reset; calendar view.
-- **Drop 11, interactive**: command palette; swipe review mode and the two-of-three learning rule; chart
+- **Drop 11, interactive**: calendar view of spending, bills, salary and card due dates; command palette; swipe review mode and the two-of-three learning rule; chart
   scrubbing (pointer and keys); guess-first recap; treemap and money-flow chart; compare modes; story recap
   shared as an image with privacy respected; Splitwise-style splits; customisable dashboard; bottom sheets
   with snap points; swipe rows, range select, column choice, per-entry history; sketchbook that fills as you
   log; the pencil's optional wry one-liners.
 - **Drop 12, insight**: plain-words search; rules editor tested on history; saved reports with relative
   dates; in-app nudges (unusual amount, likely duplicate, subscription price rise); merchant pages; trips,
-  projects and festival funds; weekly digest; 50/30/20 view; subcategories.
+  projects and festival funds; weekly digest; 50/30/20 view; subcategories; tax summary (80C, 80D and other
+  deductions tagged and totalled for the financial year, exportable); spent for whom (per family member or
+  the shop); warranties (period on an entry, receipt kept, expiring soon list).
 - **Drop 13, reach and polish (v1.1.0)**: Personal and Shop spaces with a simple profit and loss; passkey
   unlock if it works in an iPhone home-screen app; one-tap backup to Files on iPhone and a weekly file
-  backup on Chrome; app badge for bills due; Telugu and Hindi interface; accessibility and performance pass.
+  backup on Chrome; password-protected backup files (encrypted on the device); app badge for bills due; Telugu and Hindi interface; accessibility and performance pass.
 - Not doing: automatic capture, bank linking, AI chat, maps, push or email alerts, widgets, ads, analytics,
   cloud sync.

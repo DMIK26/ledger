@@ -38,4 +38,10 @@ export const MIGRATIONS: Migration[] = [
     udhaar.createIndex('by-person', 'personId');
     db.createObjectStore('loans', { keyPath: 'id' });
   },
+  // v3 (Drop 10): goals and funds, the wishlist, and assets for net worth.
+  (db) => {
+    db.createObjectStore('goals', { keyPath: 'id' });
+    db.createObjectStore('wishlist', { keyPath: 'id' });
+    db.createObjectStore('assets', { keyPath: 'id' });
+  },
 ];

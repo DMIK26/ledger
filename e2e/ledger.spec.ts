@@ -125,6 +125,27 @@ test('privacy hides every amount on every page', async ({ page }) => {
   await page.getByLabel('Interest, % a year').fill('10');
   await page.getByLabel('Months').fill('12');
   await page.getByRole('button', { name: 'Add loan' }).last().click();
+  // Drop 10 amounts: a goal with an amount put aside, a wishlist item and an asset.
+  await page.goto('./#/budgets?view=goals');
+  await page.getByRole('button', { name: 'Add goal' }).click();
+  await page.getByLabel('Name').fill('Bike');
+  await page.getByLabel('Amount needed').fill('7654.32');
+  await page.getByRole('button', { name: 'Add goal' }).last().click();
+  await page.getByRole('button', { name: 'Put aside' }).click();
+  await page.getByLabel('Amount put aside').fill('1234.56');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByTestId('goal-saved')).toContainText('1,234.56');
+  await page.goto('./#/budgets?view=wishlist');
+  await page.getByRole('button', { name: 'Add to wishlist' }).click();
+  await page.getByLabel('What').fill('Shoes');
+  await page.getByLabel('Price').fill('1234.56');
+  await page.getByRole('button', { name: 'Add to wishlist' }).last().click();
+  await page.goto('./#/money');
+  await page.getByRole('button', { name: 'Add asset' }).click();
+  await page.getByLabel('Name').fill('Gold');
+  await page.getByLabel('Worth now').fill('7654.32');
+  await page.getByRole('button', { name: 'Add asset' }).last().click();
+  await expect(page.getByTestId('asset-row')).toBeVisible();
   await page.getByRole('button', { name: 'Privacy mode' }).click();
 
   const routes = [
@@ -132,6 +153,8 @@ test('privacy hides every amount on every page', async ({ page }) => {
     '#/transactions',
     '#/transactions?view=trash',
     '#/budgets',
+    '#/budgets?view=goals',
+    '#/budgets?view=wishlist',
     '#/reports',
     '#/recurring',
     '#/settings',
@@ -145,6 +168,8 @@ test('privacy hides every amount on every page', async ({ page }) => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('.page-loading')).toHaveCount(0);
     if (r === '#/money') await page.getByRole('button', { name: /^HDFC/ }).click();
+    if (r === '#/') await page.getByText('How it is worked out').click();
+    if (r === '#/budgets?view=goals') await page.getByText('1 amount put aside').click();
     if (r === '#/money?view=udhaar') await page.getByRole('button', { name: /^Rahul/ }).click();
     if (r === '#/money?view=loans') await page.locator('summary', { hasText: 'Schedule' }).click();
     if (r === '#/transactions') await page.getByRole('button', { name: /^Edit Shawarma/ }).click();

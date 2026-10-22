@@ -13,6 +13,9 @@ import type { Sketch } from '../domain/sketch';
 import type { Account, Flow } from '../domain/accounts';
 import type { Person, UdhaarEntry } from '../domain/udhaar';
 import type { Loan } from '../domain/loans';
+import type { Goal } from '../domain/goals';
+import type { WishItem } from '../domain/wishlist';
+import type { Asset } from '../domain/networth';
 import { MIGRATIONS } from './migrations';
 
 export interface LedgerDB extends DBSchema {
@@ -37,6 +40,10 @@ export interface LedgerDB extends DBSchema {
   people: { key: string; value: Person };
   udhaar: { key: string; value: UdhaarEntry; indexes: { 'by-person': string } };
   loans: { key: string; value: Loan };
+  /** Drop 10 (schema v3). */
+  goals: { key: string; value: Goal };
+  wishlist: { key: string; value: WishItem };
+  assets: { key: string; value: Asset };
 }
 
 export type Db = IDBPDatabase<LedgerDB>;

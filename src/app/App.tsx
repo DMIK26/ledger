@@ -10,7 +10,7 @@ function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
     case '/transactions':
       return <Transactions view={query.get('view')} initialFilters={filtersFromQuery(query)} />;
     case '/budgets':
-      return <Budgets />;
+      return <Budgets view={query.get('view')} />;
     case '/reports':
       return <Reports />;
     case '/recurring':

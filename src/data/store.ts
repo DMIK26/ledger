@@ -3,7 +3,7 @@ import { DEFAULT_CATEGORIES } from '../domain/categories';
 import { categorise, normalizeMerchantKey } from '../domain/categoriser';
 import type { SavedView } from '../domain/filters';
 import { budgetsForMonth, toBudgetRows, type MonthBudgets } from '../domain/budgets';
-import { addDays, setMonthStartDay } from '../domain/dates';
+import { addDays, monthLabel, setMonthStartDay } from '../domain/dates';
 import { MAX_FAVOURITES, repeatKey, type Favourite, type RepeatItem } from '../domain/repeat';
 import {
   accountForMethod,
@@ -16,6 +16,9 @@ import {
 } from '../domain/accounts';
 import { findPerson, type Person, type UdhaarEntry, type UdhaarKind } from '../domain/udhaar';
 import type { Loan } from '../domain/loans';
+import { payFund, type Goal, type GoalKind } from '../domain/goals';
+import type { WaitDays, WishItem } from '../domain/wishlist';
+import type { Asset, AssetKind } from '../domain/networth';
 import type { ForeignAmount } from '../domain/fx';
 import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
 import type { ImportPlan } from '../domain/csvImport';
@@ -31,6 +34,7 @@ import type { ParsedEntry } from '../domain/parser';
 import {
   DEFAULT_SETTINGS,
   type Budget,
+  type BudgetKind,
   type Category,
   type CategoryId,
   type ISODate,
@@ -66,6 +70,7 @@ import {
   setSettingsList,
   FAVOURITES_KEY,
   NO_SPEND_KEY,
+  CLOSED_MONTHS_KEY,
   putRow,
   removeRow,
   putNote,
@@ -79,10 +84,11 @@ import {
   updateTransaction,
   VIEWS_KEY,
   type Command,
+  type RowStore,
 } from './commands';
 import { DB_NAME, openLedgerDB, type Db, type LedgerDB } from './db';
 
-type LedgerRow<S extends 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans'> = LedgerDB[S]['value'];
+type LedgerRow<S extends RowStore> = LedgerDB[S]['value'];
 
 /** What the add and edit forms produce. */
 export interface EntryDraft {
@@ -132,6 +138,31 @@ export interface UdhaarDraft {
 
 export type LoanDraft = Omit<Loan, 'id' | 'createdAt' | 'updatedAt'>;
 
+export interface GoalDraft {
+  name: string;
+  kind: GoalKind;
+  targetMinor: number;
+  startDate: ISODate;
+  dueDate: ISODate;
+  yearly?: boolean;
+}
+
+export interface WishDraft {
+  name: string;
+  priceMinor: number;
+  waitDays: WaitDays;
+  note: string;
+  categoryId?: CategoryId;
+}
+
+export interface AssetDraft {
+  name: string;
+  kind: AssetKind;
+  /** The value now (only used when adding). */
+  valueMinor: number;
+  date: ISODate;
+}
+
 /** `undefined` leaves the receipt as it is, `null` removes it, a Blob replaces it. */
 export type ReceiptChange = Blob | null | undefined;
 
@@ -168,6 +199,11 @@ export interface LedgerState {
   people: Person[];
   udhaar: UdhaarEntry[];
   loans: Loan[];
+  /** Drop 10. */
+  goals: Goal[];
+  wishlist: WishItem[];
+  assets: Asset[];
+  closedMonths: string[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -217,7 +253,12 @@ export interface LedgerState {
     date: ISODate;
     label?: string;
   }) => Promise<void>;
-  addFee: (input: { accountId: string; amountMinor: number; date: ISODate; label: string }) => Promise<void>;
+  addFee: (input: {
+    accountId: string;
+    amountMinor: number;
+    date: ISODate;
+    label: string;
+  }) => Promise<void>;
   deleteFlow: (id: string) => Promise<void>;
   /**
    * A cash count: records the difference as spending ("Cash not logged") or only corrects the balance.
@@ -234,6 +275,30 @@ export interface LedgerState {
   deletePerson: (id: string) => Promise<void>;
   saveLoan: (draft: LoanDraft, id?: string) => Promise<void>;
   deleteLoan: (id: string) => Promise<void>;
+  /** A category's budget type or rollover. */
+  setCategoryPlan: (
+    id: string,
+    patch: { budgetKind?: BudgetKind; rollover?: boolean },
+  ) => Promise<void>;
+  /** Plan reset: removes every budget of a month in one undoable step. */
+  clearMonthBudgets: (month: string) => Promise<void>;
+  saveGoal: (draft: GoalDraft, id?: string) => Promise<string>;
+  deleteGoal: (id: string) => Promise<void>;
+  addToGoal: (id: string, amountMinor: number, date: ISODate) => Promise<void>;
+  removeFromGoal: (id: string, contributionId: string) => Promise<void>;
+  snoozeGoal: (id: string, month: string, snoozed: boolean) => Promise<void>;
+  /** A fund marked paid; a yearly one starts again for next year. */
+  payGoal: (id: string) => Promise<void>;
+  saveWish: (draft: WishDraft, id?: string) => Promise<void>;
+  /** Logs the expense (today, last used method) and marks it bought, as one step. */
+  buyWish: (id: string) => Promise<void>;
+  skipWish: (id: string) => Promise<void>;
+  deleteWish: (id: string) => Promise<void>;
+  saveAsset: (draft: AssetDraft, id?: string) => Promise<void>;
+  setAssetValue: (id: string, valueMinor: number, date: ISODate) => Promise<void>;
+  deleteAsset: (id: string) => Promise<void>;
+  /** Marks a month reviewed; an optional note is pinned to the month, in the same step. */
+  closeMonth: (month: string, note?: string) => Promise<void>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
@@ -345,13 +410,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       const days = mergeDays(get().noSpendDays, file.data.noSpendDays ?? []);
       if (days.length !== get().noSpendDays.length)
         out.push(setSettingsList(NO_SPEND_KEY, days, get().noSpendDays, 'Restored no-spend days'));
+      const closed = mergeDays(get().closedMonths, file.data.closedMonths ?? []);
+      if (closed.length !== get().closedMonths.length)
+        out.push(
+          setSettingsList(CLOSED_MONTHS_KEY, closed, get().closedMonths, 'Restored closed months'),
+        );
       return out;
     };
 
     /** Drop 9 rows a merged backup adds: accounts, money in and transfers, people, udhaar, loans. */
     const rowMerges = (file: BackupFile): Command[] => {
       const out: Command[] = [];
-      const add = <S extends 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans'>(
+      const add = <S extends RowStore>(
         store: S,
         have: readonly { id: string }[],
         incoming: readonly LedgerRow<S>[] | undefined,
@@ -365,6 +435,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       add('people', get().people, file.data.people);
       add('udhaar', get().udhaar, file.data.udhaar);
       add('loans', get().loans, file.data.loans);
+      add('goals', get().goals, file.data.goals);
+      add('wishlist', get().wishlist, file.data.wishlist);
+      add('assets', get().assets, file.data.assets);
       return out;
     };
 
@@ -389,6 +462,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         people,
         udhaar,
         loans,
+        goals,
+        wishlist,
+        assets,
+        closedMonths,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -408,7 +485,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.getAll('people'),
         d.getAll('udhaar'),
         d.getAll('loans'),
+        d.getAll('goals'),
+        d.getAll('wishlist'),
+        d.getAll('assets'),
+        d.get('settings', CLOSED_MONTHS_KEY),
       ]);
+      goals.sort((a, b) => a.createdAt - b.createdAt);
+      wishlist.sort((a, b) => b.createdAt - a.createdAt);
+      assets.sort((a, b) => a.createdAt - b.createdAt);
       accounts.sort((a, b) => a.order - b.order);
       flows.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
       people.sort((a, b) => a.name.localeCompare(b.name));
@@ -438,6 +522,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         people,
         udhaar,
         loans,
+        goals,
+        wishlist,
+        assets,
+        closedMonths: Array.isArray(closedMonths) ? (closedMonths as string[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -467,6 +555,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       people: [],
       udhaar: [],
       loans: [],
+      goals: [],
+      wishlist: [],
+      assets: [],
+      closedMonths: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -710,7 +802,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: Date.now(),
         };
         await get().run(
-          setSettingsList(FAVOURITES_KEY, [...previous, fav], previous, `Saved ${fav.merchant} as a favourite`),
+          setSettingsList(
+            FAVOURITES_KEY,
+            [...previous, fav],
+            previous,
+            `Saved ${fav.merchant} as a favourite`,
+          ),
         );
         return true;
       },
@@ -746,7 +843,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (add.length === 0) return;
         const next = [...previous, ...add].sort();
         const label =
-          add.length === 1 ? 'Marked a day with no spending' : `Marked ${add.length} days with no spending`;
+          add.length === 1
+            ? 'Marked a day with no spending'
+            : `Marked ${add.length} days with no spending`;
         await get().run(setSettingsList(NO_SPEND_KEY, next, previous, label));
       },
 
@@ -769,7 +868,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           if (other.id === next.id) continue;
           const kept = other.methods.filter((m) => !next.methods.includes(m));
           if (kept.length !== other.methods.length)
-            steps.push(putRow('accounts', { ...other, methods: kept, updatedAt: now }, other, 'Moved methods'));
+            steps.push(
+              putRow(
+                'accounts',
+                { ...other, methods: kept, updatedAt: now },
+                other,
+                'Moved methods',
+              ),
+            );
         }
         const label = previous ? `Updated ${next.name}` : `Added ${next.name}`;
         steps.unshift(putRow('accounts', next, previous, label));
@@ -782,7 +888,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!a || Boolean(a.archived) === archived) return;
         const label = archived ? `Archived ${a.name}` : `Brought back ${a.name}`;
         await get().run(
-          putRow('accounts', { ...a, archived: archived || undefined, updatedAt: Date.now() }, a, label),
+          putRow(
+            'accounts',
+            { ...a, archived: archived || undefined, updatedAt: Date.now() },
+            a,
+            label,
+          ),
         );
       },
 
@@ -813,7 +924,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: now,
           updatedAt: now,
         };
-        await get().run(putRow('flows', flow, undefined, `Added ${flow.label}`), `Money in: ${flow.label}`);
+        await get().run(
+          putRow('flows', flow, undefined, `Added ${flow.label}`),
+          `Money in: ${flow.label}`,
+        );
       },
 
       addIncomeFromParsed: async (parsed, extra = {}) => {
@@ -835,7 +949,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const to = accounts.find((a) => a.id === toId);
         if (!from || !to || fromId === toId || amountMinor <= 0) return;
         const now = Date.now();
-        const text = label?.trim() || (to.kind === 'card' ? `Paid ${to.name}` : `${from.name} to ${to.name}`);
+        const text =
+          label?.trim() || (to.kind === 'card' ? `Paid ${to.name}` : `${from.name} to ${to.name}`);
         const flow: Flow = {
           id: newId(),
           kind: 'transfer',
@@ -925,7 +1040,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!person && draft.personName?.trim()) {
           person = findPerson(get().people, draft.personName);
           if (!person) {
-            person = { id: newId(), name: draft.personName.trim().replace(/\s+/g, ' '), createdAt: now };
+            person = {
+              id: newId(),
+              name: draft.personName.trim().replace(/\s+/g, ' '),
+              createdAt: now,
+            };
             steps.push(putRow('people', person, undefined, `Added ${person.name}`));
           }
         }
@@ -984,6 +1103,245 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       deleteLoan: async (id) => {
         const l = get().loans.find((x) => x.id === id);
         if (l) await get().run(removeRow('loans', l, `Deleted ${l.name}`));
+      },
+
+      setCategoryPlan: async (id, patch) => {
+        const before = get().categories.find((c) => c.id === id);
+        if (!before) return;
+        const after: Category = { ...before, ...patch };
+        if (after.budgetKind === before.budgetKind && !!after.rollover === !!before.rollover)
+          return;
+        const label =
+          patch.rollover !== undefined
+            ? `${patch.rollover ? 'Turned on' : 'Turned off'} rollover for ${before.name}`
+            : `Made ${before.name} ${(patch.budgetKind ?? 'flexible').replace('-', ' ')}`;
+        await get().run(putCategories([before], [after], label));
+      },
+
+      clearMonthBudgets: async (month) => {
+        await get().setMonthBudgets(
+          month,
+          { overall: null, categories: {} },
+          `Cleared the budgets for ${monthLabel(month)}`,
+        );
+      },
+
+      saveGoal: async (draft, id) => {
+        const now = Date.now();
+        const previous = id ? get().goals.find((g) => g.id === id) : undefined;
+        const clean = {
+          ...draft,
+          name: draft.name.trim(),
+          yearly: draft.kind === 'fund' && draft.yearly ? true : undefined,
+        };
+        const next: Goal = previous
+          ? { ...previous, ...clean, updatedAt: now }
+          : {
+              id: newId(),
+              ...clean,
+              contributions: [],
+              snoozed: [],
+              createdAt: now,
+              updatedAt: now,
+            };
+        await get().run(
+          putRow('goals', next, previous, previous ? `Updated ${next.name}` : `Added ${next.name}`),
+        );
+        return next.id;
+      },
+
+      deleteGoal: async (id) => {
+        const g = get().goals.find((x) => x.id === id);
+        if (g) await get().run(removeRow('goals', g, `Deleted ${g.name}`));
+      },
+
+      addToGoal: async (id, amountMinor, date) => {
+        const g = get().goals.find((x) => x.id === id);
+        if (!g || amountMinor <= 0) return;
+        const next: Goal = {
+          ...g,
+          contributions: [...g.contributions, { id: newId(), date, amountMinor }],
+          updatedAt: Date.now(),
+        };
+        await get().run(putRow('goals', next, g, `Put money aside for ${g.name}`));
+      },
+
+      removeFromGoal: async (id, contributionId) => {
+        const g = get().goals.find((x) => x.id === id);
+        if (!g || !g.contributions.some((c) => c.id === contributionId)) return;
+        const next: Goal = {
+          ...g,
+          contributions: g.contributions.filter((c) => c.id !== contributionId),
+          updatedAt: Date.now(),
+        };
+        await get().run(putRow('goals', next, g, `Took back an amount from ${g.name}`));
+      },
+
+      snoozeGoal: async (id, month, snoozed) => {
+        const g = get().goals.find((x) => x.id === id);
+        if (!g || g.snoozed.includes(month) === snoozed) return;
+        const next: Goal = {
+          ...g,
+          snoozed: snoozed ? [...g.snoozed, month].sort() : g.snoozed.filter((m) => m !== month),
+          updatedAt: Date.now(),
+        };
+        await get().run(
+          putRow(
+            'goals',
+            next,
+            g,
+            `${snoozed ? 'Snoozed' : 'Unsnoozed'} ${g.name} for ${monthLabel(month)}`,
+          ),
+        );
+      },
+
+      payGoal: async (id) => {
+        const g = get().goals.find((x) => x.id === id);
+        if (!g || g.paidOn) return;
+        const next = { ...payFund(g, todayISO(), newId()), updatedAt: Date.now() };
+        await get().run(putRow('goals', next, g, `Paid ${g.name}`));
+      },
+
+      saveWish: async (draft, id) => {
+        const now = Date.now();
+        const previous = id ? get().wishlist.find((w) => w.id === id) : undefined;
+        const clean = { ...draft, name: draft.name.trim(), note: draft.note.trim() };
+        const next: WishItem = previous
+          ? { ...previous, ...clean, updatedAt: now }
+          : {
+              id: newId(),
+              ...clean,
+              addedOn: todayISO(),
+              status: 'waiting',
+              createdAt: now,
+              updatedAt: now,
+            };
+        await get().run(
+          putRow(
+            'wishlist',
+            next,
+            previous,
+            previous ? `Updated ${next.name}` : `Added ${next.name} to the wishlist`,
+          ),
+        );
+      },
+
+      buyWish: async (id) => {
+        const w = get().wishlist.find((x) => x.id === id);
+        if (!w || w.status !== 'waiting') return;
+        const { settings, rules } = get();
+        const now = Date.now();
+        const today = todayISO();
+        const tx: Transaction = {
+          id: newId(),
+          date: today,
+          amountMinor: w.priceMinor,
+          currency: settings.currency,
+          merchant: w.name,
+          categoryId: w.categoryId ?? categorise(w.name, rules).categoryId,
+          method: settings.lastMethod,
+          notes: w.note,
+          tags: [],
+          source: 'wishlist',
+          unsure: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const label = `Bought ${w.name}`;
+        await get().run(
+          composite(label, [
+            addTransaction(tx),
+            putRow(
+              'wishlist',
+              { ...w, status: 'bought', decidedOn: today, txId: tx.id, updatedAt: now },
+              w,
+              label,
+            ),
+          ]),
+          label,
+        );
+      },
+
+      skipWish: async (id) => {
+        const w = get().wishlist.find((x) => x.id === id);
+        if (!w || w.status !== 'waiting') return;
+        await get().run(
+          putRow(
+            'wishlist',
+            { ...w, status: 'skipped', decidedOn: todayISO(), updatedAt: Date.now() },
+            w,
+            `Skipped ${w.name}`,
+          ),
+        );
+      },
+
+      deleteWish: async (id) => {
+        const w = get().wishlist.find((x) => x.id === id);
+        if (w) await get().run(removeRow('wishlist', w, `Removed ${w.name} from the wishlist`));
+      },
+
+      saveAsset: async (draft, id) => {
+        const now = Date.now();
+        const previous = id ? get().assets.find((a) => a.id === id) : undefined;
+        const name = draft.name.trim();
+        const next: Asset = previous
+          ? { ...previous, name, kind: draft.kind, updatedAt: now }
+          : {
+              id: newId(),
+              name,
+              kind: draft.kind,
+              values: [{ date: draft.date, valueMinor: draft.valueMinor }],
+              createdAt: now,
+              updatedAt: now,
+            };
+        await get().run(
+          putRow('assets', next, previous, previous ? `Updated ${name}` : `Added ${name}`),
+        );
+      },
+
+      setAssetValue: async (id, valueMinor, date) => {
+        const a = get().assets.find((x) => x.id === id);
+        if (!a || valueMinor < 0) return;
+        const next: Asset = {
+          ...a,
+          values: [...a.values.filter((v) => v.date !== date), { date, valueMinor }].sort((x, y) =>
+            x.date.localeCompare(y.date),
+          ),
+          updatedAt: Date.now(),
+        };
+        await get().run(putRow('assets', next, a, `Updated the value of ${a.name}`));
+      },
+
+      deleteAsset: async (id) => {
+        const a = get().assets.find((x) => x.id === id);
+        if (a) await get().run(removeRow('assets', a, `Deleted ${a.name}`));
+      },
+
+      closeMonth: async (month, note = '') => {
+        const previous = get().closedMonths;
+        if (previous.includes(month)) return;
+        const label = `Closed ${monthLabel(month)}`;
+        const close = setSettingsList(
+          CLOSED_MONTHS_KEY,
+          [...previous, month].sort(),
+          previous,
+          label,
+        );
+        const text = cleanNote(note);
+        if (!text) {
+          await get().run(close);
+          return;
+        }
+        const now = Date.now();
+        const pinned: Note = {
+          id: newId(),
+          anchor: `month:${month}`,
+          page: '/',
+          text,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await get().run(composite(label, [close, putNote(pinned, undefined, label)]), label);
       },
 
       bulkDelete: async (ids) => {
@@ -1276,6 +1634,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           people: await d.getAll('people'),
           udhaar: await d.getAll('udhaar'),
           loans: await d.getAll('loans'),
+          goals: await d.getAll('goals'),
+          wishlist: await d.getAll('wishlist'),
+          assets: await d.getAll('assets'),
         };
         const after = {
           transactions: file.data.transactions,
@@ -1288,6 +1649,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           people: file.data.people ?? [],
           udhaar: file.data.udhaar ?? [],
           loans: file.data.loans ?? [],
+          goals: file.data.goals ?? [],
+          wishlist: file.data.wishlist ?? [],
+          assets: file.data.assets ?? [],
         };
         // Notes and drawings are never removed by a restore; the backup's missing ones are added.
         const haveNotes = new Set(get().notes.map((n) => n.id));

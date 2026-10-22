@@ -14,7 +14,10 @@ import type { Favourite } from '../domain/repeat';
 import type { Account, Flow } from '../domain/accounts';
 import type { Person, UdhaarEntry } from '../domain/udhaar';
 import type { Loan } from '../domain/loans';
-import { FAVOURITES_KEY, NO_SPEND_KEY } from './commands';
+import type { Goal } from '../domain/goals';
+import type { WishItem } from '../domain/wishlist';
+import type { Asset } from '../domain/networth';
+import { CLOSED_MONTHS_KEY, FAVOURITES_KEY, NO_SPEND_KEY } from './commands';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -42,6 +45,11 @@ export interface BackupFile {
     people?: Person[];
     udhaar?: UdhaarEntry[];
     loans?: Loan[];
+    /** Added in Drop 10. */
+    goals?: Goal[];
+    wishlist?: WishItem[];
+    assets?: Asset[];
+    closedMonths?: string[];
   };
 }
 
@@ -89,6 +97,10 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       people: await db.getAll('people'),
       udhaar: await db.getAll('udhaar'),
       loans: await db.getAll('loans'),
+      goals: await db.getAll('goals'),
+      wishlist: await db.getAll('wishlist'),
+      assets: await db.getAll('assets'),
+      closedMonths: await listOf<string>(db, CLOSED_MONTHS_KEY),
     },
   };
 }
@@ -189,7 +201,10 @@ export function validateBackup(json: unknown): BackupFile | null {
         (r) =>
           isObj(r) &&
           typeof r.id === 'string' &&
-          (!money || Number.isInteger(r.amountMinor ?? r.principalMinor ?? r.openingMinor)),
+          (!money ||
+            Number.isInteger(
+              r.amountMinor ?? r.principalMinor ?? r.openingMinor ?? r.targetMinor ?? r.priceMinor,
+            )),
       ));
   const d = json.data;
   if (
@@ -197,7 +212,29 @@ export function validateBackup(json: unknown): BackupFile | null {
     !rowsOk(d.flows, true) ||
     !rowsOk(d.people, false) ||
     !rowsOk(d.udhaar, true) ||
-    !rowsOk(d.loans, true)
+    !rowsOk(d.loans, true) ||
+    !rowsOk(d.goals, true) ||
+    !rowsOk(d.wishlist, true) ||
+    !rowsOk(d.assets, false)
+  )
+    return null;
+  // Drop 10: goal contributions and asset values carry money too.
+  const moneyRows = (v: unknown): boolean =>
+    Array.isArray(v) &&
+    v.every(
+      (x) =>
+        isObj(x) && typeof x.date === 'string' && Number.isInteger(x.amountMinor ?? x.valueMinor),
+    );
+  if (Array.isArray(d.goals) && !d.goals.every((g) => isObj(g) && moneyRows(g.contributions)))
+    return null;
+  if (Array.isArray(d.assets) && !d.assets.every((a) => isObj(a) && moneyRows(a.values)))
+    return null;
+  if (
+    d.closedMonths !== undefined &&
+    !(
+      Array.isArray(d.closedMonths) &&
+      d.closedMonths.every((m) => typeof m === 'string' && /^\d{4}-\d{2}$/.test(m))
+    )
   )
     return null;
   return json as unknown as BackupFile;
@@ -224,10 +261,22 @@ export async function importBackup(
       'people',
       'udhaar',
       'loans',
+      'goals',
+      'wishlist',
+      'assets',
     ],
     'readwrite',
   );
-  for (const name of ['accounts', 'flows', 'people', 'udhaar', 'loans'] as const) {
+  for (const name of [
+    'accounts',
+    'flows',
+    'people',
+    'udhaar',
+    'loans',
+    'goals',
+    'wishlist',
+    'assets',
+  ] as const) {
     if (mode === 'replace') await t.objectStore(name).clear();
     for (const row of (file.data[name] ?? []) as Array<{ id: string }>) {
       if (mode === 'replace' || !(await t.objectStore(name).get(row.id)))
@@ -278,7 +327,13 @@ export async function importBackup(
     .objectStore('settings')
     .put(mergeFavourites(favs ?? [], file.data.favourites ?? []), FAVOURITES_KEY);
   const days = (await t.objectStore('settings').get(NO_SPEND_KEY)) as string[] | undefined;
-  await t.objectStore('settings').put(mergeDays(days ?? [], file.data.noSpendDays ?? []), NO_SPEND_KEY);
+  await t
+    .objectStore('settings')
+    .put(mergeDays(days ?? [], file.data.noSpendDays ?? []), NO_SPEND_KEY);
+  const closed = (await t.objectStore('settings').get(CLOSED_MONTHS_KEY)) as string[] | undefined;
+  await t
+    .objectStore('settings')
+    .put(mergeDays(closed ?? [], file.data.closedMonths ?? []), CLOSED_MONTHS_KEY);
   if (mode === 'replace') {
     for (const [key, value] of Object.entries(file.data.settings)) {
       await t.objectStore('settings').put(value, key);

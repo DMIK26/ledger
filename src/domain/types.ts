@@ -6,7 +6,15 @@ export type CategoryId = string;
 export const PAYMENT_METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer', 'Other'] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export type TxSource = 'form' | 'quick' | 'import' | 'recurring' | 'legacy' | 'repeat' | 'keypad';
+export type TxSource =
+  | 'form'
+  | 'quick'
+  | 'import'
+  | 'recurring'
+  | 'legacy'
+  | 'repeat'
+  | 'keypad'
+  | 'wishlist';
 
 export interface Transaction {
   id: string;
@@ -35,12 +43,19 @@ export interface Transaction {
   updatedAt: number;
 }
 
+/** How a category's spending behaves: the same each month, day to day, or now and then. */
+export type BudgetKind = 'fixed' | 'flexible' | 'non-monthly';
+
 export interface Category {
   id: CategoryId;
   name: string;
   color: string;
   order: number;
   archived?: boolean;
+  /** Missing means the default for the category (see budgetKindOf in plan.ts). */
+  budgetKind?: BudgetKind;
+  /** What is left of this category's budget, or what went over, carries into next month. */
+  rollover?: boolean;
 }
 
 export interface MerchantRule {

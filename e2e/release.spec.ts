@@ -6,6 +6,8 @@ const PAGES = [
   '#/',
   '#/transactions',
   '#/budgets',
+  '#/budgets?view=goals',
+  '#/budgets?view=wishlist',
   '#/reports',
   '#/recurring',
   '#/settings',

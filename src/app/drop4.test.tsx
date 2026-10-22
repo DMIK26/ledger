@@ -198,7 +198,8 @@ describe('dashboard insights', () => {
     const list = await screen.findByTestId('insights');
     expect(list.querySelectorAll('li').length).toBeGreaterThan(0);
     expect(list.querySelectorAll('li').length).toBeLessThanOrEqual(4);
-    expect(list).toHaveTextContent('At this pace the month ends at');
+    // Rent is a fixed cost (Drop 10), so the forecast no longer stretches it over the month.
+    expect(list).toHaveTextContent('On track: at this pace you finish with');
   });
 });
 

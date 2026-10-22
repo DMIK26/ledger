@@ -6,6 +6,9 @@ import type { Budget, Category, MerchantRule, Transaction, TrashItem } from '../
 import type { Account, Flow } from '../domain/accounts';
 import type { Loan } from '../domain/loans';
 import type { Person, UdhaarEntry } from '../domain/udhaar';
+import type { Goal } from '../domain/goals';
+import type { WishItem } from '../domain/wishlist';
+import type { Asset } from '../domain/networth';
 import type { Db, LedgerDB } from './db';
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
@@ -243,8 +246,9 @@ export const removeRecurring = (item: RecurringItem): Command => ({
   },
 });
 
-/** The Drop 9 stores, each a plain list of rows with an id. */
-export type RowStore = 'accounts' | 'flows' | 'people' | 'udhaar' | 'loans';
+/** The Drop 9 and Drop 10 stores, each a plain list of rows with an id. */
+export type RowStore =
+  'accounts' | 'flows' | 'people' | 'udhaar' | 'loans' | 'goals' | 'wishlist' | 'assets';
 type RowOf<S extends RowStore> = LedgerDB[S]['value'];
 
 /** Adds or replaces one row; undo puts back the previous version (or removes a new row). */
@@ -276,6 +280,8 @@ export const removeRow = <S extends RowStore>(store: S, row: RowOf<S>, label: st
 
 export const FAVOURITES_KEY = 'favourites';
 export const NO_SPEND_KEY = 'noSpendDays';
+/** Months ('YYYY-MM') closed with "Close the month". */
+export const CLOSED_MONTHS_KEY = 'closedMonths';
 
 /** Replaces one list kept in the settings store (favourites, no-spend days) as an undoable step. */
 export const setSettingsList = <T>(
@@ -322,6 +328,9 @@ export interface LedgerSnapshot {
   people: Person[];
   udhaar: UdhaarEntry[];
   loans: Loan[];
+  goals: Goal[];
+  wishlist: WishItem[];
+  assets: Asset[];
 }
 
 const SNAPSHOT_STORES = [
@@ -335,6 +344,9 @@ const SNAPSHOT_STORES = [
   'people',
   'udhaar',
   'loans',
+  'goals',
+  'wishlist',
+  'assets',
 ] as const;
 
 async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
@@ -350,6 +362,9 @@ async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
   for (const x of s.people) void t.objectStore('people').put(x);
   for (const x of s.udhaar) void t.objectStore('udhaar').put(x);
   for (const x of s.loans) void t.objectStore('loans').put(x);
+  for (const x of s.goals) void t.objectStore('goals').put(x);
+  for (const x of s.wishlist) void t.objectStore('wishlist').put(x);
+  for (const x of s.assets) void t.objectStore('assets').put(x);
   await t.done;
 }
 

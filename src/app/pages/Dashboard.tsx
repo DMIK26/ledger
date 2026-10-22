@@ -18,9 +18,9 @@ import {
   budgetStatus,
   daysLeft,
   hasBudgets,
-  projectMonthEnd,
   whatIfMonthEnd,
 } from '../../domain/budgets';
+import { forecastMonthEnd } from '../../domain/plan';
 import { categoryById } from '../../domain/categories';
 import {
   fmtDate,
@@ -46,6 +46,9 @@ import { CheckIn } from '../CheckIn';
 import { CardDue } from '../money/CardDue';
 import { InstallBanner } from '../InstallBanner';
 import { LoadSampleButton, SampleBanner } from '../SampleData';
+import { SafeToSpendCard } from '../plan/SafeToSpend';
+import { MonthCloseCard } from '../plan/MonthClose';
+import { AtRiskCard } from '../plan/AtRisk';
 
 const PER_DAY_STEP = 1000; // ₹10
 
@@ -74,11 +77,14 @@ function StatusText({
 
 function BudgetCard({
   spent,
+  forecast,
   dailyAvg,
   today,
   pinned,
 }: {
   spent: number;
+  /** Where the month is heading: flexible spending at its rate plus bills still to come. */
+  forecast: number;
   dailyAvg: number;
   today: string;
   /** With pins: the budget for what is pinned (sum of pinned categories), or a reason there is none. */
@@ -103,7 +109,7 @@ function BudgetCard({
   const startPct = Math.min(100, Math.round((dailyAvg / maxPerDay) * 100));
   const [pct, setPct] = useState<number | null>(null);
   const perDay = Math.round((maxPerDay * (pct ?? startPct)) / 100 / PER_DAY_STEP) * PER_DAY_STEP;
-  const projected = projectMonthEnd(spent, today);
+  const projected = forecast;
   const whatIf = whatIfMonthEnd(spent, today, perDay);
   const endLabel = day === dim ? 'today' : `by ${fmtDate(monthBounds(month).end).slice(0, -5)}`;
 
@@ -259,6 +265,7 @@ export function Dashboard() {
   const currency = useLedger((s) => s.settings.currency);
   const removeTransaction = useLedger((s) => s.removeTransaction);
   const setMonthBudgets = useLedger((s) => s.setMonthBudgets);
+  const recurring = useLedger((s) => s.recurring);
   const pins = usePins();
   const setMonth = useView((s) => s.setMonth);
   const [mode, setMode] = useState<BarMode>('total');
@@ -313,6 +320,19 @@ export function Dashboard() {
           ? { budget: pinnedCats!.reduce((s, id) => s + mine.categories[id]!, 0), note: '' }
           : { budget: null, note: 'No budget set for the pinned categories this month.' };
 
+  const forecast = useMemo(
+    () =>
+      forecastMonthEnd({
+        transactions,
+        categories,
+        // With categories pinned, only their bills count.
+        recurring: pinnedCats ? recurring.filter((r) => pinnedCats.includes(r.categoryId)) : recurring,
+        today: asOf,
+      }).totalMinor,
+    [transactions, categories, recurring, pinnedCats, asOf],
+  );
+  const planned = current && pins.length === 0;
+
   const toggleKpi = (id: Exclude<KpiView, null>) =>
     withTransition(() => {
       setKpiView((v) => (v === id ? null : id));
@@ -347,6 +367,8 @@ export function Dashboard() {
       <BackupReminder />
       <QuickAdd followMonth />
       <CheckIn />
+      {planned && <MonthCloseCard today={today} />}
+      {planned && <SafeToSpendCard today={today} />}
       <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
         <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
           <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>
@@ -431,10 +453,12 @@ export function Dashboard() {
       <BudgetCard
         key={month}
         spent={k.spentMinor}
+        forecast={forecast}
         dailyAvg={k.dailyAvgMinor}
         today={asOf}
         pinned={pinnedBudget}
       />
+      {planned && <AtRiskCard today={today} />}
       {current && <CardDue />}
       {current && <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />}
       <div className="chart-row">

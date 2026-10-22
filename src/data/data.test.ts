@@ -29,14 +29,17 @@ const tx = (over: Partial<Transaction> = {}): Transaction => ({
 });
 
 describe('database and migrations', () => {
-  it('creates the schema (v1, plus the Drop 9 stores in v2)', async () => {
+  it('creates the schema (v1, the Drop 9 stores in v2, the Drop 10 stores in v3)', async () => {
     const db = await openLedgerDB(freshName());
-    expect(DB_VERSION).toBe(2);
+    expect(DB_VERSION).toBe(3);
     expect([...db.objectStoreNames]).toEqual(
       expect.arrayContaining(['transactions', 'categories', 'rules', 'settings', 'audit', 'trash', 'receipts']),
     );
     expect([...db.objectStoreNames]).toEqual(
       expect.arrayContaining(['accounts', 'flows', 'people', 'udhaar', 'loans']),
+    );
+    expect([...db.objectStoreNames]).toEqual(
+      expect.arrayContaining(['goals', 'wishlist', 'assets']),
     );
     db.close();
   });

@@ -90,7 +90,17 @@ test('categories reorder by dragging the handle', async ({ page }) => {
 });
 
 test('no page scrolls sideways', async ({ page }) => {
-  for (const r of ['#/', '#/transactions', '#/budgets', '#/reports', '#/recurring', '#/settings', '#/money']) {
+  for (const r of [
+    '#/',
+    '#/transactions',
+    '#/budgets',
+    '#/budgets?view=goals',
+    '#/budgets?view=wishlist',
+    '#/reports',
+    '#/recurring',
+    '#/settings',
+    '#/money',
+  ]) {
     await page.goto(`./${r}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('.page-loading')).toHaveCount(0);

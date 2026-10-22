@@ -269,7 +269,7 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
   };
 
   const tellInsight = () => {
-    const top = buildInsights(scoped, today, overall, recurring)[0];
+    const top = buildInsights(scoped, today, overall, recurring, categories)[0];
     say(insightSentence(top, categories, currency));
   };
 

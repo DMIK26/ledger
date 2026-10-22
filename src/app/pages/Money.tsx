@@ -3,6 +3,7 @@ import { AccountsCard } from '../money/Accounts';
 import { CashFlowCard } from '../money/CashFlow';
 import { IncomeCard } from '../money/Income';
 import { LoansView } from '../money/Loans';
+import { NetWorthCard } from '../money/NetWorth';
 import { UdhaarView } from '../money/Udhaar';
 import { useMoneyData } from '../money/shared';
 
@@ -14,8 +15,8 @@ const VIEWS = [
 type View = (typeof VIEWS)[number]['id'];
 
 /**
- * The whole money picture (Drop 9): money in, accounts and cards, udhaar and loans. Spending pages stay
- * spending-only; nothing here is ever counted as spending.
+ * The whole money picture (Drop 9): money in, accounts and cards, udhaar and loans, and (Drop 10) net
+ * worth. Spending pages stay spending-only; nothing here is ever counted as spending.
  */
 export function MoneyPage({ view }: { view?: string | null }) {
   const current: View = view === 'udhaar' || view === 'loans' ? view : 'overview';
@@ -39,6 +40,7 @@ export function MoneyPage({ view }: { view?: string | null }) {
           <CashFlowCard today={today} />
           <IncomeCard />
           <AccountsCard />
+          <NetWorthCard />
         </>
       )}
       {current === 'udhaar' && <UdhaarView />}

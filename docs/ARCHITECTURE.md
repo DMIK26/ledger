@@ -47,13 +47,20 @@ v1: transactions (indexes by-date, by-category), categories, rules, settings (ke
 trash (index by-deleted), budgets, recurring, notes, sketches, receipts (blobs).
 
 The settings store (key/value) also holds lists changed through Commands: `savedViews`,
-`recurringIgnored`, `sampleData`, and since Drop 8 `favourites` and `noSpendDays`. Month boundaries all
+`recurringIgnored`, `sampleData`, since Drop 8 `favourites` and `noSpendDays`, and since Drop 10
+`closedMonths`. Month boundaries all
 go through `monthKey` / `monthBounds` in `src/domain/dates.ts`, which follow the month start day
 (Settings, set once at start-up like privacy in `money.ts`); never slice a date to get its month.
 
 Schema v2 (Drop 9) adds `accounts`, `flows` (income, transfers, fees, cash-check adjustments), `people`,
 `udhaar` and `loans`. Spending stays in `transactions`; money in, transfers, fees, udhaar and loans never
 reach spending totals. Rows in these stores change through `putRow` / `removeRow` Commands.
+
+Schema v3 (Drop 10) adds `goals` (contributions and snoozed months live inside each goal), `wishlist` and
+`assets` (dated values inside each asset), also through `putRow` / `removeRow`. Categories carry an
+optional `budgetKind` (fixed, flexible, non-monthly; `budgetKindOf` in `src/domain/plan.ts` gives the
+default) and `rollover`. Planning logic (forecast, safe to spend, rollover, pacing, at risk, month review)
+is pure in `src/domain/plan.ts`; goals, wishlist and net worth have their own modules.
 
 Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`); tests swap in
 `lazy.eager.tsx` through an alias in `vite.config.ts`.
