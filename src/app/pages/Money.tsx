@@ -5,6 +5,7 @@ import { IncomeCard } from '../money/Income';
 import { LoansView } from '../money/Loans';
 import { NetWorthCard } from '../money/NetWorth';
 import { UdhaarView } from '../money/Udhaar';
+import { SplitsCard } from '../money/SplitsCard';
 import { useMoneyData } from '../money/shared';
 
 const VIEWS = [
@@ -43,7 +44,12 @@ export function MoneyPage({ view }: { view?: string | null }) {
           <NetWorthCard />
         </>
       )}
-      {current === 'udhaar' && <UdhaarView />}
+      {current === 'udhaar' && (
+        <>
+          <UdhaarView />
+          <SplitsCard />
+        </>
+      )}
       {current === 'loans' && <LoansView />}
     </>
   );

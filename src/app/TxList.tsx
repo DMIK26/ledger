@@ -1,3 +1,4 @@
+import { useRef, useState, type PointerEvent } from 'react';
 import { useLedger } from '../data/store';
 import { categoryById } from '../domain/categories';
 import { fmtDate } from '../domain/dates';
@@ -16,13 +17,30 @@ export interface RowActions {
   onReceipt?: (id: string) => void;
   /** Present when rows can be selected for bulk actions. */
   selected?: ReadonlySet<string>;
-  onToggle?: (id: string) => void;
+  /** `range`: Shift was held, so select everything from the last row chosen. */
+  onToggle?: (id: string, range?: boolean) => void;
   editingId?: string | null;
+  /** Columns turned off with Columns ('category', 'method', 'account', 'tags'). */
+  hidden?: readonly string[];
 }
+
+/** How far (px) a row must be swiped on a phone to delete (left) or edit (right). */
+export const ROW_SWIPE = 90;
 
 function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   const categories = useLedger((s) => s.categories);
+  const accounts = useLedger((s) => s.accounts);
   const masked = usePrivacy();
+  const [dx, setDx] = useState(0);
+  const swipe = useRef<{ x: number; y: number; locked: boolean | null } | null>(null);
+  const shift = useRef(false);
+  const hidden = actions.hidden ?? [];
+  const account =
+    !hidden.includes('account') && accounts.length > 0
+      ? accounts.find(
+          (a) => a.id === (tx.accountId ?? accounts.find((x) => x.methods.includes(tx.method))?.id),
+        )
+      : undefined;
   const category = categoryById(categories, tx.categoryId);
   // The typed text holds the amount, so privacy mode hides it along with every other figure.
   const showRaw = !masked && tx.raw && tx.raw.trim().toLowerCase() !== tx.merchant.toLowerCase();
@@ -43,9 +61,11 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           editing={{
             id: tx.id,
             hasReceipt: tx.hasReceipt,
+            split: tx.split,
             draft: {
               date: tx.date,
-              amountMinor: tx.amountMinor,
+              // A split is edited as the whole bill.
+              amountMinor: tx.split ? tx.split.totalMinor : tx.amountMinor,
               merchant: tx.merchant,
               categoryId: tx.categoryId,
               method: tx.method,
@@ -64,6 +84,33 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   }
 
   const selectable = actions.selected !== undefined && actions.onToggle !== undefined;
+  const swipeable = actions.onDelete !== undefined || actions.onEdit !== undefined;
+
+  // Phones: swipe left to delete, right to edit. Vertical moves stay scrolling.
+  const onPointerDown = (e: PointerEvent<HTMLLIElement>) => {
+    if (!swipeable || e.pointerType !== 'touch') return;
+    swipe.current = { x: e.clientX, y: e.clientY, locked: null };
+  };
+  const onPointerMove = (e: PointerEvent<HTMLLIElement>) => {
+    const s = swipe.current;
+    if (!s) return;
+    const mx = e.clientX - s.x;
+    const my = e.clientY - s.y;
+    if (s.locked === null && Math.abs(mx) + Math.abs(my) > 10) {
+      s.locked = Math.abs(mx) > Math.abs(my) * 1.5;
+      if (s.locked) e.currentTarget.setPointerCapture?.(e.pointerId);
+    }
+    if (s.locked) setDx(mx);
+  };
+  const onPointerEnd = () => {
+    const s = swipe.current;
+    swipe.current = null;
+    const moved = dx;
+    setDx(0);
+    if (!s?.locked) return;
+    if (moved <= -ROW_SWIPE && actions.onDelete) actions.onDelete(tx.id);
+    else if (moved >= ROW_SWIPE && actions.onEdit) actions.onEdit(tx.id);
+  };
 
   return (
     <li
@@ -73,6 +120,15 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
       data-anchor={`tx:${tx.id}`}
       data-entity={txEntities(tx)}
       data-hl={catKey}
+      data-swipe={dx <= -ROW_SWIPE ? 'delete' : dx >= ROW_SWIPE ? 'edit' : undefined}
+      style={dx ? { transform: `translateX(${dx}px)` } : undefined}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerEnd}
+      onPointerCancel={() => {
+        swipe.current = null;
+        setDx(0);
+      }}
     >
       {selectable && (
         <label className="tx-select">
@@ -81,7 +137,13 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
             className="checkbox"
             aria-label={`Select ${name} on ${when}`}
             checked={actions.selected!.has(tx.id)}
-            onChange={() => actions.onToggle!(tx.id)}
+            onClick={(e) => {
+              shift.current = e.shiftKey;
+            }}
+            onChange={() => {
+              actions.onToggle!(tx.id, shift.current);
+              shift.current = false;
+            }}
           />
         </label>
       )}
@@ -100,7 +162,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           </button>
         </span>
         {showRaw && <span className="tx-raw">{tx.raw}</span>}
-        {tx.tags.length > 0 && (
+        {tx.tags.length > 0 && !hidden.includes('tags') && (
           <span className="tx-tags">
             {tx.tags.map((t) => (
               <button
@@ -133,7 +195,10 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           {tx.unsure && <span className="chip-note">unsure</span>}
         </button>
         <span className="tx-mobile-meta">
-          {when} · {tx.method}
+          {when}
+          {hidden.includes('method') ? '' : ` · ${tx.method}`}
+          {account ? ` · ${account.name}` : ''}
+          {tx.split ? ' · split' : ''}
         </span>
       </span>
       <span className="tx-method">
@@ -147,6 +212,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
         >
           {tx.method}
         </button>
+        {account && <span className="tx-account muted small">{account.name}</span>}
       </span>
       <span className="tx-amount">
         <Money minor={tx.amountMinor} currency={tx.currency} />
@@ -200,7 +266,7 @@ export function TxList({
   ...actions
 }: RowActions & { transactions: Transaction[]; label: string }) {
   return (
-    <ul className="tx-list" aria-label={label}>
+    <ul className="tx-list" aria-label={label} data-hide={actions.hidden?.join(' ') || undefined}>
       {transactions.map((tx) => (
         <Row key={tx.id} tx={tx} actions={actions} />
       ))}

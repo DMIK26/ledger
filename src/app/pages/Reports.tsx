@@ -16,7 +16,15 @@ import {
   toDate,
   type PeriodKind,
 } from '../../domain/periods';
-import { buildReport, inRange } from '../../domain/reports';
+import { averageWindow, buildReport, inRange, scaleCompare } from '../../domain/reports';
+import { diffDays, monthKey, shiftMonthKey } from '../../domain/dates';
+import { moneyFlow, type FlowNode } from '../../domain/flow';
+import { normalizeMerchantKey } from '../../domain/categoriser';
+import { monthRecap } from '../../domain/recap';
+import { FlowChart } from '../../charts/FlowChart';
+import { Treemap } from '../../charts/Treemap';
+import { fillFor } from '../../charts/fills';
+import { useUi } from '../../kit/ui';
 import { csvFile, ExportButton } from '../files';
 import { useScopedTransactions, useView } from '../../kit/view';
 import { Money } from '../Money';
@@ -29,7 +37,7 @@ const KINDS: Array<{ value: PeriodKind; label: string }> = [
   { value: 'custom', label: 'Custom' },
 ];
 
-type CompareMode = 'previous' | 'lastYear';
+type CompareMode = 'previous' | 'lastYear' | 'average';
 
 function Change({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="muted">No comparison</span>;
@@ -72,6 +80,10 @@ export function Reports() {
   const transactions = useScopedTransactions();
   const togglePin = useView((s) => s.togglePin);
   const categories = useLedger((s) => s.categories);
+  const flows = useLedger((s) => s.flows);
+  const openRecap = useUi((s) => s.openRecap);
+  const [treeCat, setTreeCat] = useState<string | null>(null);
+  const [flowCat, setFlowCat] = useState<string | null>(null);
   const currency = useLedger((s) => s.settings.currency);
   const fyStart = useLedger((s) => s.settings.fyStartMonth);
   const today = todayISO();
@@ -85,17 +97,73 @@ export function Reports() {
   const period =
     kind === 'custom' ? customPeriod(from, to) : periodFor(kind, today, fyStart, offset);
   const comparePeriod =
-    compareMode === 'previous' ? previousPeriod(period, fyStart) : sameLastYear(period, fyStart);
+    compareMode === 'lastYear' ? sameLastYear(period, fyStart) : previousPeriod(period, fyStart);
   const span = toDate(period, comparePeriod, today);
-  const report = useMemo(
+  const report = useMemo(() => {
+    if (compareMode === 'average') {
+      // The 12 months before the period, scaled to the period's days so far.
+      const window = averageWindow(period.start);
+      return scaleCompare(
+        buildReport(transactions, { start: period.start, end: span.end }, window),
+        diffDays(span.end, period.start) + 1,
+      );
+    }
+    return buildReport(
+      transactions,
+      { start: period.start, end: span.end },
+      { start: comparePeriod.start, end: span.compareEnd },
+    );
+  }, [transactions, period.start, span.end, comparePeriod.start, span.compareEnd, compareMode]);
+  const flow = useMemo(
     () =>
-      buildReport(
+      moneyFlow({
         transactions,
-        { start: period.start, end: span.end },
-        { start: comparePeriod.start, end: span.compareEnd },
-      ),
-    [transactions, period.start, span.end, comparePeriod.start, span.compareEnd],
+        flows,
+        categories,
+        start: period.start,
+        end: span.end,
+        expand: flowCat,
+      }),
+    [transactions, flows, categories, period.start, span.end, flowCat],
   );
+  const treeTiles = useMemo(() => {
+    const range = inRange(transactions, period.start, span.end);
+    if (treeCat) {
+      const c = categories.find((x) => x.id === treeCat);
+      const byM = new Map<string, { label: string; value: number }>();
+      for (const t of range) {
+        if (t.categoryId !== treeCat) continue;
+        const key = normalizeMerchantKey(t.merchant) || 'untitled';
+        const m = byM.get(key) ?? { label: t.merchant || 'Untitled', value: 0 };
+        m.value += t.amountMinor;
+        byM.set(key, m);
+      }
+      return [...byM.entries()]
+        .sort((a, b) => b[1].value - a[1].value)
+        .map(([id, m]) => ({ id, label: m.label, valueMinor: m.value, color: fillFor(c) }));
+    }
+    return report.categories
+      .filter((r) => r.totalMinor > 0)
+      .map((r) => {
+        const c = categoryById(categories, r.categoryId);
+        return {
+          id: r.categoryId,
+          label: c?.name ?? 'Other',
+          valueMinor: r.totalMinor,
+          color: fillFor(c),
+        };
+      });
+  }, [transactions, period.start, span.end, treeCat, categories, report.categories]);
+  const flowColor = (n: FlowNode): string =>
+    n.kind === 'category'
+      ? fillFor(categoryById(categories, n.categoryId!))
+      : n.kind === 'income'
+        ? 'var(--green)'
+        : n.kind === 'left'
+          ? 'var(--sand)'
+          : n.kind === 'merchant'
+            ? fillFor(categoryById(categories, flowCat ?? ''))
+            : 'var(--faint)';
   const symbol = (CURRENCIES[currency] ?? CURRENCIES.INR!).symbol;
   const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
 
@@ -177,7 +245,36 @@ export function Reports() {
             >
               Same period last year
             </button>
+            <button
+              type="button"
+              aria-pressed={compareMode === 'average'}
+              onClick={() => setCompareMode('average')}
+            >
+              12-month average
+            </button>
           </div>
+        </div>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setKind('fy');
+              setOffset(0);
+              setCompareMode('lastYear');
+            }}
+          >
+            Year to date against last year
+          </button>
+          {kind === 'month' && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => openRecap(monthRecap(shiftMonthKey(monthKey(today), offset)))}
+            >
+              Story recap
+            </button>
+          )}
         </div>
       </section>
 
@@ -199,10 +296,21 @@ export function Reports() {
             </>
           ) : (
             <>
-              <Change pct={report.changePct} /> than {fmtDate(report.compareStart)} to{' '}
-              {fmtDate(report.compareEnd)} (
-              <Money minor={report.compareMinor} currency={currency} />)
-              {span.partial && ', comparing the same number of days so far'}.
+              <Change pct={report.changePct} /> than{' '}
+              {compareMode === 'average' ? (
+                <>
+                  the average of {fmtDate(report.compareStart)} to {fmtDate(report.compareEnd)} for
+                  the same number of days (
+                  <Money minor={report.compareMinor} currency={currency} />)
+                </>
+              ) : (
+                <>
+                  {fmtDate(report.compareStart)} to {fmtDate(report.compareEnd)} (
+                  <Money minor={report.compareMinor} currency={currency} />)
+                  {span.partial && ', comparing the same number of days so far'}
+                </>
+              )}
+              .
             </>
           )}
         </p>
@@ -304,6 +412,44 @@ export function Reports() {
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section className="card" aria-labelledby="tree-title">
+            <div className="card-head">
+              <h2 id="tree-title">
+                {treeCat
+                  ? `${categoryById(categories, treeCat)?.name ?? 'Other'}, by merchant`
+                  : 'Where it went'}
+              </h2>
+              {treeCat && (
+                <button type="button" className="btn btn-ghost" onClick={() => setTreeCat(null)}>
+                  Back to all categories
+                </button>
+              )}
+            </div>
+            <Treemap
+              tiles={treeTiles}
+              currency={currency}
+              label={treeCat ? 'Merchants' : 'Categories'}
+              onPick={treeCat ? undefined : (id) => setTreeCat(id)}
+            />
+          </section>
+
+          <section className="card" aria-labelledby="flow-title">
+            <div className="card-head">
+              <h2 id="flow-title">Money flow</h2>
+              <span className="muted small">
+                <Money minor={flow.inMinor} currency={currency} /> in,{' '}
+                <Money minor={flow.spentMinor} currency={currency} /> spent
+              </span>
+            </div>
+            <FlowChart
+              flow={flow}
+              colorOf={flowColor}
+              currency={currency}
+              expanded={flowCat}
+              onExpand={setFlowCat}
+            />
           </section>
 
           <div className="report-grid">

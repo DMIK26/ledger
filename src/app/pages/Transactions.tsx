@@ -1,6 +1,6 @@
 import { LoadSampleButton } from '../SampleData';
 import { EmptyDoodle } from '../../doodle/Studio';
-import { useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
 import { fmtDate, parseISO, todayISO } from '../../domain/dates';
@@ -33,6 +33,75 @@ import { QuickAdd } from '../QuickAdd';
 import { ReceiptViewer } from '../ReceiptViewer';
 import { href } from '../router';
 import { TxList } from '../TxList';
+
+// Loaded on first use, so the list stays quick to open.
+const CalendarView = lazy(() =>
+  import('../views/Calendar').then((m) => ({ default: m.CalendarView })),
+);
+const ReviewView = lazy(() => import('../views/Review').then((m) => ({ default: m.ReviewView })));
+
+const COLUMNS: Array<{ id: string; label: string }> = [
+  { id: 'category', label: 'Category' },
+  { id: 'method', label: 'Method' },
+  { id: 'account', label: 'Account' },
+  { id: 'tags', label: 'Tags' },
+];
+
+/** Columns: which parts of each row Transactions shows. Saved on this device. */
+function ColumnsMenu() {
+  const hidden = useLedger((s) => s.settings.hiddenColumns);
+  const setSetting = useLedger((s) => s.setSetting);
+  return (
+    <details className="columns-menu">
+      <summary className="btn btn-ghost">Columns</summary>
+      <fieldset className="columns-panel">
+        <legend className="visually-hidden">Show these columns</legend>
+        {COLUMNS.map((c) => (
+          <label key={c.id} className="check">
+            <input
+              type="checkbox"
+              checked={!hidden.includes(c.id)}
+              onChange={(e) =>
+                void setSetting(
+                  'hiddenColumns',
+                  e.target.checked ? hidden.filter((h) => h !== c.id) : [...hidden, c.id],
+                )
+              }
+            />
+            {c.label}
+          </label>
+        ))}
+      </fieldset>
+    </details>
+  );
+}
+
+function ViewTabs({ current }: { current: 'list' | 'calendar' | 'review' }) {
+  const unsure = useLedger((s) => s.transactions.filter((t) => t.unsure).length);
+  const tabs: Array<{ id: typeof current; label: string; to: string }> = [
+    { id: 'list', label: 'List', to: '/transactions' },
+    { id: 'calendar', label: 'Calendar', to: '/transactions?view=calendar' },
+    {
+      id: 'review',
+      label: unsure > 0 ? `Review (${unsure})` : 'Review',
+      to: '/transactions?view=review',
+    },
+  ];
+  return (
+    <div className="segmented page-views" role="group" aria-label="Show">
+      {tabs.map((t) => (
+        <a
+          key={t.id}
+          className="segmented-link"
+          href={href(t.to)}
+          aria-current={current === t.id ? 'page' : undefined}
+        >
+          {t.label}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 const SORTS: Array<{ value: string; label: string; sort: Sort }> = [
   { value: 'date-desc', label: 'Newest first', sort: { key: 'date', dir: 'desc' } },
@@ -450,6 +519,8 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
   const [filtersOpen, setFiltersOpen] = useState(() => isFiltered(initialFilters));
   const [panelKey, setPanelKey] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const lastToggled = useRef<string | null>(null);
+  const hiddenColumns = useLedger((s) => s.settings.hiddenColumns);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [receiptId, setReceiptId] = useState<string | null>(null);
 
@@ -478,13 +549,25 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
     setPage(1);
   };
 
-  const toggleOne = (id: string) =>
+  const toggleOne = (id: string, range = false) => {
+    const from = lastToggled.current;
+    lastToggled.current = id;
     setSelected((s) => {
       const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const on = !next.has(id);
+      // Shift: everything between the last row chosen and this one takes this row's new state.
+      const order = visible.map((t) => t.id);
+      const a = from ? order.indexOf(from) : -1;
+      const b = order.indexOf(id);
+      const ids =
+        range && a >= 0 && b >= 0 ? order.slice(Math.min(a, b), Math.max(a, b) + 1) : [id];
+      for (const x of ids) {
+        if (on) next.add(x);
+        else next.delete(x);
+      }
       return next;
     });
+  };
 
   const marquee = useMarquee(listRef, (ids, additive) =>
     setSelected((cur) => (additive ? new Set([...cur, ...ids]) : new Set(ids))),
@@ -586,6 +669,7 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
             )
           }
         />
+        <ColumnsMenu />
         <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
           {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}
         </a>
@@ -676,6 +760,7 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
                 selected={shownSelected}
                 onToggle={toggleOne}
                 editingId={editingId}
+                hidden={hiddenColumns}
               />
             </div>
           ))}
@@ -734,5 +819,22 @@ export function Transactions({
   view?: string | null;
   initialFilters?: Filters;
 }) {
-  return view === 'trash' ? <TrashView /> : <Ledger initialFilters={initialFilters} />;
+  if (view === 'trash') return <TrashView />;
+  const current = view === 'calendar' || view === 'review' ? view : 'list';
+  return (
+    <>
+      <ViewTabs current={current} />
+      <Suspense
+        fallback={
+          <p className="muted page-loading" aria-busy="true">
+            Opening…
+          </p>
+        }
+      >
+        {current === 'calendar' && <CalendarView />}
+        {current === 'review' && <ReviewView />}
+      </Suspense>
+      {current === 'list' && <Ledger initialFilters={initialFilters} />}
+    </>
+  );
 }

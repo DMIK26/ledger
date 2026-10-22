@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSheetSnap } from '../kit/sheet';
 import { useLedger } from '../data/store';
 import type { AddMode } from '../domain/types';
 import { EntryForm } from './EntryForm';
@@ -30,6 +31,7 @@ export function AddSheet({
   const [round, setRound] = useState(0);
   const mode = useLedger((s) => s.settings.addMode);
   const setSetting = useLedger((s) => s.setSetting);
+  const snap = useSheetSnap(open, onClose);
 
   useEffect(() => {
     const d = ref.current;
@@ -49,6 +51,8 @@ export function AddSheet({
       ref={ref}
       className="sheet add-sheet"
       aria-labelledby="add-title"
+      data-snap={snap.snap}
+      style={snap.style}
       onClose={onClose}
       onCancel={(e) => {
         e.preventDefault();
@@ -59,6 +63,7 @@ export function AddSheet({
       }}
     >
       <div className="sheet-body">
+        <div {...snap.handleProps} />
         <div className="sheet-head">
           <h2 id="add-title">Add expense</h2>
           <button

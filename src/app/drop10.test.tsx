@@ -254,6 +254,8 @@ describe('goals', () => {
       expect(within(goal).getByTestId('goal-saved')).toHaveTextContent('₹5,000.00 of ₹24,000.00'),
     );
     expect(within(goal).getByTestId('goal-state')).toHaveTextContent('Ahead');
+    // The form closes once the save has finished, a moment after the amount shows.
+    await waitFor(() => expect(within(goal).queryByLabelText('Amount put aside')).toBeNull());
     await userEvent.click(within(goal).getByRole('button', { name: 'Snooze this month' }));
     expect(await within(goal).findByText(/Snoozed this month/)).toBeInTheDocument();
   });

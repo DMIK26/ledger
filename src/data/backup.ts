@@ -17,7 +17,7 @@ import type { Loan } from '../domain/loans';
 import type { Goal } from '../domain/goals';
 import type { WishItem } from '../domain/wishlist';
 import type { Asset } from '../domain/networth';
-import { CLOSED_MONTHS_KEY, FAVOURITES_KEY, NO_SPEND_KEY } from './commands';
+import { CLOSED_MONTHS_KEY, FAVOURITES_KEY, NO_SPEND_KEY, SETTLED_SPLITS_KEY } from './commands';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -50,6 +50,8 @@ export interface BackupFile {
     wishlist?: WishItem[];
     assets?: Asset[];
     closedMonths?: string[];
+    /** Added in Drop 11. */
+    settledSplits?: string[];
   };
 }
 
@@ -101,6 +103,7 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       wishlist: await db.getAll('wishlist'),
       assets: await db.getAll('assets'),
       closedMonths: await listOf<string>(db, CLOSED_MONTHS_KEY),
+      settledSplits: await listOf<string>(db, SETTLED_SPLITS_KEY),
     },
   };
 }
@@ -230,6 +233,11 @@ export function validateBackup(json: unknown): BackupFile | null {
   if (Array.isArray(d.assets) && !d.assets.every((a) => isObj(a) && moneyRows(a.values)))
     return null;
   if (
+    d.settledSplits !== undefined &&
+    !(Array.isArray(d.settledSplits) && d.settledSplits.every((x) => typeof x === 'string'))
+  )
+    return null;
+  if (
     d.closedMonths !== undefined &&
     !(
       Array.isArray(d.closedMonths) &&
@@ -330,6 +338,10 @@ export async function importBackup(
   await t
     .objectStore('settings')
     .put(mergeDays(days ?? [], file.data.noSpendDays ?? []), NO_SPEND_KEY);
+  const settled = (await t.objectStore('settings').get(SETTLED_SPLITS_KEY)) as string[] | undefined;
+  await t
+    .objectStore('settings')
+    .put(mergeDays(settled ?? [], file.data.settledSplits ?? []), SETTLED_SPLITS_KEY);
   const closed = (await t.objectStore('settings').get(CLOSED_MONTHS_KEY)) as string[] | undefined;
   await t
     .objectStore('settings')

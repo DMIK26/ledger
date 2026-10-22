@@ -32,7 +32,12 @@ export function buildInsights(
   const spent = current.reduce((s, t) => s + t.amountMinor, 0);
   if (overallBudgetMinor !== null && spent > 0 && p.day < p.length) {
     // The month-end forecast: flexible spending at its rate, plus bills still to come.
-    const projected = forecastMonthEnd({ transactions: list, categories, recurring, today }).totalMinor;
+    const projected = forecastMonthEnd({
+      transactions: list,
+      categories,
+      recurring,
+      today,
+    }).totalMinor;
     const s = budgetStatus(projected, overallBudgetMinor);
     out.push(
       s.kind === 'over'

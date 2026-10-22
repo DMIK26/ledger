@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useId, useState, type FormEvent } from 'react';
 import { useLedger, type EntryDraft, type ReceiptChange } from '../data/store';
 import { categorise } from '../domain/categoriser';
 import { fmtDate, parseISO, todayISO } from '../domain/dates';
@@ -12,10 +12,59 @@ import { convertMinor, FX_CURRENCIES, parseRate, rateAsMinor, rateInput } from '
 import { fmtMoney } from '../domain/money';
 import { usePrivacy } from './Money';
 import { prepareReceipt, useObjectUrl } from './receiptImage';
+import { myShare, shareAmounts, type Split } from '../domain/splits';
+import type { AuditEvent } from '../domain/types';
+import { fmtTime } from '../domain/dates';
+import {
+  emptySplit,
+  previewParts,
+  splitDraft,
+  splitProblem,
+  splitToState,
+  type SplitState,
+} from './split/splitForm';
+
+// The split section loads the first time someone splits an expense.
+const SplitEditor = lazy(() =>
+  import('./split/SplitEditor').then((m) => ({ default: m.SplitEditor })),
+);
+
+/** What the activity log holds about this entry (Drop 11), loaded when opened. */
+function EntryHistory({ id }: { id: string }) {
+  const getEntryHistory = useLedger((s) => s.getEntryHistory);
+  const [events, setEvents] = useState<AuditEvent[] | null>(null);
+  const word = { do: '', undo: 'Undone: ', redo: 'Redone: ' } as const;
+  return (
+    <details className="entry-history">
+      <summary
+        onClick={() => {
+          if (events === null) void getEntryHistory(id).then(setEvents);
+        }}
+      >
+        History
+      </summary>
+      {events === null ? null : events.length === 0 ? (
+        <p className="muted small">Nothing recorded yet. The log keeps the last 500 steps.</p>
+      ) : (
+        <ul className="history-list" data-testid="entry-history">
+          {events.map((e) => (
+            <li key={e.id ?? e.at}>
+              <span className="muted small">
+                {fmtDate(todayISO(new Date(e.at)))} {fmtTime(e.at)}
+              </span>{' '}
+              {word[e.action]}
+              {e.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
+  );
+}
 
 interface Props {
   /** The entry being edited; omit to add a new one. */
-  editing?: { id: string; draft: EntryDraft; hasReceipt?: boolean };
+  editing?: { id: string; draft: EntryDraft; hasReceipt?: boolean; split?: Split };
   /** Show the "Describe it" field that fills the form from a quick-add sentence. */
   describe?: boolean;
   /** A new entry's starting date (the check-in opens Add for a missed day). */
@@ -42,6 +91,7 @@ export function EntryForm({
   const addEntry = useLedger((s) => s.addEntry);
   const editTransaction = useLedger((s) => s.editTransaction);
   const getReceipt = useLedger((s) => s.getReceipt);
+  const people = useLedger((s) => s.people);
   const masked = usePrivacy();
 
   const start = editing?.draft;
@@ -77,6 +127,10 @@ export function EntryForm({
   const [receiptChanged, setReceiptChanged] = useState(false);
   const [receiptError, setReceiptError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [splitOn, setSplitOn] = useState(Boolean(editing?.split));
+  const [split, setSplit] = useState<SplitState>(() =>
+    editing?.split ? splitToState(editing.split, people) : emptySplit(),
+  );
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [saving, setSaving] = useState(false);
   const receiptUrl = useObjectUrl(receipt);
@@ -125,6 +179,8 @@ export function EntryForm({
       foreignOn && fxAmount !== null && rate4 !== null
         ? { currency: fxCurrency, amountMinor: fxAmount, rate4 }
         : undefined,
+    // A split sends the whole bill and the people; turning one off on an edit removes it.
+    ...(splitOn ? { split: splitDraft(split) } : editing?.split ? { split: null } : {}),
   });
 
   const duplicate =
@@ -139,6 +195,18 @@ export function EntryForm({
     else if (effective === null || effective <= 0) problems.push('Enter an amount above zero');
     if (!merchant.trim()) problems.push('Say what it was for');
     if (!parseISO(date)) problems.push('Pick a valid date');
+    if (splitOn && effective !== null && effective > 0) {
+      const problem = splitProblem(split);
+      const shares = shareAmounts(effective, split.mode, previewParts(split));
+      if (problem) problems.push(problem);
+      else if (!shares.ok) problems.push(shares.error);
+      else if (
+        myShare({
+          parts: previewParts(split).map((p, i) => ({ ...p, shareMinor: shares.shares[i]! })),
+        }) <= 0
+      )
+        problems.push('Your share is zero; record lending in Udhaar instead');
+    }
     setErrors(problems);
     if (problems.length > 0 || saving) return;
     if (duplicate && !confirmDuplicate) {
@@ -199,6 +267,10 @@ export function EntryForm({
         />
         Paid in another currency
       </label>
+      <label className="check foreign-toggle">
+        <input type="checkbox" checked={splitOn} onChange={(e) => setSplitOn(e.target.checked)} />
+        Split with others
+      </label>
       <div className="form-grid">
         {foreignOn ? (
           <>
@@ -242,7 +314,7 @@ export function EntryForm({
           </>
         ) : (
           <div className="field">
-            <label htmlFor={f('amount')}>Amount</label>
+            <label htmlFor={f('amount')}>{splitOn ? 'Whole bill' : 'Amount'}</label>
             <AmountInput
               key={amountKey}
               id={f('amount')}
@@ -348,6 +420,11 @@ export function EntryForm({
           />
         </div>
       </div>
+      {splitOn && (
+        <Suspense fallback={<p className="muted small">Opening the split…</p>}>
+          <SplitEditor totalMinor={effective} state={split} onChange={setSplit} />
+        </Suspense>
+      )}
       <div className="field">
         <label htmlFor={f('notes')}>Notes</label>
         <textarea
@@ -405,6 +482,7 @@ export function EntryForm({
           to keep both.
         </p>
       )}
+      {editing && <EntryHistory id={editing.id} />}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary" disabled={saving}>
           {duplicate && confirmDuplicate ? 'Save anyway' : submitLabel}

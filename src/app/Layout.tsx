@@ -1,22 +1,30 @@
 import { replaceRoute, useBackClose } from '../pwa/back';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLedger } from '../data/store';
 import { AddSheet } from './AddSheet';
 import { Icon, type IconName } from './icons';
 import { LockScreen } from './LockScreen';
 import { usePrivacy } from './Money';
-import { href, navigate, parseHash, type RoutePath } from './router';
+import { addPath, closeAddPath, href, navigate, type RoutePath } from './router';
 import { Toast } from './Toast';
 import { getHighlight } from '../kit/entityBus';
 import { HoverCard } from '../kit/HoverCard';
 import { LiveRegion, MonthSwitcher, PinBar, UndoControls, useNavInfo } from '../kit/Shell';
 import { useView } from '../kit/view';
+import { useUi } from '../kit/ui';
+import { useSheetSnap } from '../kit/sheet';
 import { Companion } from '../doodle/Companion';
 import { DoodleLayer } from '../doodle/DoodleLayer';
 import { DoodleDefs } from '../doodle/art';
 import { useIsDesktop } from '../doodle/anchors';
 import { DoodleBurst, NotesPanel, SketchToolbar, useDoodleKeys } from '../doodle/Studio';
 import { useDoodle } from '../doodle/state';
+
+// Opened on first use, so they cost nothing at start-up.
+const Palette = lazy(() => import('./Palette').then((m) => ({ default: m.Palette })));
+const RecapViewer = lazy(() =>
+  import('./recap/RecapViewer').then((m) => ({ default: m.RecapViewer })),
+);
 
 interface NavItem {
   path: RoutePath;
@@ -38,8 +46,6 @@ const MORE: RoutePath[] = ['/money', '/budgets', '/recurring', '/settings'];
 
 export const titleFor = (path: RoutePath): string =>
   NAV.find((n) => n.path === path)?.label ?? 'Ledger';
-
-const currentPath = (): RoutePath => parseHash(window.location.hash).path;
 
 export const AUTO_LOCK_MS = 30_000;
 
@@ -102,6 +108,21 @@ function useAutoLock(): void {
   }, [hasLock, lockNow, applyPinResetIfDue]);
 }
 
+/** Ctrl+K or Cmd+K opens and closes the command palette, even from a field. */
+function usePaletteShortcut(): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k')
+        return;
+      e.preventDefault();
+      const ui = useUi.getState();
+      ui.setPalette(!ui.paletteOpen);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 /** Escape removes the last pin, unless something else (a dialog, a popover, a field) has it. */
 function usePinEscape(): void {
   const popPin = useView((s) => s.popPin);
@@ -124,11 +145,22 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
   const desktop = useIsDesktop();
   const sketchOn = useDoodle((s) => s.sketchOn);
   const toggleSketch = useDoodle((s) => s.toggleSketch);
+  const setPalette = useUi((s) => s.setPalette);
 
   return (
     <header className="topbar">
       <h1>{title}</h1>
       {!desktop && doodles && <Companion path={path} placement="header" />}
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon"
+        aria-label="Search and commands"
+        aria-keyshortcuts="Control+K Meta+K"
+        title="Search and commands (Ctrl+K)"
+        onClick={() => setPalette(true)}
+      >
+        <Icon name="search" />
+      </button>
       <UndoControls />
       {desktop && (
         <button
@@ -156,7 +188,7 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
       <button
         type="button"
         className="btn btn-primary topbar-add"
-        onClick={() => navigate(`${currentPath()}?action=add`)}
+        onClick={() => navigate(addPath())}
       >
         <Icon name="plus" />
         Add
@@ -170,6 +202,7 @@ function TabBar({ path }: { path: RoutePath }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = MORE.includes(path);
   useBackClose(moreOpen, () => sheet.current?.close());
+  const snap = useSheetSnap(moreOpen, () => sheet.current?.close());
 
   const go = (to: RoutePath) => {
     // Replace the sheet's history entry, so back returns to the page the sheet was opened on.
@@ -196,7 +229,7 @@ function TabBar({ path }: { path: RoutePath }) {
           type="button"
           className="tab-add"
           aria-label="Add expense"
-          onClick={() => navigate(`${path}?action=add`)}
+          onClick={() => navigate(addPath())}
         >
           <Icon name="plus" size={24} />
         </button>
@@ -226,12 +259,15 @@ function TabBar({ path }: { path: RoutePath }) {
         ref={sheet}
         className="sheet"
         aria-labelledby="more-title"
+        data-snap={snap.snap}
+        style={snap.style}
         onClose={() => setMoreOpen(false)}
         onClick={(e) => {
           if (e.target === e.currentTarget) sheet.current?.close();
         }}
       >
         <div className="sheet-body">
+          <div {...snap.handleProps} />
           <h2 id="more-title">More</h2>
           <ul className="sheet-list">
             {NAV.filter((n) => MORE.includes(n.path)).map((n) => (
@@ -272,11 +308,15 @@ export function Layout({
   const locked = useLedger((s) => s.locked);
   const title = titleFor(path);
   useUndoShortcuts();
+  usePaletteShortcut();
   usePinEscape();
   useDoodleKeys();
   const nav = useNavInfo();
   const desktop = useIsDesktop();
   const doodles = useLedger((s) => s.settings.doodles);
+  // Mounted from the first opening on, so the palette reopens fast.
+  const paletteUsed = useUi((s) => s.paletteUsed);
+  const recap = useUi((s) => s.recap);
   useAutoLock();
 
   useEffect(() => {
@@ -368,7 +408,7 @@ export function Layout({
         </main>
       </div>
       <TabBar path={path} />
-      <AddSheet open={adding} date={addDate} onClose={() => navigate(path)} />
+      <AddSheet open={adding} date={addDate} onClose={() => navigate(closeAddPath())} />
       <SketchToolbar path={path} />
       <NotesPanel />
       <DoodleBurst />
@@ -376,6 +416,10 @@ export function Layout({
       <HoverCard />
       <LiveRegion />
       <Toast />
+      <Suspense fallback={null}>
+        {paletteUsed && <Palette />}
+        {recap && <RecapViewer key={recap.id} period={recap} />}
+      </Suspense>
     </div>
   );
 }

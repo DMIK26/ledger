@@ -1,4 +1,5 @@
 import type { ForeignAmount } from './fx';
+import type { Split } from './splits';
 
 export type ISODate = string; // 'YYYY-MM-DD', a local calendar date
 export type CategoryId = string;
@@ -7,14 +8,7 @@ export const PAYMENT_METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer', 'Other']
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export type TxSource =
-  | 'form'
-  | 'quick'
-  | 'import'
-  | 'recurring'
-  | 'legacy'
-  | 'repeat'
-  | 'keypad'
-  | 'wishlist';
+  'form' | 'quick' | 'import' | 'recurring' | 'legacy' | 'repeat' | 'keypad' | 'wishlist';
 
 export interface Transaction {
   id: string;
@@ -39,6 +33,8 @@ export interface Transaction {
   accountId?: string;
   /** Paid in another currency: the original amount and the rate typed (amountMinor is in rupees). */
   foreign?: ForeignAmount;
+  /** Shared with people (Drop 11): amountMinor is your share; the split has the whole bill. */
+  split?: Split;
   createdAt: number;
   updatedAt: number;
 }
@@ -92,6 +88,16 @@ export interface Settings {
   checkinHiddenOn: ISODate | '';
   /** How the Add sheet opens: the full form, the keypad or several lines at once. */
   addMode: AddMode;
+  /** Dashboard cards in the order chosen (Drop 11); missing cards take their default place. */
+  dashboardOrder: string[];
+  /** Dashboard cards hidden with Customise. */
+  dashboardHidden: string[];
+  /** Transactions columns turned off with Columns. */
+  hiddenColumns: string[];
+  /** The pencil's wry one-liners, off unless chosen. */
+  wryLines: boolean;
+  /** Recaps opened or put away, so each is offered once ('month:2026-10'). */
+  recapsSeen: string[];
 }
 
 export type AddMode = 'form' | 'keypad' | 'several';
@@ -111,6 +117,11 @@ export const DEFAULT_SETTINGS: Settings = {
   monthStartDay: 1,
   checkinHiddenOn: '',
   addMode: 'form',
+  dashboardOrder: [],
+  dashboardHidden: [],
+  hiddenColumns: [],
+  wryLines: false,
+  recapsSeen: [],
 };
 
 export interface AuditEvent {
@@ -118,6 +129,8 @@ export interface AuditEvent {
   at: number;
   action: 'do' | 'undo' | 'redo';
   label: string;
+  /** What the step touched, such as 'tx:<id>', for an entry's history (Drop 11 on). */
+  entities?: string[];
 }
 
 export interface TrashItem {

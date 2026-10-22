@@ -41,3 +41,23 @@ export function navigate(path: string): void {
 }
 
 export const href = (path: string): string => `#${path}`;
+
+/** The current address with the Add sheet open (on a date, if given), keeping the page's own query. */
+export function addPath(on?: string): string {
+  const { path, query } = parseHash(window.location.hash);
+  const q = new URLSearchParams(query);
+  q.set('action', 'add');
+  if (on) q.set('on', on);
+  else q.delete('on');
+  return `${path}?${q.toString()}`;
+}
+
+/** The current address without the Add sheet. */
+export function closeAddPath(): string {
+  const { path, query } = parseHash(window.location.hash);
+  const q = new URLSearchParams(query);
+  q.delete('action');
+  q.delete('on');
+  const rest = q.toString();
+  return rest ? `${path}?${rest}` : path;
+}

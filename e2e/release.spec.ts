@@ -16,6 +16,8 @@ const PAGES = [
   '#/money?view=loans',
   '#/transactions?action=add',
   '#/transactions?view=trash',
+  '#/transactions?view=calendar',
+  '#/transactions?view=review',
   '#/settings?view=activity',
 ];
 
@@ -42,6 +44,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('no serious or critical accessibility problems on any page', async ({ page }) => {
+  // Seventeen pages, each analysed in full.
+  test.setTimeout(90_000);
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);
     await page.getByRole('heading', { level: 1 }).waitFor();
@@ -65,12 +69,13 @@ test('no serious or critical accessibility problems on any page', async ({ page 
 for (const width of [360, 390, 430]) {
   test(`at ${width}px: no sideways scroll, 44px controls, 16px inputs`, async ({ page }, info) => {
     test.skip(info.project.name === 'desktop', 'Phone widths');
+    test.setTimeout(90_000);
     await page.setViewportSize({ width, height: 800 });
     const all: string[] = [];
     for (const hash of PAGES) {
       await page.goto(`./${hash}`);
       await page.getByRole('heading', { level: 1 }).waitFor();
-    await expect(page.locator('.page-loading')).toHaveCount(0);
+      await expect(page.locator('.page-loading')).toHaveCount(0);
       const report = await page.evaluate(() => {
         const problems: string[] = [];
         if (document.documentElement.scrollWidth > window.innerWidth + 1)

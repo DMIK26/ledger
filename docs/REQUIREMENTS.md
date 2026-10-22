@@ -280,13 +280,58 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   and out, top category, carried budget, an optional note, and "Close" (undoable).
 - The offline storage budget rises to 1,300 KB. The calendar view moves to Drop 11.
 
+### Drop 11: interactive (owner approval, 22 Oct 2026)
+
+- **Calendar** (Transactions > Calendar): a month grid, weeks starting Monday, each day with what was
+  spent, and markers for bills due (recurring payments), money in, card due dates and no-spend days.
+  Arrow keys move between days; choosing a day lists its entries, bills and money in, with "Add for this
+  day".
+- **Command palette**: Ctrl+K or Cmd+K anywhere, and a search button in the top bar on every screen size.
+  Go to any page or view, add an expense, undo, redo, hide or show amounts, change the theme, open the
+  recap, customise the Dashboard, or type a merchant to pin it and see its entries. Arrow keys and Enter;
+  Escape closes.
+- **Review** (Transactions > Review, with a count of unsure entries): one unsure entry at a time. Swipe
+  right or press the right arrow to accept the category, swipe left or press the left arrow to skip, or
+  pick another category (number keys 1 to 9). Every decision undoes. **Learning rule**: a merchant's
+  remembered category changes only when two of its last three entries agree; a first-time merchant
+  still learns from its first correction.
+- **Scrubbing** (Dashboard > Day by day): the month's spending added up day by day. A finger, the mouse
+  or the arrow keys move a line and label along it; the donut and the entries under the chart follow the
+  chosen day. Escape or leaving the chart returns to today.
+- **Treemap and money flow** (Reports): a treemap of categories (choose one to see its merchants, Back to
+  return) and a money-flow chart from money in to categories (and what was left), where choosing a
+  category adds its top merchants. Both have a list or table equivalent for screen readers.
+- **Compare modes** (Reports): previous period, same period last year, and the average of the 12 months
+  before (scaled to the period's days); a "Year to date" shortcut sets the financial year so far against
+  the same days last year.
+- **Story recap** for last week, last month and the last financial year: a few cards (total and change,
+  top category, top merchant, busiest day, no-spend days, biggest expense, money in and left). For the
+  month recap, **guess first**: drag to guess what you spent, then see the real figure. Share a card as an
+  image (share sheet, or download); with privacy on, the image has no amounts. The Dashboard offers each
+  new recap once; dismissing or opening it puts it away for good. Reports and the palette open it any
+  time.
+- **Splits**: on the Add and edit form, split an expense with people (from udhaar or new names): equally,
+  exact amounts, percentages or shares, paid by you or by someone else. Your share is the spending; the
+  others' shares become udhaar automatically (paid by someone else: you owe them your share and no account
+  of yours moves). Money > Udhaar shows "Who pays whom" for open splits with the fewest transfers, and
+  "Mark all settled" records your part as settled.
+- **Customisable Dashboard**: "Customise" (or a long press on a card) lets you move cards up and down and
+  hide or show them; quick add stays first and time-limited cards (check-in, close the month, recap)
+  stay on top. Saved on this device with the other settings.
+- **Bottom sheets with snap points** on phones (Add and More): drag the handle to half or full height,
+  or down to close; the handle also works with Enter and the arrow keys.
+- **Rows**: on phones swipe an entry left to delete (with undo) or right to edit; Shift+click selects a
+  range of rows; "Columns" chooses which columns Transactions shows (category, method, account, tags);
+  each entry's edit form has a "History" list of what happened to it, from the activity log (kept for
+  the last 500 steps).
+- **Sketchbook** (Dashboard, with doodles on): a page for the month that fills with a small drawing of
+  each logged day's top category; no-spend days get a resting doodle.
+- **Wry one-liners** (Settings > Doodles, off by default): the pencil sometimes says a short, kind,
+  wry line about the month instead of a plain fact. Written in Ledger, no AI and no server.
+- New screens load on first use so start-up stays within the 170 KB budget.
+
 ### Later drops (scope agreed, details written when each starts)
 
-- **Drop 11, interactive**: calendar view of spending, bills, salary and card due dates; command palette; swipe review mode and the two-of-three learning rule; chart
-  scrubbing (pointer and keys); guess-first recap; treemap and money-flow chart; compare modes; story recap
-  shared as an image with privacy respected; Splitwise-style splits; customisable dashboard; bottom sheets
-  with snap points; swipe rows, range select, column choice, per-entry history; sketchbook that fills as you
-  log; the pencil's optional wry one-liners.
 - **Drop 12, insight**: plain-words search; rules editor tested on history; saved reports with relative
   dates; in-app nudges (unusual amount, likely duplicate, subscription price rise); merchant pages; trips,
   projects and festival funds; weekly digest; 50/30/20 view; subcategories; tax summary (80C, 80D and other

@@ -1,6 +1,6 @@
 import { EmptyDoodle } from '../../doodle/Studio';
 import { MoodFace, MOOD_OF } from '../../doodle/faces';
-import { useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MonthBars, type BarMode } from '../../charts/MonthBars';
 import { Donut } from '../../charts/Donut';
 import { useLedger } from '../../data/store';
@@ -23,6 +23,7 @@ import {
 import { forecastMonthEnd } from '../../domain/plan';
 import { categoryById } from '../../domain/categories';
 import {
+  addDays,
   fmtDate,
   monthBounds,
   monthKey,
@@ -49,6 +50,20 @@ import { LoadSampleButton, SampleBanner } from '../SampleData';
 import { SafeToSpendCard } from '../plan/SafeToSpend';
 import { MonthCloseCard } from '../plan/MonthClose';
 import { AtRiskCard } from '../plan/AtRisk';
+import { RecapCard } from '../dash/RecapCard';
+import { ScrubChart, type DayPoint } from '../../charts/ScrubChart';
+import {
+  DASHBOARD_CARD_LABEL,
+  dashboardOrder,
+  moveCard,
+  type DashboardCard,
+} from '../../domain/dashboard';
+import { useUi } from '../../kit/ui';
+
+const Sketchbook = lazy(() =>
+  import('../dash/Sketchbook').then((m) => ({ default: m.Sketchbook })),
+);
+const LONG_PRESS_MS = 600;
 
 const PER_DAY_STEP = 1000; // ₹10
 
@@ -273,6 +288,15 @@ export function Dashboard() {
   const [kpiView, setKpiView] = useState<KpiView>(null);
   const [kpiPath, setKpiPath] = useState<BreakdownPath>([]);
   const [donutPath, setDonutPath] = useState<BreakdownPath>([]);
+  // The scrubbed day belongs to the month it was chosen in; another month starts unscrubbed.
+  const [scrubbed, setScrubbed] = useState<{ month: string; index: number } | null>(null);
+  const customising = useUi((s) => s.customising);
+  const setCustomising = useUi((s) => s.setCustomising);
+  const savedOrder = useLedger((s) => s.settings.dashboardOrder);
+  const hiddenCards = useLedger((s) => s.settings.dashboardHidden);
+  const doodles = useLedger((s) => s.settings.doodles);
+  const setSetting = useLedger((s) => s.setSetting);
+  const press = useRef<{ timer: number; x: number; y: number } | null>(null);
 
   const today = todayISO();
   const month = useViewMonth();
@@ -283,13 +307,37 @@ export function Dashboard() {
   const k = useMemo(() => kpis(transactions, asOf), [transactions, asOf]);
   const toDate = useMemo(() => transactions.filter((t) => t.date <= asOf), [transactions, asOf]);
   const monthEntries = useMemo(() => inMonth(toDate, month), [toDate, month]);
+  // Day by day: the month's spending added up, for scrubbing.
+  const dayPoints = useMemo<DayPoint[]>(() => {
+    const byDay = new Map<string, number>();
+    for (const t of monthEntries) byDay.set(t.date, (byDay.get(t.date) ?? 0) + t.amountMinor);
+    const out: DayPoint[] = [];
+    let total = 0;
+    for (let d = first; d <= asOf; d = addDays(d, 1)) {
+      const v = byDay.get(d) ?? 0;
+      total += v;
+      out.push({ date: d, dayMinor: v, totalMinor: total });
+    }
+    return out;
+  }, [monthEntries, first, asOf]);
+  const scrub = scrubbed?.month === month ? scrubbed.index : null;
+  const setScrub = (index: number | null) => setScrubbed(index === null ? null : { month, index });
+  const scrubDate = scrub !== null ? (dayPoints[scrub]?.date ?? null) : null;
   const lastMonthEntries = useMemo(() => {
     const prev = previousMonth(month);
     const cutoff = samePointLastMonth(asOf);
     return inMonth(transactions, prev).filter((t) => t.date <= cutoff);
   }, [transactions, month, asOf]);
   const donutMonth = preview ?? month;
-  const totals = useMemo(() => categoryTotals(toDate, donutMonth), [toDate, donutMonth]);
+  // Scrubbing the day-by-day chart shows the month up to that day in the donut.
+  const totals = useMemo(
+    () =>
+      categoryTotals(
+        scrubDate && !preview ? toDate.filter((t) => t.date <= scrubDate) : toDate,
+        donutMonth,
+      ),
+    [toDate, donutMonth, scrubDate, preview],
+  );
   const series = useMemo(() => monthSeries(toDate, lastMonths(asOf, 6)), [toDate, asOf]);
   // Hovering a bar previews that month in the donut. The legend keeps one fixed set of rows (this
   // month's categories, then any other category in the six bars), so the card never changes height
@@ -326,7 +374,9 @@ export function Dashboard() {
         transactions,
         categories,
         // With categories pinned, only their bills count.
-        recurring: pinnedCats ? recurring.filter((r) => pinnedCats.includes(r.categoryId)) : recurring,
+        recurring: pinnedCats
+          ? recurring.filter((r) => pinnedCats.includes(r.categoryId))
+          : recurring,
         today: asOf,
       }).totalMinor,
     [transactions, categories, recurring, pinnedCats, asOf],
@@ -360,96 +410,97 @@ export function Dashboard() {
   }
 
   const label = monthLabel(month);
-  return (
-    <>
-      <InstallBanner />
-      <SampleBanner />
-      <BackupReminder />
-      <QuickAdd followMonth />
-      <CheckIn />
-      {planned && <MonthCloseCard today={today} />}
-      {planned && <SafeToSpendCard today={today} />}
-      <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
-        <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
-          <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>
-          <p className="kpi-value" data-testid="month-total">
-            <Money minor={k.spentMinor} currency={currency} />
-          </p>
-          <p className="muted small">{k.entries === 1 ? '1 entry' : `${k.entries} entries`}</p>
-        </KpiButton>
-        <KpiButton id="change" open={kpiView === 'change'} onToggle={toggleKpi}>
-          <h2>Against last month</h2>
-          <p className="kpi-value" data-testid="kpi-change">
-            {k.changePct === null
-              ? 'No comparison'
-              : k.changePct === 0
-                ? 'The same'
-                : `${Math.abs(k.changePct)}% ${k.changePct > 0 ? 'more' : 'less'}`}
-          </p>
-          <p className="muted small">
-            Than by day {k.daysElapsed} of last month,{' '}
-            <Money minor={k.lastMonthToDateMinor} currency={currency} />
-          </p>
-        </KpiButton>
-        <KpiButton id="daily" open={kpiView === 'daily'} onToggle={toggleKpi}>
-          <h2>Daily average</h2>
-          <p className="kpi-value">
-            <Money minor={k.dailyAvgMinor} currency={currency} />
-          </p>
-          <p className="muted small">
-            Over {k.daysElapsed === 1 ? '1 day' : `${k.daysElapsed} days`}
-          </p>
-        </KpiButton>
-        <KpiButton id="top" open={kpiView === 'top'} onToggle={toggleKpi}>
-          <h2>Top category</h2>
-          <p
-            className="kpi-value kpi-name"
-            data-hl={k.topCategory ? entityKey('category', k.topCategory.categoryId) : undefined}
-          >
-            {top ? top.name : 'None yet'}
-          </p>
-          <p className="muted small">
-            {k.topCategory ? (
-              <Money minor={k.topCategory.totalMinor} currency={currency} />
-            ) : (
-              'Add an entry to see it'
-            )}
-          </p>
-        </KpiButton>
-      </section>
-      {kpiView && (
-        <section
-          className="card"
-          id="kpi-breakdown"
-          aria-label="Breakdown"
-          style={{ viewTransitionName: 'kpi-open' }}
-        >
-          <div className="card-head">
-            <h2>
-              {
-                {
-                  spent: 'Where it went',
-                  change: 'Against last month',
-                  daily: 'Day by day',
-                  top: 'Top category',
-                }[kpiView]
-              }
-            </h2>
-            <button type="button" className="btn btn-ghost" onClick={() => toggleKpi(kpiView)}>
-              Close
-            </button>
-          </div>
-          <Breakdown
-            root={kpiView === 'daily' ? 'days' : kpiView === 'change' ? 'compare' : 'categories'}
-            rootLabel={kpiView === 'daily' ? 'All days' : 'All categories'}
-            entries={monthEntries}
-            compareEntries={lastMonthEntries}
-            path={kpiPath}
-            onPath={setKpiPath}
-            range={{ from: first, to: asOf }}
-          />
+  const scrubEntries = scrubDate ? monthEntries.filter((t) => t.date === scrubDate) : [];
+  const order = dashboardOrder(savedOrder);
+
+  const cards: Record<DashboardCard, ReactNode> = {
+    safe: planned ? <SafeToSpendCard today={today} /> : null,
+    kpis: (
+      <>
+        <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
+          <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
+            <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>
+            <p className="kpi-value" data-testid="month-total">
+              <Money minor={k.spentMinor} currency={currency} />
+            </p>
+            <p className="muted small">{k.entries === 1 ? '1 entry' : `${k.entries} entries`}</p>
+          </KpiButton>
+          <KpiButton id="change" open={kpiView === 'change'} onToggle={toggleKpi}>
+            <h2>Against last month</h2>
+            <p className="kpi-value" data-testid="kpi-change">
+              {k.changePct === null
+                ? 'No comparison'
+                : k.changePct === 0
+                  ? 'The same'
+                  : `${Math.abs(k.changePct)}% ${k.changePct > 0 ? 'more' : 'less'}`}
+            </p>
+            <p className="muted small">
+              Than by day {k.daysElapsed} of last month,{' '}
+              <Money minor={k.lastMonthToDateMinor} currency={currency} />
+            </p>
+          </KpiButton>
+          <KpiButton id="daily" open={kpiView === 'daily'} onToggle={toggleKpi}>
+            <h2>Daily average</h2>
+            <p className="kpi-value">
+              <Money minor={k.dailyAvgMinor} currency={currency} />
+            </p>
+            <p className="muted small">
+              Over {k.daysElapsed === 1 ? '1 day' : `${k.daysElapsed} days`}
+            </p>
+          </KpiButton>
+          <KpiButton id="top" open={kpiView === 'top'} onToggle={toggleKpi}>
+            <h2>Top category</h2>
+            <p
+              className="kpi-value kpi-name"
+              data-hl={k.topCategory ? entityKey('category', k.topCategory.categoryId) : undefined}
+            >
+              {top ? top.name : 'None yet'}
+            </p>
+            <p className="muted small">
+              {k.topCategory ? (
+                <Money minor={k.topCategory.totalMinor} currency={currency} />
+              ) : (
+                'Add an entry to see it'
+              )}
+            </p>
+          </KpiButton>
         </section>
-      )}
+        {kpiView && (
+          <section
+            className="card"
+            id="kpi-breakdown"
+            aria-label="Breakdown"
+            style={{ viewTransitionName: 'kpi-open' }}
+          >
+            <div className="card-head">
+              <h2>
+                {
+                  {
+                    spent: 'Where it went',
+                    change: 'Against last month',
+                    daily: 'Day by day',
+                    top: 'Top category',
+                  }[kpiView]
+                }
+              </h2>
+              <button type="button" className="btn btn-ghost" onClick={() => toggleKpi(kpiView)}>
+                Close
+              </button>
+            </div>
+            <Breakdown
+              root={kpiView === 'daily' ? 'days' : kpiView === 'change' ? 'compare' : 'categories'}
+              rootLabel={kpiView === 'daily' ? 'All days' : 'All categories'}
+              entries={monthEntries}
+              compareEntries={lastMonthEntries}
+              path={kpiPath}
+              onPath={setKpiPath}
+              range={{ from: first, to: asOf }}
+            />
+          </section>
+        )}
+      </>
+    ),
+    budget: (
       <BudgetCard
         key={month}
         spent={k.spentMinor}
@@ -458,15 +509,68 @@ export function Dashboard() {
         today={asOf}
         pinned={pinnedBudget}
       />
-      {planned && <AtRiskCard today={today} />}
-      {current && <CardDue />}
-      {current && <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />}
+    ),
+    risk: planned ? <AtRiskCard today={today} /> : null,
+    cards: current ? <CardDue /> : null,
+    insights: current ? (
+      <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />
+    ) : null,
+    day:
+      dayPoints.length > 0 ? (
+        <section className="card" aria-labelledby="day-title" data-testid="day-by-day">
+          <div className="card-head">
+            <h2 id="day-title">Day by day</h2>
+            <span className="muted small" aria-live="polite" data-testid="scrub-label">
+              {scrubDate ? (
+                <>
+                  By {fmtDate(scrubDate)}:{' '}
+                  <Money minor={dayPoints[scrub!]!.totalMinor} currency={currency} />
+                </>
+              ) : (
+                <>
+                  {current ? 'So far' : 'Whole month'}:{' '}
+                  <Money minor={dayPoints[dayPoints.length - 1]!.totalMinor} currency={currency} />
+                </>
+              )}
+            </span>
+          </div>
+          <ScrubChart
+            points={dayPoints}
+            index={scrub}
+            onScrub={setScrub}
+            currency={currency}
+            label={`${label}, spending added up day by day`}
+          />
+          {scrubDate ? (
+            <>
+              {scrubEntries.length > 0 ? (
+                <TxList label={`Entries on ${fmtDate(scrubDate)}`} transactions={scrubEntries} />
+              ) : (
+                <p className="muted small">Nothing spent on {fmtDate(scrubDate)}.</p>
+              )}
+              <button type="button" className="btn btn-ghost" onClick={() => setScrub(null)}>
+                Back to {current ? 'today' : 'the whole month'}
+              </button>
+            </>
+          ) : (
+            <p className="muted small">
+              Point at the line, drag along it, or focus it and use the arrow keys; the donut
+              follows.
+            </p>
+          )}
+        </section>
+      ) : null,
+    charts: (
       <div className="chart-row">
         <section className="card chart-card" aria-labelledby="donut-title">
           <div className="card-head">
             <h2 id="donut-title">Where it went</h2>
             <span className="muted small" aria-live="polite">
-              {preview && preview !== month ? `Preview: ${monthLabel(preview)}` : label}
+              {preview && preview !== month
+                ? `Preview: ${monthLabel(preview)}`
+                : scrubDate
+                  ? `By ${fmtDate(scrubDate)}`
+                  : label}
             </span>
           </div>
           <Donut
@@ -474,7 +578,13 @@ export function Dashboard() {
             categories={categories}
             currency={currency}
             caption={
-              preview && preview !== month ? monthLabel(preview) : current ? 'This month' : label
+              preview && preview !== month
+                ? monthLabel(preview)
+                : scrubDate
+                  ? `By ${fmtDate(scrubDate).slice(0, -5)}`
+                  : current
+                    ? 'This month'
+                    : label
             }
             selected={donutPath[0]?.slice(2) ?? null}
             legend={donutPath.length === 0}
@@ -536,7 +646,14 @@ export function Dashboard() {
           )}
         </section>
       </div>
-      {transactions.length === 0 ? (
+    ),
+    sketchbook: doodles ? (
+      <Suspense fallback={null}>
+        <Sketchbook />
+      </Suspense>
+    ) : null,
+    recent:
+      transactions.length === 0 ? (
         <section className="card empty">
           <EmptyDoodle art="pin" />
           <h2>No entries match the pins</h2>
@@ -556,6 +673,143 @@ export function Dashboard() {
             onDelete={(id) => void removeTransaction(id)}
           />
         </section>
+      ),
+  };
+
+  const move = (id: DashboardCard, delta: -1 | 1) =>
+    void setSetting('dashboardOrder', moveCard(order, id, delta));
+  const toggleHidden = (id: DashboardCard) =>
+    void setSetting(
+      'dashboardHidden',
+      hiddenCards.includes(id) ? hiddenCards.filter((h) => h !== id) : [...hiddenCards, id],
+    );
+  // A long press on a card (touch) opens Customise.
+  const pressStart = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || customising) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    press.current = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        press.current = null;
+        setCustomising(true);
+      }, LONG_PRESS_MS),
+    };
+  };
+  const pressEnd = () => {
+    if (press.current) window.clearTimeout(press.current.timer);
+    press.current = null;
+  };
+  const pressMove = (e: React.PointerEvent) => {
+    const p = press.current;
+    if (p && Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) > 10) pressEnd();
+  };
+
+  return (
+    <>
+      <InstallBanner />
+      <SampleBanner />
+      <BackupReminder />
+      <QuickAdd followMonth />
+      <CheckIn />
+      {planned && <MonthCloseCard today={today} />}
+      {planned && <RecapCard today={today} />}
+      {customising && (
+        <section className="card customise-bar" aria-labelledby="customise-title">
+          <div className="card-head">
+            <h2 id="customise-title">Customise the Dashboard</h2>
+            <button type="button" className="btn btn-primary" onClick={() => setCustomising(false)}>
+              Done
+            </button>
+          </div>
+          <p className="muted small">
+            Move cards up or down, or hide the ones you do not need. Quick add stays first.
+          </p>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              void setSetting('dashboardOrder', []);
+              void setSetting('dashboardHidden', []);
+            }}
+          >
+            Reset to the usual layout
+          </button>
+        </section>
+      )}
+      {order.map((id, i) => {
+        const node = cards[id];
+        const isHidden = hiddenCards.includes(id);
+        if (!customising) {
+          if (isHidden || !node) return null;
+          return (
+            <div
+              key={id}
+              className="dash-slot"
+              onPointerDown={pressStart}
+              onPointerUp={pressEnd}
+              onPointerCancel={pressEnd}
+              onPointerMove={pressMove}
+            >
+              {node}
+            </div>
+          );
+        }
+        return (
+          <div
+            key={id}
+            className="dash-edit"
+            data-testid={`dash-${id}`}
+            data-hidden={isHidden || undefined}
+          >
+            <div className="dash-controls">
+              <span className="dash-name">
+                {DASHBOARD_CARD_LABEL[id]}
+                {!node && !isHidden ? (
+                  <span className="muted small"> (nothing to show now)</span>
+                ) : null}
+              </span>
+              <span className="btn-row">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={i === 0}
+                  aria-label={`Move ${DASHBOARD_CARD_LABEL[id]} up`}
+                  onClick={() => move(id, -1)}
+                >
+                  Up
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={i === order.length - 1}
+                  aria-label={`Move ${DASHBOARD_CARD_LABEL[id]} down`}
+                  onClick={() => move(id, 1)}
+                >
+                  Down
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  aria-pressed={!isHidden}
+                  aria-label={`Show ${DASHBOARD_CARD_LABEL[id]}`}
+                  onClick={() => toggleHidden(id)}
+                >
+                  {isHidden ? 'Show' : 'Shown'}
+                </button>
+              </span>
+            </div>
+            {!isHidden && node && <Fragment>{node}</Fragment>}
+          </div>
+        );
+      })}
+      {!customising && (
+        <p className="dash-customise">
+          <button type="button" className="btn btn-ghost" onClick={() => setCustomising(true)}>
+            Customise the Dashboard
+          </button>
+        </p>
       )}
     </>
   );

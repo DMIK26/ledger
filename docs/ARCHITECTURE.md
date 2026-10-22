@@ -62,6 +62,13 @@ optional `budgetKind` (fixed, flexible, non-monthly; `budgetKindOf` in `src/doma
 default) and `rollover`. Planning logic (forecast, safe to spend, rollover, pacing, at risk, month review)
 is pure in `src/domain/plan.ts`; goals, wishlist and net worth have their own modules.
 
+Drop 11 adds no stores. A split lives on its entry (`Transaction.split`: whole bill, parts, who paid, the
+ids of the udhaar rows it created); the entry's `amountMinor` is your share, so every total stays
+spending-only. Audit events carry `entities` (such as `tx:<id>`) for an entry's history; `Command`
+has the same optional field and `composite` merges its children's. Screen-wide UI that several pages
+open (palette, recap, Customise) lives in a small Zustand store, `src/kit/ui.ts`. The palette, the
+recap viewer, Calendar, Review, the split editor and the sketchbook load on first use.
+
 Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`); tests swap in
 `lazy.eager.tsx` through an alias in `vite.config.ts`.
 

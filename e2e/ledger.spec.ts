@@ -146,12 +146,23 @@ test('privacy hides every amount on every page', async ({ page }) => {
   await page.getByLabel('Worth now').fill('7654.32');
   await page.getByRole('button', { name: 'Add asset' }).last().click();
   await expect(page.getByTestId('asset-row')).toBeVisible();
+  // Drop 11: a split (its shares and who pays whom carry amounts too).
+  await page.goto('./#/?action=add');
+  const add = page.getByRole('dialog', { name: 'Add expense' });
+  await add.getByLabel('Split with others').check();
+  await add.getByLabel('Whole bill').fill('1234.56');
+  await add.getByLabel('What for').fill('Dinner');
+  await add.getByLabel('Person 1').fill('Rahul');
+  await add.getByRole('button', { name: 'Save' }).click();
+  await expect(add).toBeHidden();
   await page.getByRole('button', { name: 'Privacy mode' }).click();
 
   const routes = [
     '#/',
     '#/transactions',
     '#/transactions?view=trash',
+    '#/transactions?view=calendar',
+    '#/transactions?view=review',
     '#/budgets',
     '#/budgets?view=goals',
     '#/budgets?view=wishlist',
@@ -168,7 +179,10 @@ test('privacy hides every amount on every page', async ({ page }) => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('.page-loading')).toHaveCount(0);
     if (r === '#/money') await page.getByRole('button', { name: /^HDFC/ }).click();
-    if (r === '#/') await page.getByText('How it is worked out').click();
+    if (r === '#/') {
+      await page.getByText('How it is worked out').click();
+      await page.getByTestId('scrub').press('Home');
+    }
     if (r === '#/budgets?view=goals') await page.getByText('1 amount put aside').click();
     if (r === '#/money?view=udhaar') await page.getByRole('button', { name: /^Rahul/ }).click();
     if (r === '#/money?view=loans') await page.locator('summary', { hasText: 'Schedule' }).click();

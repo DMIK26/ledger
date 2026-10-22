@@ -58,6 +58,7 @@ function Experience() {
   const haptics = useLedger((s) => s.settings.haptics);
   const sounds = useLedger((s) => s.settings.sounds);
   const doodles = useLedger((s) => s.settings.doodles);
+  const wryLines = useLedger((s) => s.settings.wryLines);
   const sketchStyle = useLedger((s) => s.settings.sketchStyle);
   const setSetting = useLedger((s) => s.setSetting);
   return (
@@ -123,6 +124,21 @@ function Experience() {
       <p className="muted small">
         The pencil, category drawings, mood faces and handwritten notes on charts. Your own notes
         and sketches stay either way.
+      </p>
+      <div className="field-row">
+        <span id="wry-label">Wry one-liners</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={wryLines}
+          aria-labelledby="wry-label"
+          onClick={() => void setSetting('wryLines', !wryLines)}
+        />
+      </div>
+      <p className="muted small">
+        Now and then the pencil says a short, kind, wry line about your month instead of a plain
+        fact. Written into Ledger; nothing goes online.
       </p>
       <div className="field-row">
         <span id="sketch-style-label">Sketch style</span>
@@ -317,7 +333,9 @@ function Favourites() {
         </>
       )}
       {favourites.length === 0 && suggestions.length === 0 && (
-        <p className="muted small">Nothing yet. Things you log three times in 90 days show up here.</p>
+        <p className="muted small">
+          Nothing yet. Things you log three times in 90 days show up here.
+        </p>
       )}
     </section>
   );

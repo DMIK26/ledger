@@ -34,7 +34,7 @@ export class CommandBus {
 
   async run(command: Command): Promise<void> {
     await command.apply(this.db);
-    await this.log('do', command.label);
+    await this.log('do', command.label, command.entities);
     this.undoStack.push(command);
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
     this.redoStack = [];
@@ -46,7 +46,7 @@ export class CommandBus {
     if (!command) return null;
     await command.revert(this.db);
     this.redoStack.push(command);
-    await this.log('undo', command.label);
+    await this.log('undo', command.label, command.entities);
     await this.onChange();
     return command.label;
   }
@@ -56,13 +56,22 @@ export class CommandBus {
     if (!command) return null;
     await command.apply(this.db);
     this.undoStack.push(command);
-    await this.log('redo', command.label);
+    await this.log('redo', command.label, command.entities);
     await this.onChange();
     return command.label;
   }
 
-  private async log(action: 'do' | 'undo' | 'redo', label: string): Promise<void> {
-    await this.db.add('audit', { at: Date.now(), action, label });
+  private async log(
+    action: 'do' | 'undo' | 'redo',
+    label: string,
+    entities?: string[],
+  ): Promise<void> {
+    await this.db.add('audit', {
+      at: Date.now(),
+      action,
+      label,
+      ...(entities && entities.length > 0 ? { entities } : {}),
+    });
     const excess = (await this.db.count('audit')) - AUDIT_LIMIT;
     if (excess > 0) {
       const keys = await this.db.getAllKeys('audit', undefined, excess);

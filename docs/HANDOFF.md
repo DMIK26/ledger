@@ -1,7 +1,7 @@
 # Handoff: where the build stands
 
-Updated 22 Oct 2026. **Drops 1 to 9 are complete and published** at
-https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 10 is built and verified here; it goes live
+Updated 22 Oct 2026. **Drops 1 to 10 are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 11 is built and verified here; it goes live
 once Dhaarmik commits and pushes it with GitHub Desktop.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
 `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
@@ -37,7 +37,52 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 10: plan ahead (22 Oct 2026, built, awaiting publish)
+## Drop 11: interactive (22 Oct 2026, built, awaiting publish)
+
+- **Transactions** has List, Calendar and Review views (`?view=calendar`, `?view=review`, loaded on
+  first use from `src/app/views/`). Calendar: Monday-first weeks with spending, bills, money in, card
+  dues and no-spend days; arrows move a day or a week, Page Up and Page Down a month. Review: unsure
+  entries one at a time; right arrow or swipe right accepts, left skips, 1 to 9 picks a category.
+- **Learning rule** (`src/domain/learning.ts`): only decided entries vote; a merchant's rule changes when
+  two of its last three decided entries agree; a merchant's first decision is learned straight away.
+  Used by edits and Review (not bulk moves).
+- **Command palette** (`src/app/Palette.tsx`, lazy): Ctrl+K or Cmd+K, or the search button in the top
+  bar. Pages and views, add, undo, redo, privacy, theme, recaps, customise, and merchants (pins the
+  merchant and opens Transactions).
+- **Dashboard**: cards can be reordered and hidden (Customise, or a long press on a phone; settings
+  `dashboardOrder` and `dashboardHidden`; quick add, check-in, close the month and the recap offer stay
+  on top). New cards: Day by day (scrub with pointer or keys; the donut and a list follow the day) and
+  Sketchbook (with doodles on). A recap offer appears once per new week, month or financial year.
+- **Recap** (`src/app/recap/`, lazy): cards for a week, month or financial year; the month recap starts
+  with a guess; "Share this card" draws a PNG (no amounts with privacy on) and uses the share sheet
+  where files can be shared, else downloads it. Reports opens the month on screen; the palette opens
+  last week or month.
+- **Reports**: compare with the 12-month average (scaled to the period's days), a "Year to date against
+  last year" shortcut, a treemap (categories, then a category's merchants) and a money-flow chart with
+  a table; categories can open their merchants.
+- **Splits** (Add and edit form, `src/app/split/`, editor lazy): equal, exact, percentages or shares;
+  paid by you or someone else. The entry keeps your share and `split` (whole bill, parts, udhaar ids);
+  others' shares become udhaar (`Split: <merchant>`), so balances and udhaar stay right; deleting,
+  restoring or editing the entry updates its udhaar. A split paid by someone else moves none of your
+  accounts. Money > Udhaar shows "Who pays whom" (fewest transfers) and "Mark all settled" (settings
+  list `settledSplits`).
+- **Rows and sheets**: swipe a row left to delete or right to edit (phones); Shift+click selects a range;
+  Columns hides category, method, account or tags (`hiddenColumns`); the edit form has a History list
+  from the activity log (audit events now carry `entities` such as `tx:<id>`). Add and More sheets have
+  a handle with half and full snap points (drag, tap, Enter or arrow keys).
+- **Wry one-liners** (Settings > Doodles, off by default, `src/domain/wry.ts`): with them on, every other
+  pencil tap says a kind, amount-free line about the month.
+- Opening and closing Add keeps the page's own query (`addPath`, `closeAddPath` in `router.ts`), so the
+  calendar stays the calendar.
+- **Size**: start-up JavaScript 166 of 170 KB (tight; Drop 13's performance pass should win some back),
+  all JavaScript 217 of 300 KB, CSS 13 of 16 KB, precache 1184 of 1300 KB. No schema change.
+
+Verified: lint, typecheck, 431 unit tests (41 files), build with budgets, Playwright 95 passed and 15
+skipped with `CI=1` (new `e2e/drop11.spec.ts`; the privacy, axe, phone-size and sideways sweeps include
+Calendar and Review and a split; touch gestures are driven with pointer events on the phone project). Not verified on real phones:
+the share sheet for recap images (headless browsers download instead), swipe feel, long press.
+
+## Drop 10: plan ahead (22 Oct 2026, published)
 
 - **Dashboard**: "Safe to spend today" (budget, or money in without one, less spending before today, bills
   still to come, entries logged for later days and what goals need this month, shared over the days left

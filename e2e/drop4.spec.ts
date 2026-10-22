@@ -93,6 +93,8 @@ test('no page scrolls sideways', async ({ page }) => {
   for (const r of [
     '#/',
     '#/transactions',
+    '#/transactions?view=calendar',
+    '#/transactions?view=review',
     '#/budgets',
     '#/budgets?view=goals',
     '#/budgets?view=wishlist',

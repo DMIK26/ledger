@@ -16,10 +16,13 @@ export interface Command {
   label: string;
   apply(db: Db): Promise<void>;
   revert(db: Db): Promise<void>;
+  /** What it touches, such as 'tx:<id>', written to the activity log for an entry's history. */
+  entities?: string[];
 }
 
 export const addTransaction = (tx: Transaction): Command => ({
   label: `Added ${tx.merchant}`,
+  entities: [`tx:${tx.id}`],
   apply: async (db) => {
     await db.put('transactions', tx);
   },
@@ -30,6 +33,7 @@ export const addTransaction = (tx: Transaction): Command => ({
 
 export const updateTransaction = (before: Transaction, after: Transaction): Command => ({
   label: `Edited ${after.merchant}`,
+  entities: [`tx:${after.id}`],
   apply: async (db) => {
     await db.put('transactions', after);
   },
@@ -41,6 +45,7 @@ export const updateTransaction = (before: Transaction, after: Transaction): Comm
 /** Deleting moves the entry to Trash, where it stays restorable for 30 days. */
 export const deleteTransaction = (tx: Transaction, now: number = Date.now()): Command => ({
   label: `Deleted ${tx.merchant}`,
+  entities: [`tx:${tx.id}`],
   apply: async (db) => {
     const t = db.transaction(['transactions', 'trash'], 'readwrite');
     void t.objectStore('transactions').delete(tx.id);
@@ -88,6 +93,7 @@ export const importTransactions = (
 
 export const composite = (label: string, commands: Command[]): Command => ({
   label,
+  entities: [...new Set(commands.flatMap((c) => c.entities ?? []))],
   apply: async (db) => {
     for (const c of commands) await c.apply(db);
   },
@@ -99,6 +105,7 @@ export const composite = (label: string, commands: Command[]): Command => ({
 /** Brings an entry back from Trash. */
 export const restoreFromTrash = (item: TrashItem): Command => ({
   label: `Restored ${item.tx.merchant}`,
+  entities: [`tx:${item.id}`],
   apply: async (db) => {
     const t = db.transaction(['transactions', 'trash'], 'readwrite');
     void t.objectStore('transactions').put(item.tx);
@@ -116,6 +123,7 @@ export const restoreFromTrash = (item: TrashItem): Command => ({
 /** Removes an entry from Trash for good. Undo still works during this session. */
 export const deleteForever = (item: TrashItem, receipt?: Blob): Command => ({
   label: `Deleted ${item.tx.merchant} for good`,
+  entities: [`tx:${item.id}`],
   apply: async (db) => {
     const t = db.transaction(['trash', 'receipts'], 'readwrite');
     void t.objectStore('trash').delete(item.id);
@@ -133,6 +141,7 @@ export const deleteForever = (item: TrashItem, receipt?: Blob): Command => ({
 /** Stores (or removes, when `next` is null) the receipt for an entry, keyed by the entry id. */
 export const setReceipt = (txId: string, next: Blob | null, previous?: Blob): Command => ({
   label: next ? 'Attached a receipt' : 'Removed a receipt',
+  entities: [`tx:${txId}`],
   apply: async (db) => {
     if (next) await db.put('receipts', next, txId);
     else await db.delete('receipts', txId);
@@ -280,6 +289,8 @@ export const removeRow = <S extends RowStore>(store: S, row: RowOf<S>, label: st
 
 export const FAVOURITES_KEY = 'favourites';
 export const NO_SPEND_KEY = 'noSpendDays';
+/** Split entries already settled with "Mark all settled" (Drop 11). */
+export const SETTLED_SPLITS_KEY = 'settledSplits';
 /** Months ('YYYY-MM') closed with "Close the month". */
 export const CLOSED_MONTHS_KEY = 'closedMonths';
 

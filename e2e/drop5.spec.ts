@@ -52,6 +52,8 @@ test('marquee selection total equals the sum of the selected rows', async ({ pag
     info.project.name === 'phone',
     'Marquee is a mouse gesture; phones use the checkboxes.',
   );
+  // Tall enough that the drag stays on screen (the browser scrolls when a drag leaves it).
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('./#/transactions');
   const rows = page.getByTestId('tx-row');
   await expect(rows).toHaveCount(5);

@@ -14,12 +14,26 @@ import {
   type Flow,
   type IncomeKind,
 } from '../domain/accounts';
-import { findPerson, type Person, type UdhaarEntry, type UdhaarKind } from '../domain/udhaar';
+import {
+  findPerson,
+  owedEffect,
+  type Person,
+  type UdhaarEntry,
+  type UdhaarKind,
+} from '../domain/udhaar';
 import type { Loan } from '../domain/loans';
 import { payFund, type Goal, type GoalKind } from '../domain/goals';
 import type { WaitDays, WishItem } from '../domain/wishlist';
 import type { Asset, AssetKind } from '../domain/networth';
 import type { ForeignAmount } from '../domain/fx';
+import { shouldLearn } from '../domain/learning';
+import {
+  myShare,
+  shareAmounts,
+  udhaarForSplit,
+  type Split,
+  type SplitMode,
+} from '../domain/splits';
 import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
 import type { ImportPlan } from '../domain/csvImport';
 import type { RecurringItem } from '../domain/recurring';
@@ -71,6 +85,7 @@ import {
   FAVOURITES_KEY,
   NO_SPEND_KEY,
   CLOSED_MONTHS_KEY,
+  SETTLED_SPLITS_KEY,
   putRow,
   removeRow,
   putNote,
@@ -102,6 +117,21 @@ export interface EntryDraft {
   /** The account it came out of, when picked (otherwise its method's account). */
   accountId?: string;
   foreign?: ForeignAmount;
+  /** Shared with people: amountMinor is then the whole bill, and the entry keeps your share. */
+  split?: SplitDraft | null;
+}
+
+/** A person in a split: someone known (personId), a new name, or you (personId null, no name). */
+export interface SplitPerson {
+  personId?: string | null;
+  personName?: string;
+}
+
+export interface SplitDraft {
+  mode: SplitMode;
+  /** null: you paid. */
+  paidBy: SplitPerson | null;
+  parts: Array<SplitPerson & { value: number }>;
 }
 
 /** What the money-in form produces. */
@@ -204,6 +234,8 @@ export interface LedgerState {
   wishlist: WishItem[];
   assets: Asset[];
   closedMonths: string[];
+  /** Split entries settled with "Mark all settled". */
+  settledSplits: string[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -299,6 +331,12 @@ export interface LedgerState {
   deleteAsset: (id: string) => Promise<void>;
   /** Marks a month reviewed; an optional note is pinned to the month, in the same step. */
   closeMonth: (month: string, note?: string) => Promise<void>;
+  /** Review mode: confirms an unsure entry, or moves it to another category, learning by the two-of-three rule. */
+  reviewEntry: (id: string, categoryId?: CategoryId) => Promise<void>;
+  /** Records your part of every open split as settled, as udhaar settle-ups, in one step. */
+  settleSplits: () => Promise<void>;
+  /** What the activity log holds about one entry, newest first. */
+  getEntryHistory: (id: string) => Promise<AuditEvent[]>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
   bulkDelete: (ids: string[]) => Promise<void>;
@@ -415,7 +453,133 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         out.push(
           setSettingsList(CLOSED_MONTHS_KEY, closed, get().closedMonths, 'Restored closed months'),
         );
+      const settled = mergeDays(get().settledSplits, file.data.settledSplits ?? []);
+      if (settled.length !== get().settledSplits.length)
+        out.push(
+          setSettingsList(
+            SETTLED_SPLITS_KEY,
+            settled,
+            get().settledSplits,
+            'Restored settled splits',
+          ),
+        );
       return out;
+    };
+
+    /** A split's person: an existing id, a name (found, or added in `steps`), or null for you. */
+    const resolvePerson = (
+      p: SplitPerson | null,
+      made: Person[],
+      steps: Command[],
+      now: number,
+    ): string | null => {
+      if (!p) return null;
+      if (p.personId) return p.personId;
+      const name = p.personName?.trim().replace(/\s+/g, ' ');
+      if (!name) return null;
+      const found = findPerson([...get().people, ...made], name);
+      if (found) return found.id;
+      const person: Person = { id: newId(), name, createdAt: now };
+      made.push(person);
+      steps.push(putRow('people', person, undefined, `Added ${name}`));
+      return person.id;
+    };
+
+    /** A split entry worked out: your share, the split record, and the people and udhaar it adds. */
+    const planSplit = (
+      draft: SplitDraft,
+      totalMinor: number,
+      base: { date: ISODate; merchant: string; method: PaymentMethod; accountId?: string },
+      now: number,
+    ): { shareMinor: number; split: Split; steps: Command[] } => {
+      const steps: Command[] = [];
+      const made: Person[] = [];
+      const paidBy = resolvePerson(draft.paidBy, made, steps, now);
+      const ids = draft.parts.map((p) => resolvePerson(p, made, steps, now));
+      const result = shareAmounts(
+        totalMinor,
+        draft.mode,
+        draft.parts.map((p, i) => ({ personId: ids[i] ?? null, value: p.value })),
+      );
+      if (!result.ok) throw new Error(result.error);
+      const parts = draft.parts.map((p, i) => ({
+        personId: ids[i] ?? null,
+        value: p.value,
+        shareMinor: result.shares[i]!,
+      }));
+      const accountId = base.accountId ?? accountForMethod(get().accounts, base.method)?.id;
+      const entries: UdhaarEntry[] = udhaarForSplit({ paidBy, parts }).map((o) => ({
+        id: newId(),
+        personId: o.personId,
+        kind: o.kind,
+        date: base.date,
+        amountMinor: o.amountMinor,
+        note: `Split: ${base.merchant}`,
+        accountId: o.kind === 'lent' ? accountId : undefined,
+        createdAt: now,
+        updatedAt: now,
+      }));
+      for (const e of entries) steps.push(putRow('udhaar', e, undefined, 'Split'));
+      const split: Split = {
+        totalMinor,
+        mode: draft.mode,
+        paidBy,
+        parts,
+        udhaarIds: entries.map((e) => e.id),
+      };
+      const shareMinor = myShare(split);
+      if (shareMinor <= 0) throw new Error('Your share is zero; record lending in Udhaar instead');
+      return { shareMinor, split, steps };
+    };
+
+    /** Removes the udhaar a split created (when its entry is deleted or its split changes). */
+    const dropSplitRows = (tx: Transaction): Command[] =>
+      (tx.split?.udhaarIds ?? [])
+        .map((id) => get().udhaar.find((u) => u.id === id))
+        .filter((u): u is UdhaarEntry => u !== undefined)
+        .map((u) => removeRow('udhaar', u, 'Split'));
+
+    /** Puts a split's udhaar back (when its entry comes back from Trash). */
+    const restoreSplitRows = (tx: Transaction): Command[] => {
+      if (!tx.split) return [];
+      const now = Date.now();
+      const accountId = tx.accountId ?? accountForMethod(get().accounts, tx.method)?.id;
+      return udhaarForSplit(tx.split)
+        .map((o, i): UdhaarEntry => ({
+          id: tx.split!.udhaarIds[i] ?? newId(),
+          personId: o.personId,
+          kind: o.kind,
+          date: tx.date,
+          amountMinor: o.amountMinor,
+          note: `Split: ${tx.merchant}`,
+          accountId: o.kind === 'lent' ? accountId : undefined,
+          createdAt: now,
+          updatedAt: now,
+        }))
+        .filter(
+          (e) =>
+            get().people.some((p) => p.id === e.personId) &&
+            !get().udhaar.some((u) => u.id === e.id),
+        )
+        .map((e) => putRow('udhaar', e, undefined, 'Split'));
+    };
+
+    /** The rule change a category decision teaches, by the two-of-three rule (Drop 11), if any. */
+    const learnStep = (after: Transaction, now: number): Command | null => {
+      const key = normalizeMerchantKey(after.merchant);
+      if (!key) return null;
+      const decided = [
+        ...get().transactions.filter(
+          (t) => t.id !== after.id && !t.unsure && normalizeMerchantKey(t.merchant) === key,
+        ),
+        after,
+      ];
+      const rule = get().rules[key];
+      if (!shouldLearn({ categoryId: after.categoryId, rule, decided })) return null;
+      return setRule(
+        { key, categoryId: after.categoryId, updatedAt: now },
+        rule ? { key, categoryId: rule, updatedAt: now } : undefined,
+      );
     };
 
     /** Drop 9 rows a merged backup adds: accounts, money in and transfers, people, udhaar, loans. */
@@ -466,6 +630,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         wishlist,
         assets,
         closedMonths,
+        settledSplits,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -489,6 +654,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.getAll('wishlist'),
         d.getAll('assets'),
         d.get('settings', CLOSED_MONTHS_KEY),
+        d.get('settings', SETTLED_SPLITS_KEY),
       ]);
       goals.sort((a, b) => a.createdAt - b.createdAt);
       wishlist.sort((a, b) => b.createdAt - a.createdAt);
@@ -526,6 +692,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         wishlist,
         assets,
         closedMonths: Array.isArray(closedMonths) ? (closedMonths as string[]) : [],
+        settledSplits: Array.isArray(settledSplits) ? (settledSplits as string[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -559,6 +726,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       wishlist: [],
       assets: [],
       closedMonths: [],
+      settledSplits: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -654,9 +822,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       addEntry: async (draft, receipt, source = 'form') => {
         const { settings, rules } = get();
         const now = Date.now();
+        const { split: splitDraft, ...fields } = draft;
+        const plan = splitDraft ? planSplit(splitDraft, draft.amountMinor, draft, now) : null;
         const tx: Transaction = {
           id: newId(),
-          ...draft,
+          ...fields,
+          amountMinor: plan ? plan.shareMinor : draft.amountMinor,
+          ...(plan ? { split: plan.split } : {}),
           currency: settings.currency,
           source,
           unsure: false,
@@ -664,7 +836,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: now,
           updatedAt: now,
         };
-        const steps: Command[] = [addTransaction(tx)];
+        const steps: Command[] = [addTransaction(tx), ...(plan?.steps ?? [])];
         if (receipt) steps.push(setReceipt(tx.id, receipt));
         const key = normalizeMerchantKey(draft.merchant);
         const guess = categorise(draft.merchant, rules);
@@ -682,27 +854,30 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!before) return;
         const now = Date.now();
         const categoryChanged = draft.categoryId !== before.categoryId;
+        const { split: splitDraft, ...fields } = draft;
+        // undefined keeps the split as it is; null removes it; a draft works it out again.
+        const plan = splitDraft ? planSplit(splitDraft, draft.amountMinor, draft, now) : null;
         const after: Transaction = {
           ...before,
-          ...draft,
+          ...fields,
+          ...(plan ? { amountMinor: plan.shareMinor, split: plan.split } : {}),
+          ...(splitDraft === null ? { split: undefined } : {}),
           unsure: before.unsure && !categoryChanged ? true : false,
           hasReceipt: receipt === undefined ? before.hasReceipt : receipt !== null || undefined,
           updatedAt: now,
         };
-        const steps: Command[] = [updateTransaction(before, after)];
+        const steps: Command[] = [
+          updateTransaction(before, after),
+          ...(splitDraft !== undefined ? dropSplitRows(before) : []),
+          ...(plan?.steps ?? []),
+        ];
         if (receipt !== undefined) {
           const previous = before.hasReceipt ? await requireDb().get('receipts', id) : undefined;
           steps.push(setReceipt(id, receipt, previous));
         }
-        const key = normalizeMerchantKey(after.merchant);
-        if (before.unsure && categoryChanged && key) {
-          const previous = get().rules[key];
-          steps.push(
-            setRule(
-              { key, categoryId: after.categoryId, updatedAt: now },
-              previous ? { key, categoryId: previous, updatedAt: now } : undefined,
-            ),
-          );
+        if (categoryChanged) {
+          const learn = learnStep(after, now);
+          if (learn) steps.push(learn);
         }
         const label = `Edited ${after.merchant}`;
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
@@ -771,6 +946,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             raw: undefined,
             hasReceipt: undefined,
             recurringId: undefined,
+            split: undefined,
             unsure: false,
             createdAt: now + i,
             updatedAt: now + i,
@@ -1344,6 +1520,73 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         await get().run(composite(label, [close, putNote(pinned, undefined, label)]), label);
       },
 
+      reviewEntry: async (id, categoryId) => {
+        const before = get().transactions.find((t) => t.id === id);
+        if (!before) return;
+        const now = Date.now();
+        const target = categoryId ?? before.categoryId;
+        const after: Transaction = { ...before, categoryId: target, unsure: false, updatedAt: now };
+        const steps: Command[] = [updateTransaction(before, after)];
+        const learn = learnStep(after, now);
+        if (learn) steps.push(learn);
+        const name = get().categories.find((c) => c.id === target)?.name ?? 'Other';
+        const label =
+          target === before.categoryId
+            ? `Confirmed ${before.merchant} as ${name}`
+            : `Moved ${before.merchant} to ${name}`;
+        await get().run(composite(label, steps), label);
+      },
+
+      settleSplits: async () => {
+        const settled = get().settledSplits;
+        const open = get().transactions.filter((t) => t.split && !settled.includes(t.id));
+        if (open.length === 0) return;
+        // Your part with each person: what the open splits' udhaar says they owe you, or you owe them.
+        const ids = new Set(open.flatMap((t) => t.split!.udhaarIds));
+        const perPerson = new Map<string, number>();
+        for (const u of get().udhaar)
+          if (ids.has(u.id))
+            perPerson.set(u.personId, (perPerson.get(u.personId) ?? 0) + owedEffect(u));
+        const now = Date.now();
+        const today = todayISO();
+        const label = 'Settled all splits';
+        const steps: Command[] = [...perPerson]
+          .filter(([, v]) => v !== 0)
+          .map(([personId, v]) =>
+            putRow(
+              'udhaar',
+              {
+                id: newId(),
+                personId,
+                kind: v > 0 ? 'got-back' : 'paid-back',
+                date: today,
+                amountMinor: Math.abs(v),
+                note: 'Settled splits',
+                createdAt: now,
+                updatedAt: now,
+              },
+              undefined,
+              label,
+            ),
+          );
+        steps.push(
+          setSettingsList(
+            SETTLED_SPLITS_KEY,
+            [...settled, ...open.map((t) => t.id)].sort(),
+            settled,
+            label,
+          ),
+        );
+        await get().run(composite(label, steps), label);
+      },
+
+      getEntryHistory: async (id) => {
+        const events = await requireDb().getAll('audit');
+        return events
+          .filter((e) => e.entities?.includes(`tx:${id}`))
+          .sort((a, b) => b.at - a.at || (b.id ?? 0) - (a.id ?? 0));
+      },
+
       bulkDelete: async (ids) => {
         const list = get().transactions.filter((t) => ids.includes(t.id));
         if (list.length === 0) return;
@@ -1351,7 +1594,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         await get().run(
           composite(
             label,
-            list.map((t) => deleteTransaction(t)),
+            list.flatMap((t) => [deleteTransaction(t), ...dropSplitRows(t)]),
           ),
           label,
         );
@@ -1392,7 +1635,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
       restore: async (id) => {
         const item = get().trash.find((t) => t.id === id);
-        if (item) await get().run(restoreFromTrash(item));
+        if (!item) return;
+        const extra = restoreSplitRows(item.tx);
+        const restoring = restoreFromTrash(item);
+        await get().run(
+          extra.length === 0 ? restoring : composite(restoring.label, [restoring, ...extra]),
+        );
       },
 
       purge: async (id) => {
@@ -1496,7 +1744,15 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
       removeTransaction: async (id) => {
         const tx = get().transactions.find((t) => t.id === id);
-        if (tx) await get().run(deleteTransaction(tx), `Deleted ${tx.merchant}`);
+        if (!tx) return;
+        const label = `Deleted ${tx.merchant}`;
+        const extra = dropSplitRows(tx);
+        await get().run(
+          extra.length === 0
+            ? deleteTransaction(tx)
+            : composite(label, [deleteTransaction(tx), ...extra]),
+          label,
+        );
       },
 
       setMonthBudgets: async (month, next, label = 'Updated budgets') => {

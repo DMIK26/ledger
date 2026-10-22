@@ -18,6 +18,7 @@ import {
 } from '../domain/companion';
 import { monthKey, todayISO } from '../domain/dates';
 import { buildInsights } from '../domain/insights';
+import { wryLine, wryLines } from '../domain/wry';
 import { usePrivacy } from '../app/Money';
 import { createSpring2D, motionReduced } from '../kit/spring';
 import { useScopedTransactions, useView, useViewMonth } from '../kit/view';
@@ -132,6 +133,9 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
   const recurring = useLedger((s) => s.recurring);
   const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
+  const wryOn = useLedger((s) => s.settings.wryLines);
+  const noSpendDays = useLedger((s) => s.noSpendDays);
+  const told = useRef(0);
   const month = useViewMonth();
   const announce = useView((s) => s.announce);
   const showCaption = useDoodle((s) => s.showCaption);
@@ -269,6 +273,21 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
   };
 
   const tellInsight = () => {
+    told.current += 1;
+    // With wry one-liners on, every other time the pencil says one instead of a plain fact.
+    if (wryOn && told.current % 2 === 1) {
+      const line = wryLine(
+        wryLines({
+          transactions: all,
+          categories,
+          noSpendDays,
+          overallBudgetMinor: overall,
+          today,
+        }),
+        told.current,
+      );
+      if (line) return say(line);
+    }
     const top = buildInsights(scoped, today, overall, recurring, categories)[0];
     say(insightSentence(top, categories, currency));
   };

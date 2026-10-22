@@ -98,7 +98,10 @@ export const expenseAccountId = (
 ): string | undefined => tx.accountId ?? accountForMethod(accounts, tx.method)?.id;
 
 export interface MoneyData {
-  transactions: readonly Pick<Transaction, 'date' | 'amountMinor' | 'method' | 'accountId'>[];
+  transactions: readonly Pick<
+    Transaction,
+    'date' | 'amountMinor' | 'method' | 'accountId' | 'split'
+  >[];
   flows: readonly Flow[];
   udhaar: readonly UdhaarEntry[];
 }
@@ -121,7 +124,11 @@ export function balances(
     if (!a || date < a.openingDate || date > asOf) return;
     out[id] = (out[id] ?? 0) + delta;
   };
-  for (const t of data.transactions) move(expenseAccountId(t, accounts), t.date, -t.amountMinor);
+  for (const t of data.transactions) {
+    // Paid by someone else (a split): your share is spending, but none of your accounts paid.
+    if (t.split && t.split.paidBy !== null) continue;
+    move(expenseAccountId(t, accounts), t.date, -t.amountMinor);
+  }
   for (const f of data.flows) {
     if (f.kind === 'income') move(f.accountId, f.date, f.amountMinor);
     else if (f.kind === 'fee') move(f.accountId, f.date, -f.amountMinor);

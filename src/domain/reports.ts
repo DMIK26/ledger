@@ -1,6 +1,6 @@
 import { lastMonths, monthSeries } from './aggregates';
 import { normalizeMerchantKey } from './categoriser';
-import { addDays, diffDays, weekdayOf } from './dates';
+import { addDays, daysInMonth, diffDays, isoFromYMD, parseISO, weekdayOf } from './dates';
 import type { CategoryId, ISODate, PaymentMethod, Transaction } from './types';
 
 export const inRange = (
@@ -159,5 +159,39 @@ export function buildReport(
     methods,
     weekdays,
     days,
+  };
+}
+
+/**
+ * The 12 months before a range (Drop 11 compare mode): from a year before the range starts to the day
+ * before it. With an April-to-March year and a range starting 1 Oct, that is 1 Oct last year to 30 Sep.
+ */
+export function averageWindow(start: ISODate): { start: ISODate; end: ISODate } {
+  const p = parseISO(start)!;
+  return {
+    start: isoFromYMD(p.y - 1, p.m, Math.min(p.d, daysInMonth(p.y - 1, p.m))),
+    end: addDays(start, -1),
+  };
+}
+
+/**
+ * Turns a report compared against a long window into one compared against the window's average for the
+ * same number of days: every compared figure is scaled by the range's days over the window's days.
+ */
+export function scaleCompare(report: Report, rangeDays: number): Report {
+  const windowDays = diffDays(report.compareEnd, report.compareStart) + 1;
+  const f = windowDays > 0 ? rangeDays / windowDays : 0;
+  const compareMinor = Math.round(report.compareMinor * f);
+  return {
+    ...report,
+    compareMinor,
+    changePct:
+      compareMinor > 0
+        ? Math.round(((report.totalMinor - compareMinor) / compareMinor) * 100)
+        : null,
+    categories: report.categories.map((c) => ({
+      ...c,
+      compareMinor: Math.round(c.compareMinor * f),
+    })),
   };
 }
