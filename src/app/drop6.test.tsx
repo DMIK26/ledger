@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLedger, type EntryDraft } from '../data/store';
@@ -170,7 +170,8 @@ describe('sketch mode and notes', () => {
     fireEvent.keyDown(window, { key: 'N', shiftKey: true });
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Delete note on Food & Dining' }));
-    expect(useLedger.getState().notes).toHaveLength(0);
+    // Deleting is asynchronous (IndexedDB); wait for it rather than racing it.
+    await waitFor(() => expect(useLedger.getState().notes).toHaveLength(0));
     await act(async () => {
       await useLedger.getState().undo();
     });
