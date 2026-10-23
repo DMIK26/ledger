@@ -1,9 +1,9 @@
 # Handoff: where the build stands
 
-Updated 23 Oct 2026. **Drops 1 to 12 are complete and published** at
-https://dmik26.github.io/ledger/ (v1.0.0 was tagged after Drop 7). **Drop 13 (reach and polish) is built
-and verified here as version 1.1.0; it goes live once Dhaarmik commits and pushes it with GitHub Desktop
-and tags it v1.1.0.** No further drop is planned.
+Updated 23 Oct 2026. **Drops 1 to 13 are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.1.0** (v1.0.0 was tagged after Drop 7). The live site
+was checked after the push: it reports 1.1.0, offers the language picker, Spaces and protected backups,
+and switches to Telugu and back. No further drop is planned.
 Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified at 1.0 (Drop 7)
@@ -38,7 +38,7 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 13: reach and polish, v1.1.0 (23 Oct 2026, built, awaiting publish and tag)
+## Drop 13: reach and polish, v1.1.0 (23 Oct 2026, published and tagged)
 
 - **Spaces** (Settings > Spaces, off by default): "Keep a Shop ledger as well" and the shop's name. A
   switcher in the context bar picks Personal, the shop or Both (remembered on the device). Each ledger
@@ -530,10 +530,9 @@ backups, CSV import; installable and offline on iPhone and Android.
 
 ## Next
 
-1. Publish Drop 13 with GitHub Desktop and tag v1.1.0 (`docs/PUBLISHING.md`).
-2. Try the unverified items above on a real iPhone and Android phone, and read the Telugu and Hindi
+1. Try the unverified items above on a real iPhone and Android phone, and read the Telugu and Hindi
    screens once.
-3. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
+2. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
 
 ## Notes
 
