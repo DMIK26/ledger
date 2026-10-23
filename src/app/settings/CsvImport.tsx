@@ -13,15 +13,31 @@ import {
 } from '../../domain/csvImport';
 import { fmtDate } from '../../domain/dates';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const LABELS: Record<CsvField, string> = {
-  date: 'Date',
-  amount: 'Amount',
-  merchant: 'What for',
-  category: 'Category',
-  method: 'Paid by',
-  tags: 'Tags',
-  notes: 'Notes',
+  get date() {
+    return tl('Date');
+  },
+  get amount() {
+    return tl('Amount');
+  },
+  get merchant() {
+    return tl('What for');
+  },
+  get category() {
+    return tl('Category');
+  },
+  get method() {
+    return tl('Paid by');
+  },
+  get tags() {
+    return tl('Tags');
+  },
+  get notes() {
+    return tl('Notes');
+  },
 };
 
 /**
@@ -51,7 +67,7 @@ export function CsvImport() {
     const [header, ...rows] = parseCsv(await f.text());
     if (!header || rows.length === 0) {
       setFile(null);
-      setError('That file has no rows to import.');
+      setError(tl('That file has no rows to import.'));
       return;
     }
     const m = guessMapping(header);
@@ -81,14 +97,15 @@ export function CsvImport() {
 
   return (
     <section className="card" aria-labelledby="csv-title">
-      <h2 id="csv-title">Import from CSV</h2>
+      <h2 id="csv-title">{tl('Import from CSV')}</h2>
       <p className="muted small">
-        From a spreadsheet or your bank&rsquo;s statement export. You match the columns and see what
-        will be added before anything changes.
+        {tl(
+          'From a spreadsheet or your bank’s statement export. You match the columns and see what will be added before anything changes.',
+        )}
       </p>
       {!file && (
         <label className="btn">
-          Choose a CSV file
+          {tl('Choose a CSV file')}
           <input
             type="file"
             accept=".csv,text/csv"
@@ -105,7 +122,7 @@ export function CsvImport() {
       {file && mapping && (
         <div className="csv-import" data-testid="csv-import">
           <p className="small">
-            {file.name}: {file.rows.length === 1 ? '1 row' : `${file.rows.length} rows`}.
+            {file.name}: {file.rows.length === 1 ? tl('1 row') : tl('{0} rows', file.rows.length)}.
           </p>
           <div className="form-grid">
             {CSV_FIELDS.map((field) => (
@@ -117,10 +134,10 @@ export function CsvImport() {
                   value={mapping[field]}
                   onChange={(e) => setMapping({ ...mapping, [field]: Number(e.target.value) })}
                 >
-                  <option value={-1}>Not in this file</option>
+                  <option value={-1}>{tl('Not in this file')}</option>
                   {file.header.map((h, i) => (
                     <option key={`${h}-${i}`} value={i}>
-                      {h || `Column ${i + 1}`}
+                      {h || tl('Column {0}', i + 1)}
                       {file.rows[0]?.[i] ? `, e.g. ${file.rows[0][i]!.slice(0, 24)}` : ''}
                     </option>
                   ))}
@@ -128,41 +145,56 @@ export function CsvImport() {
               </div>
             ))}
             <div className="field">
-              <label htmlFor="map-order">Dates are written</label>
+              <label htmlFor="map-order">{tl('Dates are written')}</label>
               <select
                 id="map-order"
                 className="select input"
                 value={dateOrder}
                 onChange={(e) => setDateOrder(e.target.value as DateOrder)}
               >
-                <option value="dmy">Day first (18/10/2026)</option>
-                <option value="mdy">Month first (10/18/2026)</option>
+                <option value="dmy">{tl('Day first (18/10/2026)')}</option>
+                <option value="mdy">{tl('Month first (10/18/2026)')}</option>
               </select>
             </div>
           </div>
           {!plan ? (
             <p className="errors" role="alert">
-              Choose the columns that hold the date and the amount.
+              {tl('Choose the columns that hold the date and the amount.')}
             </p>
           ) : (
             <>
               <p role="status" data-testid="csv-summary">
-                Ready to add{' '}
-                {plan.transactions.length === 1 ? '1 entry' : `${plan.transactions.length} entries`}
-                .
-                {plan.duplicates > 0 &&
-                  ` ${plan.duplicates} already in Ledger ${plan.duplicates === 1 ? 'is' : 'are'} skipped.`}
-                {plan.skippedIncome > 0 &&
-                  ` ${plan.skippedIncome} ${plan.skippedIncome === 1 ? 'row looks' : 'rows look'} like money coming in and ${plan.skippedIncome === 1 ? 'is' : 'are'} skipped.`}
-                {plan.newCategories.length > 0 &&
-                  ` New categories: ${plan.newCategories.map((c) => c.name).join(', ')}.`}
+                {tr(
+                  'Ready to add {0}.{1}{2}{3}',
+                  plan.transactions.length === 1
+                    ? tl('1 entry')
+                    : tl('{0} entries', plan.transactions.length),
+                  plan.duplicates > 0 &&
+                    ' ' +
+                      (plan.duplicates === 1
+                        ? tl('1 already in Ledger is skipped.')
+                        : tl('{0} already in Ledger are skipped.', plan.duplicates)),
+                  plan.skippedIncome > 0 &&
+                    ' ' +
+                      (plan.skippedIncome === 1
+                        ? tl('1 row looks like money coming in and is skipped.')
+                        : tl(
+                            '{0} rows look like money coming in and are skipped.',
+                            plan.skippedIncome,
+                          )),
+                  plan.newCategories.length > 0 &&
+                    ' ' +
+                      tl('New categories: {0}.', plan.newCategories.map((c) => c.name).join(', ')),
+                )}
               </p>
               {plan.errors.length > 0 && (
                 <ul className="errors">
                   {plan.errors.slice(0, 5).map((e) => (
                     <li key={e.row}>{e.message}</li>
                   ))}
-                  {plan.errors.length > 5 && <li>and {plan.errors.length - 5} more rows</li>}
+                  {plan.errors.length > 5 && (
+                    <li>{tl('and {0} more rows', plan.errors.length - 5)}</li>
+                  )}
                 </ul>
               )}
               {plan.transactions.length > 0 && (
@@ -170,17 +202,17 @@ export function CsvImport() {
                   className="table-wrap"
                   tabIndex={0}
                   role="region"
-                  aria-label="First rows to be added"
+                  aria-label={tl('First rows to be added')}
                 >
                   <table className="report-table">
-                    <caption className="visually-hidden">First rows to be added</caption>
+                    <caption className="visually-hidden">{tl('First rows to be added')}</caption>
                     <thead>
                       <tr>
-                        <th scope="col">Date</th>
-                        <th scope="col">What for</th>
-                        <th scope="col">Category</th>
+                        <th scope="col">{tl('Date')}</th>
+                        <th scope="col">{tl('What for')}</th>
+                        <th scope="col">{tl('Category')}</th>
                         <th scope="col" className="num">
-                          Amount
+                          {tl('Amount')}
                         </th>
                       </tr>
                     </thead>
@@ -191,7 +223,7 @@ export function CsvImport() {
                           <td>{t.merchant}</td>
                           <td>
                             {categoryById([...categories, ...plan.newCategories], t.categoryId)
-                              ?.name ?? 'Other'}
+                              ?.name ?? tl('Other')}
                           </td>
                           <td className="num">
                             <Money minor={t.amountMinor} currency={currency} />
@@ -214,10 +246,10 @@ export function CsvImport() {
                 reset();
               }}
             >
-              Import
+              {tl('Import')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={reset}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </div>

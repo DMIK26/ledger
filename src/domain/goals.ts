@@ -8,6 +8,8 @@ import {
   shiftMonthKey,
 } from './dates';
 import type { ISODate } from './types';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 /**
  * Goals and funds. A save-up goal is money you keep (a phone, a trip, an emergency fund); a fund is
@@ -18,8 +20,12 @@ import type { ISODate } from './types';
 export type GoalKind = 'goal' | 'fund';
 
 export const GOAL_KIND_LABEL: Record<GoalKind, string> = {
-  goal: 'Save-up goal',
-  fund: 'Fund for a known cost',
+  get goal() {
+    return tl('Save-up goal');
+  },
+  get fund() {
+    return tl('Fund for a known cost');
+  },
 };
 
 export interface Contribution {
@@ -31,6 +37,8 @@ export interface Contribution {
 
 export interface Goal {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   kind: GoalKind;
   targetMinor: number;
@@ -53,11 +61,21 @@ export interface Goal {
 export type GoalState = 'paid' | 'done' | 'ahead' | 'on-track' | 'at-risk';
 
 export const GOAL_STATE_LABEL: Record<GoalState, string> = {
-  paid: 'Paid',
-  done: 'Reached',
-  ahead: 'Ahead',
-  'on-track': 'On track',
-  'at-risk': 'At risk',
+  get paid() {
+    return tl('Paid');
+  },
+  get done() {
+    return tl('Reached');
+  },
+  get ahead() {
+    return tl('Ahead');
+  },
+  get 'on-track'() {
+    return tl('On track');
+  },
+  get 'at-risk'() {
+    return tl('At risk');
+  },
 };
 
 export const MAX_GOAL_NAME = 40;

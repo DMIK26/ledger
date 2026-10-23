@@ -5,6 +5,8 @@ import { loanStatus, type Loan } from './loans';
 import { occurrence } from './recurring';
 import { owedEffect } from './udhaar';
 import type { ISODate } from './types';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 /**
  * Net worth: what you have less what you owe. Assets such as gold, deposits and funds have no live
@@ -14,13 +16,27 @@ import type { ISODate } from './types';
 export type AssetKind = 'gold' | 'fd' | 'mutual-fund' | 'stocks' | 'pf' | 'property' | 'other';
 
 export const ASSET_KIND_LABEL: Record<AssetKind, string> = {
-  gold: 'Gold',
-  fd: 'Fixed deposit',
-  'mutual-fund': 'Mutual funds',
-  stocks: 'Stocks',
-  pf: 'PF and PPF',
-  property: 'Property',
-  other: 'Other',
+  get gold() {
+    return tl('Gold');
+  },
+  get fd() {
+    return tl('Fixed deposit');
+  },
+  get 'mutual-fund'() {
+    return tl('Mutual funds');
+  },
+  get stocks() {
+    return tl('Stocks');
+  },
+  get pf() {
+    return tl('PF and PPF');
+  },
+  get property() {
+    return tl('Property');
+  },
+  get other() {
+    return tl('Other');
+  },
 };
 
 export interface AssetValue {
@@ -30,6 +46,8 @@ export interface AssetValue {
 
 export interface Asset {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   kind: AssetKind;
   /** Values you entered over time; selling it is a value of 0. */

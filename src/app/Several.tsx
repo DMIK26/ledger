@@ -5,6 +5,8 @@ import { fmtDate, parseISO, todayISO } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
 import { usePrivacy } from './Money';
+import { methodLabel } from '../domain/types';
+import { tl } from '../domain/i18n';
 
 export const MAX_LINES = 50;
 
@@ -55,7 +57,7 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
   return (
     <div className="several">
       <div className="field">
-        <label htmlFor={`${uid}-lines`}>One entry per line</label>
+        <label htmlFor={`${uid}-lines`}>{tl('One entry per line')}</label>
         <textarea
           id={`${uid}-lines`}
           className="input textarea several-input"
@@ -64,27 +66,27 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          placeholder={'chai 20 cash\nauto 40+30 yesterday\nlunch 180 upi'}
+          placeholder={tl('chai 20 cash\nauto 40+30 yesterday\nlunch 180 upi')}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
         <p className="muted small">
-          Each line works like quick add: what, how much and when. Sums are fine.
+          {tl('Each line works like quick add: what, how much and when. Sums are fine.')}
         </p>
       </div>
       {lines.length > 0 && (
-        <ol className="several-preview" aria-label="What each line becomes">
+        <ol className="several-preview" aria-label={tl('What each line becomes')}>
           {lines.map((p, i) => {
-            const problem = p.errors[0] ?? (p.amountMinor === null ? 'No amount' : null);
+            const problem = p.errors[0] ?? (p.amountMinor === null ? tl('No amount') : null);
             return (
               <li key={i} className={problem ? 'several-bad' : undefined}>
                 <span className="several-merchant">{p.merchant}</span>
                 <span className="muted small">
-                  {fmtDate(p.date)} · {categoryById(categories, p.categoryId)?.name ?? 'Other'}
-                  {p.unsure ? ' (a guess)' : ''} · {p.method}
+                  {fmtDate(p.date)} · {categoryById(categories, p.categoryId)?.name ?? tl('Other')}
+                  {p.unsure ? ' ' + tl('(a guess)') : ''} · {methodLabel(p.method)}
                 </span>
                 {problem ? (
-                  <span className="several-problem">{problem}, skipped</span>
+                  <span className="several-problem">{tl('{0}, skipped', problem)}</span>
                 ) : (
                   <span className="amt">{fmtMoney(p.amountMinor!, { currency })}</span>
                 )}
@@ -93,7 +95,7 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
           })}
         </ol>
       )}
-      {tooMany && <p className="warning">Only the first {MAX_LINES} lines are used.</p>}
+      {tooMany && <p className="warning">{tl('Only the first {0} lines are used.', MAX_LINES)}</p>}
       <div className="btn-row">
         <button
           type="button"
@@ -101,10 +103,10 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
           disabled={saving || good.length === 0}
           onClick={() => void save()}
         >
-          {good.length === 1 ? 'Save 1 entry' : `Save ${good.length} entries`}
+          {good.length === 1 ? tl('Save 1 entry') : tl('Save {0} entries', good.length)}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </div>

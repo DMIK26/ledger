@@ -4,6 +4,8 @@ import { categoryById } from '../../domain/categories';
 import { categoriesAtRisk, type CategoryRisk } from '../../domain/plan';
 import { Money } from '../Money';
 import { href } from '../router';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 export function useRisks(today: string): CategoryRisk[] {
   const transactions = useLedger((s) => s.transactions);
@@ -20,12 +22,15 @@ export function useRisks(today: string): CategoryRisk[] {
 export function RiskText({ risk, currency }: { risk: CategoryRisk; currency: string }) {
   return risk.kind === 'over' ? (
     <span className="status-over">
-      Over by <Money minor={risk.spentMinor - risk.budgetMinor} currency={currency} />
+      {tr('Over by {0}', <Money minor={risk.spentMinor - risk.budgetMinor} currency={currency} />)}
     </span>
   ) : (
     <span className="status-near">
-      Heading for <Money minor={risk.forecastMinor} currency={currency} /> of{' '}
-      <Money minor={risk.budgetMinor} currency={currency} />
+      {tr(
+        'Heading for {0} of {1}',
+        <Money minor={risk.forecastMinor} currency={currency} />,
+        <Money minor={risk.budgetMinor} currency={currency} />,
+      )}
     </span>
   );
 }
@@ -39,16 +44,16 @@ export function AtRiskCard({ today }: { today: string }) {
   return (
     <section className="card" aria-labelledby="risk-title" data-testid="at-risk">
       <div className="card-head">
-        <h2 id="risk-title">Budgets to watch</h2>
+        <h2 id="risk-title">{tl('Budgets to watch')}</h2>
         <a className="small" href={href('/budgets')}>
-          Budgets
+          {tl('Budgets')}
         </a>
       </div>
       <ul className="money-list">
         {risks.slice(0, 4).map((r) => (
           <li key={r.categoryId} className="money-row risk-row">
             <span className="money-main">
-              <span>{categoryById(categories, r.categoryId)?.name ?? 'Other'}</span>
+              <span>{categoryById(categories, r.categoryId)?.name ?? tl('Other')}</span>
             </span>
             <span className="small">
               <RiskText risk={r} currency={currency} />

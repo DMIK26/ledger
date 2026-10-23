@@ -76,10 +76,47 @@ subcategory never changes a total. Your rules (`customRules`), saved reports (`s
 nudges (`nudgesDismissed`) are settings lists. Pure logic: `search`, `rules`, `subcategories`, `nudges`,
 `merchant`, `projects`, `tax`, `needs`, `warranties`, `forWhom` in `src/domain`.
 
-Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`, which also
+Pages other than the Dashboard load on demand (Transactions too since Drop 13) (`src/app/pages/lazy.tsx`, which also
 has the merchant page); tests swap in `lazy.eager.tsx` through an alias in `vite.config.ts`. The Add
 sheet's forms, the lock screen and the close-the-month card load the same way from `src/app/deferred.tsx`
 (tests: `deferred.eager.tsx`), and the search words load on first search.
+
+Drop 13 needs no schema change. **Spaces**: rows that belong to a ledger (entries, flows, accounts, people,
+udhaar, loans, goals, wishlist, assets, budgets, recurring, projects) carry an optional `space`; missing
+means Personal, `'shop'` the Shop. Settings `spacesOn`, `shopName`, `space` (Personal, Shop or Both).
+`src/data/commands.ts` keeps a module-level write space (like privacy in `money.ts`) and stamps new rows;
+the store keeps every row in `everything` and shows the view's rows in the usual lists, so pages need no
+changes. Shop budget ids start `shop|`. A backup holds every space; restoring one with Shop rows turns
+Spaces on. Pure logic in `src/domain/spaces.ts` (profit and loss too).
+
+**Interface language** (`src/domain/i18n.ts`): `tl(text, ...parts)` returns the text in the chosen
+language with `{0}`, `{1}` filled; `tr(text, ...nodes)` (`src/app/tr.tsx`) does the same with React
+parts such as `<Money>`; `msg(text)` marks text kept in a list made at start-up, translated where it is
+shown. The English text is the key; `src/i18n/te.json` and `hi.json` hold the words and load on first
+use (`src/i18n/load.ts`, precached), before anything re-renders; the Layout is keyed by language so
+everything redraws. Built-in category names are shown translated and stored English
+(`shownCategory` / `storedCategory`); payment methods are shown with `methodLabel`. Dates use
+`monthName`, `monthShort`, `dayName`, `dayShort`. `src/i18n/coverage.test.ts` fails if any `tl`, `tr` or
+`msg` text lacks a Telugu or Hindi translation or a translation drops a placeholder. New interface text
+must go through `tl`/`tr`, never a bare string; `t` is not used because it names entries everywhere.
+
+**Backups** (`src/domain/backupCrypto.ts`): an optional password encrypts the backup with AES-GCM; the
+key comes from PBKDF2-SHA-256, 600,000 rounds, random salt and IV; the password is never stored.
+`src/app/folderBackup.ts` writes the weekly folder backup through the File System Access API; the folder
+handle is kept in the settings store under `backupFolderHandle` (not backed up).
+
+**Passkey unlock** (`src/domain/passkey.ts`, `src/app/passkeyUnlock.ts`): WebAuthn with a platform
+authenticator and user verification. Ledger stores the credential id and public key (settings key
+`lockPasskey`, never backed up) and checks each assertion itself (challenge, origin, RP id hash, user
+present and verified flags, ES256 or RS256 signature). Removing the PIN removes it.
+
+**App badge** (`src/domain/badge.ts`, `src/app/appBadge.ts`): `navigator.setAppBadge` with the number of
+recurring and card payments due in the next seven days, from every space.
+
+**Sizes**: `scripts/budget.mjs` checks start-up JavaScript (160 KB gzipped), all other JavaScript (300),
+the two language chunks (80 gzipped, 320 offline), CSS (16) and the rest of the precache (1,300 KB), and
+fails on a file listed twice. Transactions and the sketch tools load on first use, and the charts use
+`src/charts/scale.ts` instead of d3-scale (kept as a dev dependency for its parity test).
 
 New schema work is a **new entry** appended to `MIGRATIONS` in `src/data/migrations.ts`; never edit an old
 step. `DB_VERSION` is `MIGRATIONS.length`.

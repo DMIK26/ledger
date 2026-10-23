@@ -6,6 +6,7 @@ import { occurrencesBetween, type RecurringItem } from '../domain/recurring';
 import type { Category } from '../domain/types';
 import { fillFor } from './fills';
 import { tick } from '../kit/haptics';
+import { tl } from '../domain/i18n';
 
 export const TIMELINE_DAYS = 30;
 
@@ -115,9 +116,12 @@ export function Timeline({ items, categories, currency, today, off, onShift }: P
                       className="tl-pill"
                       data-dragging={drag?.key === key ? '' : undefined}
                       style={{ left: `${pct(shown)}%`, background: color }}
-                      aria-label={`${item.merchant}, ${fmtMoney(item.amountMinor, { currency })}, ${fmtDate(
-                        addDays(today, shown),
-                      )}. Move with the arrow keys`}
+                      aria-label={tl(
+                        '{0}, {1}, {2}. Move with the arrow keys',
+                        item.merchant,
+                        fmtMoney(item.amountMinor, { currency }),
+                        fmtDate(addDays(today, shown)),
+                      )}
                       data-testid={`pill-${item.id}`}
                       onPointerDown={onPointerDown(key, item.id)}
                       onPointerMove={onPointerMove}

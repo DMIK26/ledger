@@ -2,6 +2,7 @@ import { normalizeMerchantKey } from './categoriser';
 import { subcategoryFits } from './subcategories';
 import { normalizeTag } from './tags';
 import type { Category, CategoryId, PaymentMethod, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Your own rules (Drop 12): "when the merchant contains amazon (and the amount is over 1,000), file it
@@ -13,8 +14,12 @@ export type RuleMatch = 'contains' | 'starts' | 'is';
 
 export const RULE_MATCH_LABEL: Record<RuleMatch, string> = {
   contains: 'contains',
-  starts: 'starts with',
-  is: 'is exactly',
+  get starts() {
+    return tl('starts with');
+  },
+  get is() {
+    return tl('is exactly');
+  },
 };
 
 export interface RuleSet {
@@ -141,12 +146,12 @@ export function testRule(
 export function ruleProblem(
   rule: Pick<CustomRule, 'text' | 'minMinor' | 'maxMinor' | 'set'>,
 ): string | null {
-  if (!normalizeMerchantKey(rule.text)) return 'Type what the merchant contains';
+  if (!normalizeMerchantKey(rule.text)) return tl('Type what the merchant contains');
   if (rule.minMinor !== undefined && rule.maxMinor !== undefined && rule.minMinor > rule.maxMinor)
-    return 'The lowest amount is above the highest';
+    return tl('The lowest amount is above the highest');
   const s = rule.set;
   if (!s.categoryId && !s.subcategoryId && !s.tag && !s.forWhom && !s.taxSection)
-    return 'Choose at least one thing the rule sets';
+    return tl('Choose at least one thing the rule sets');
   return null;
 }
 

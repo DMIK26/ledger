@@ -1,4 +1,5 @@
 import type { Category } from './types';
+import { msg, tl } from './i18n';
 
 /** Ten distinguishable colours. No two default categories share one. Gray is reserved for Other. */
 export const CATEGORY_PALETTE = [
@@ -24,17 +25,34 @@ const make = (id: string, name: string, order: number): Category => ({
 });
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  make('housing', 'Housing & Utilities', 0),
-  make('food', 'Food & Dining', 1),
-  make('groceries', 'Groceries', 2),
-  make('shopping', 'Shopping & Essentials', 3),
-  make('health', 'Health & Wellness', 4),
-  make('transport', 'Transport & Travel', 5),
-  make('entertainment', 'Entertainment & Culture', 6),
-  make('education', 'Education', 7),
-  make('business', 'Business', 8),
-  make(OTHER_ID, 'Other', 9),
+  make('housing', msg('Housing & Utilities'), 0),
+  make('food', msg('Food & Dining'), 1),
+  make('groceries', msg('Groceries'), 2),
+  make('shopping', msg('Shopping & Essentials'), 3),
+  make('health', msg('Health & Wellness'), 4),
+  make('transport', msg('Transport & Travel'), 5),
+  make('entertainment', msg('Entertainment & Culture'), 6),
+  make('education', msg('Education'), 7),
+  make('business', msg('Business'), 8),
+  make(OTHER_ID, msg('Other'), 9),
 ];
+
+const DEFAULT_NAMES = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c.name]));
+
+/**
+ * The built-in categories show in the interface language until renamed (Drop 13); what is stored
+ * stays English, so a backup or another language reads the same.
+ */
+export function shownCategory(c: Category): Category {
+  const name = DEFAULT_NAMES.get(c.id);
+  return name !== undefined && c.name === name ? { ...c, name: tl(name) } : c;
+}
+
+/** The other way: a built-in name still as shown goes back to its English name for storing. */
+export function storedCategory(c: Category): Category {
+  const name = DEFAULT_NAMES.get(c.id);
+  return name !== undefined && c.name !== name && c.name === tl(name) ? { ...c, name } : c;
+}
 
 /** Next palette colour not already used. Past ten the palette repeats (the UI adds a hatch). */
 export function nextUnusedColor(used: readonly string[]): string {
@@ -60,10 +78,10 @@ export function categoryNameProblem(
   ignoreId?: string,
 ): string | null {
   const n = name.trim();
-  if (!n) return 'Give the category a name';
-  if (n.length > MAX_CATEGORY_NAME) return `Keep it under ${MAX_CATEGORY_NAME} characters`;
+  if (!n) return tl('Give the category a name');
+  if (n.length > MAX_CATEGORY_NAME) return tl('Keep it under {0} characters', MAX_CATEGORY_NAME);
   if (categories.some((c) => c.id !== ignoreId && c.name.toLowerCase() === n.toLowerCase()))
-    return 'There is already a category with that name';
+    return tl('There is already a category with that name');
   return null;
 }
 

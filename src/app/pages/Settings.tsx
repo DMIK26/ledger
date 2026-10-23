@@ -1,55 +1,98 @@
 import { SampleCard } from '../SampleData';
 import { InstallButton, InstallText } from '../InstallBanner';
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
-import { exportBackup, validateBackup, type BackupFile } from '../../data/backup';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useLedger } from '../../data/store';
 import {
-  fmtDate,
   MAX_MONTH_START,
   monthKey,
   monthLabel,
   monthRangeLabel,
   MONTHS,
+  monthName,
   todayISO,
 } from '../../domain/dates';
 import { frequentEntries, MAX_FAVOURITES, repeatKey } from '../../domain/repeat';
 import { categoryById } from '../../domain/categories';
 import { CURRENCIES } from '../../domain/money';
 import { isValidPin } from '../../domain/pin';
-import type { ThemeChoice } from '../../domain/types';
+import { methodLabel, type ThemeChoice } from '../../domain/types';
 import { checkForUpdates, usePwaState } from '../../pwa/register';
 import { Money, usePrivacy } from '../Money';
-import { ExportButton } from '../files';
 import { href } from '../router';
 import { CategoryManager } from '../settings/CategoryManager';
 import { CsvImport } from '../settings/CsvImport';
 import { Activity } from '../settings/Activity';
 import { RulesCard } from '../settings/Rules';
+import { SpacesCard } from '../spaces/SpacesCard';
+import { BackupCard } from '../settings/BackupCard';
+import { PasskeySetting } from '../settings/PasskeySetting';
+import { getLanguage, LANGUAGES } from '../../domain/i18n';
+import { badgeSupported, needsNotificationsForBadge } from '../appBadge';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
+  {
+    value: 'system',
+    get label() {
+      return tl('System');
+    },
+  },
+  {
+    value: 'light',
+    get label() {
+      return tl('Light');
+    },
+  },
+  {
+    value: 'dark',
+    get label() {
+      return tl('Dark');
+    },
+  },
 ];
 
 function Appearance() {
   const theme = useLedger((s) => s.settings.theme);
+  const language = useLedger((s) => s.settings.language);
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <section className="card" aria-labelledby="appearance-title">
-      <h2 id="appearance-title">Appearance</h2>
-      <div className="segmented" role="group" aria-label="Theme">
-        {THEMES.map((t) => (
+      <h2 id="appearance-title">{tl('Appearance')}</h2>
+      <div className="segmented" role="group" aria-label={tl('Theme')}>
+        {THEMES.map((th) => (
           <button
-            key={t.value}
+            key={th.value}
             type="button"
-            aria-pressed={theme === t.value}
-            onClick={() => void setSetting('theme', t.value)}
+            aria-pressed={theme === th.value}
+            onClick={() => void setSetting('theme', th.value)}
           >
-            {t.label}
+            {th.label}
           </button>
         ))}
       </div>
+      <div className="field-row">
+        <span id="language-label">{tl('Language')}</span>
+        <div className="segmented" role="group" aria-labelledby="language-label">
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.value}
+              type="button"
+              lang={l.html}
+              aria-pressed={language === l.value}
+              data-testid={`language-${l.value}`}
+              onClick={() => void setSetting('language', l.value)}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="muted small">
+        {tl(
+          'Screens, messages and dates follow the language. Amounts keep Western digits and the rupee sign, and anything not yet translated shows in English.',
+        )}
+      </p>
     </section>
   );
 }
@@ -64,15 +107,15 @@ function Experience() {
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <section className="card" aria-labelledby="experience-title">
-      <h2 id="experience-title">Experience</h2>
+      <h2 id="experience-title">{tl('Experience')}</h2>
       <div className="field-row">
-        <span id="motion-label">Motion</span>
+        <span id="motion-label">{tl('Motion')}</span>
         <div className="segmented" role="group" aria-labelledby="motion-label">
           {(
             [
-              ['full', 'Full'],
-              ['reduced', 'Reduced'],
-              ['off', 'Off'],
+              ['full', tl('Full')],
+              ['reduced', tl('Reduced')],
+              ['off', tl('Off')],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -87,10 +130,10 @@ function Experience() {
         </div>
       </div>
       <p className="muted small">
-        Reduced keeps short fades only. Your device&rsquo;s reduce-motion setting always wins.
+        {tl('Reduced keeps short fades only. Your device’s reduce-motion setting always wins.')}
       </p>
       <div className="field-row">
-        <span id="haptics-label">Vibrate when a drag snaps</span>
+        <span id="haptics-label">{tl('Vibrate when a drag snaps')}</span>
         <button
           type="button"
           role="switch"
@@ -101,7 +144,7 @@ function Experience() {
         />
       </div>
       <div className="field-row">
-        <span id="sounds-label">Click when a drag snaps</span>
+        <span id="sounds-label">{tl('Click when a drag snaps')}</span>
         <button
           type="button"
           role="switch"
@@ -112,7 +155,7 @@ function Experience() {
         />
       </div>
       <div className="field-row">
-        <span id="doodles-label">Doodles</span>
+        <span id="doodles-label">{tl('Doodles')}</span>
         <button
           type="button"
           role="switch"
@@ -123,11 +166,12 @@ function Experience() {
         />
       </div>
       <p className="muted small">
-        The pencil, category drawings, mood faces and handwritten notes on charts. Your own notes
-        and sketches stay either way.
+        {tl(
+          'The pencil, category drawings, mood faces and handwritten notes on charts. Your own notes and sketches stay either way.',
+        )}
       </p>
       <div className="field-row">
-        <span id="wry-label">Wry one-liners</span>
+        <span id="wry-label">{tl('Wry one-liners')}</span>
         <button
           type="button"
           role="switch"
@@ -138,11 +182,12 @@ function Experience() {
         />
       </div>
       <p className="muted small">
-        Now and then the pencil says a short, kind, wry line about your month instead of a plain
-        fact. Written into Ledger; nothing goes online.
+        {tl(
+          'Now and then the pencil says a short, kind, wry line about your month instead of a plain fact. Written into Ledger; nothing goes online.',
+        )}
       </p>
       <div className="field-row">
-        <span id="sketch-style-label">Sketch style</span>
+        <span id="sketch-style-label">{tl('Sketch style')}</span>
         <button
           type="button"
           role="switch"
@@ -152,8 +197,58 @@ function Experience() {
           onClick={() => void setSetting('sketchStyle', !sketchStyle)}
         />
       </div>
-      <p className="muted small">Hand-drawn outlines on cards and buttons. Printing stays clean.</p>
+      <p className="muted small">
+        {tl('Hand-drawn outlines on cards and buttons. Printing stays clean.')}
+      </p>
+      <BadgeSetting />
     </section>
+  );
+}
+
+/** Bills due this week on the app icon (Drop 13), only where the device has a badge. */
+function BadgeSetting() {
+  const on = useLedger((s) => s.settings.appBadge);
+  const setSetting = useLedger((s) => s.setSetting);
+  const [blocked, setBlocked] = useState(false);
+  if (!badgeSupported()) return null;
+  const toggle = async () => {
+    setBlocked(false);
+    if (on) return setSetting('appBadge', false);
+    await setSetting('appBadge', true);
+    if (needsNotificationsForBadge() && typeof Notification !== 'undefined') {
+      const permission =
+        Notification.permission === 'default'
+          ? await Notification.requestPermission()
+          : Notification.permission;
+      if (permission !== 'granted') setBlocked(true);
+    }
+  };
+  return (
+    <>
+      <div className="field-row">
+        <span id="badge-label">{tl('Bills due this week on the app icon')}</span>
+        <button
+          type="button"
+          role="switch"
+          className="switch"
+          aria-checked={on}
+          aria-labelledby="badge-label"
+          onClick={() => void toggle()}
+        />
+      </div>
+      <p className="muted small">
+        {tl(
+          'The number of recurring payments and card payments due in the next seven days, updated while Ledger is open. On an iPhone it only shows if notifications are allowed; Ledger asks, and never sends any.',
+        )}
+      </p>
+      {blocked && (
+        <p className="small" role="status">
+          {tl(
+            'Notifications are off for Ledger, so the iPhone will not show the number. Turn them on in Settings, Notifications, Ledger.',
+          )}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -164,9 +259,9 @@ function Privacy() {
     <section className="card" aria-labelledby="privacy-title">
       <div className="field-row">
         <div>
-          <h2 id="privacy-title">Privacy mode</h2>
+          <h2 id="privacy-title">{tl('Privacy mode')}</h2>
           <p className="muted small">
-            Hides every amount on screen, for when someone is looking over your shoulder.
+            {tl('Hides every amount on screen, for when someone is looking over your shoulder.')}
           </p>
         </div>
         <button
@@ -179,15 +274,18 @@ function Privacy() {
         />
       </div>
       <p className="preview">
-        <span className="muted small">Sample</span>
+        <span className="muted small">{tl('Sample')}</span>
         <Money minor={123456} />
       </p>
     </section>
   );
 }
 
+// "1st" in English; Telugu and Hindi say the plain number.
 const ordinal = (n: number): string =>
-  `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+  getLanguage() !== 'en'
+    ? String(n)
+    : `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
 
 function MoneySettings() {
   const currency = useLedger((s) => s.settings.currency);
@@ -197,9 +295,9 @@ function MoneySettings() {
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <section className="card" aria-labelledby="money-title">
-      <h2 id="money-title">Money</h2>
+      <h2 id="money-title">{tl('Money')}</h2>
       <div className="field-row">
-        <label htmlFor="currency">Currency for new entries</label>
+        <label htmlFor="currency">{tl('Currency for new entries')}</label>
         <select
           id="currency"
           className="select"
@@ -214,7 +312,7 @@ function MoneySettings() {
         </select>
       </div>
       <div className="field-row">
-        <label htmlFor="fy-start">Financial year starts in</label>
+        <label htmlFor="fy-start">{tl('Financial year starts in')}</label>
         <select
           id="fy-start"
           className="select"
@@ -223,13 +321,13 @@ function MoneySettings() {
         >
           {MONTHS.map((m, i) => (
             <option key={m} value={i + 1}>
-              {m}
+              {monthName(i + 1)}
             </option>
           ))}
         </select>
       </div>
       <div className="field-row">
-        <label htmlFor="month-start">Months start on the</label>
+        <label htmlFor="month-start">{tl('Months start on the')}</label>
         <select
           id="month-start"
           className="select"
@@ -246,8 +344,14 @@ function MoneySettings() {
       </div>
       <p className="muted small" id="month-start-help" data-testid="month-start-help">
         {monthStartDay === 1
-          ? 'Budgets and month totals follow calendar months. Paid on a fixed day? Start months on that day.'
-          : `${monthLabel(thisMonth)} runs ${monthRangeLabel(thisMonth)}. A month starting after the 15th is named after the month it ends in.`}
+          ? tl(
+              'Budgets and month totals follow calendar months. Paid on a fixed day? Start months on that day.',
+            )
+          : tl(
+              '{0} runs {1}. A month starting after the 15th is named after the month it ends in.',
+              monthLabel(thisMonth),
+              monthRangeLabel(thisMonth),
+            )}
       </p>
     </section>
   );
@@ -268,29 +372,30 @@ function Favourites() {
     .filter((f) => !pinned.has(f.key))
     .slice(0, 5);
   const full = favourites.length >= MAX_FAVOURITES;
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   return (
     <section className="card" aria-labelledby="favourites-title">
-      <h2 id="favourites-title">Favourites</h2>
+      <h2 id="favourites-title">{tl('Favourites')}</h2>
       <p className="muted small">
-        Favourites come first in the Repeat row under quick add; one tap adds them for today. Save
-        one from Transactions too: select an entry, then Save as favourite.
+        {tl(
+          'Favourites come first in the Repeat row under quick add; one tap adds them for today. Save one from Transactions too: select an entry, then Save as favourite.',
+        )}
       </p>
       {favourites.length > 0 && (
-        <ul className="rule-list" aria-label="Your favourites">
+        <ul className="rule-list" aria-label={tl('Your favourites')}>
           {favourites.map((f, i) => (
             <li key={f.id} className="rule-row">
               <span>
                 {f.merchant} <Money minor={f.amountMinor} currency={currency} />
               </span>
               <span className="muted">
-                {name(f.categoryId)}, {f.method}
+                {name(f.categoryId)}, {methodLabel(f.method)}
               </span>
               <span className="btn-row">
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon"
-                  aria-label={`Move ${f.merchant} up`}
+                  aria-label={tl('Move {0} up', f.merchant)}
                   disabled={i === 0}
                   onClick={() => void moveFavourite(f.id, i - 1)}
                 >
@@ -299,10 +404,10 @@ function Favourites() {
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  aria-label={`Remove ${f.merchant} from favourites`}
+                  aria-label={tl('Remove {0} from favourites', f.merchant)}
                   onClick={() => void removeFavourite(f.id)}
                 >
-                  Remove
+                  {tl('Remove')}
                 </button>
               </span>
             </li>
@@ -311,22 +416,22 @@ function Favourites() {
       )}
       {suggestions.length > 0 && (
         <>
-          <h3 className="small">Logged often</h3>
-          <ul className="rule-list" aria-label="Suggested favourites">
+          <h3 className="small">{tl('Logged often')}</h3>
+          <ul className="rule-list" aria-label={tl('Suggested favourites')}>
             {suggestions.map((f) => (
               <li key={f.key} className="rule-row">
                 <span>
                   {f.merchant} <Money minor={f.amountMinor} currency={currency} />
                 </span>
-                <span className="muted">{f.count} times in 90 days</span>
+                <span className="muted">{tr('{0} times in 90 days', f.count)}</span>
                 <button
                   type="button"
                   className="btn"
                   disabled={full}
-                  aria-label={`Save ${f.merchant} as a favourite`}
+                  aria-label={tl('Save {0} as a favourite', f.merchant)}
                   onClick={() => void saveFavourite(f)}
                 >
-                  Save
+                  {tl('Save')}
                 </button>
               </li>
             ))}
@@ -335,139 +440,8 @@ function Favourites() {
       )}
       {favourites.length === 0 && suggestions.length === 0 && (
         <p className="muted small">
-          Nothing yet. Things you log three times in 90 days show up here.
+          {tl('Nothing yet. Things you log three times in 90 days show up here.')}
         </p>
-      )}
-    </section>
-  );
-}
-
-function Data() {
-  const getDb = useLedger((s) => s.getDb);
-  const count = useLedger((s) => s.transactions.length);
-  const lastBackupAt = useLedger((s) => s.settings.lastBackupAt);
-  const importFromBackup = useLedger((s) => s.importFromBackup);
-  const restoreBackup = useLedger((s) => s.restoreBackup);
-  const setSetting = useLedger((s) => s.setSetting);
-  const [pending, setPending] = useState<BackupFile | null>(null);
-  const [replacing, setReplacing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    setPending(null);
-    setReplacing(false);
-    setError(null);
-    if (!file) return;
-    try {
-      const backup = validateBackup(JSON.parse(await file.text()));
-      if (backup) setPending(backup);
-      else setError('That file is not a Ledger backup, or it is damaged. Nothing was imported.');
-    } catch {
-      setError('That file is not a Ledger backup, or it is damaged. Nothing was imported.');
-    }
-  };
-
-  const dates = pending?.data.transactions.map((t) => t.date).sort() ?? [];
-  const close = () => {
-    setPending(null);
-    setReplacing(false);
-  };
-
-  return (
-    <section className="card" aria-labelledby="data-title">
-      <h2 id="data-title">Backup</h2>
-      <p className="muted small">
-        Everything lives on this device. A backup is a file you keep somewhere safe and can restore
-        here or on another phone.{' '}
-        {lastBackupAt > 0
-          ? `Last backup ${fmtDate(todayISO(new Date(lastBackupAt)))}.`
-          : 'No backup yet.'}
-      </p>
-      <div className="btn-row">
-        <ExportButton
-          label="Export backup"
-          disabled={count === 0}
-          build={async () =>
-            new File(
-              [JSON.stringify(await exportBackup(getDb()), null, 2)],
-              `ledger-backup-${todayISO()}.json`,
-              { type: 'application/json' },
-            )
-          }
-          onDone={() => void setSetting('lastBackupAt', Date.now())}
-        />
-        <label className="btn">
-          Restore from backup
-          <input
-            type="file"
-            accept="application/json,.json"
-            className="visually-hidden"
-            onChange={(e) => void onFile(e)}
-          />
-        </label>
-      </div>
-      {error && (
-        <p className="errors" role="alert">
-          {error}
-        </p>
-      )}
-      {pending && (
-        <div className="preview" data-testid="restore-preview">
-          <p>
-            This backup has{' '}
-            {pending.data.transactions.length === 1
-              ? '1 entry'
-              : `${pending.data.transactions.length} entries`}
-            {dates.length > 0 && `, ${fmtDate(dates[0]!)} to ${fmtDate(dates[dates.length - 1]!)}`}.
-          </p>
-          {replacing ? (
-            <>
-              <p>
-                Replace everything on this device with the backup? Entries, categories, budgets and
-                recurring payments here are swapped for the backup&rsquo;s. Theme, privacy and PIN
-                stay as they are. You can undo it straight after.
-              </p>
-              <div className="btn-row">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => {
-                    const file = pending;
-                    close();
-                    void restoreBackup(file);
-                  }}
-                >
-                  Replace everything
-                </button>
-                <button type="button" className="btn btn-ghost" onClick={close}>
-                  Cancel
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="btn-row">
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  const file = pending;
-                  close();
-                  void importFromBackup(file);
-                }}
-              >
-                Add what is missing
-              </button>
-              <button type="button" className="btn" onClick={() => setReplacing(true)}>
-                Replace everything
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={close}>
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
       )}
     </section>
   );
@@ -477,16 +451,16 @@ function Records() {
   const trashCount = useLedger((s) => s.trash.length);
   return (
     <section className="card" aria-labelledby="records-title">
-      <h2 id="records-title">History</h2>
+      <h2 id="records-title">{tl('History')}</h2>
       <p className="muted small">
-        Every change is logged, and deleted entries wait in Trash for 30 days.
+        {tl('Every change is logged, and deleted entries wait in Trash for 30 days.')}
       </p>
       <div className="btn-row">
         <a className="btn" href={href('/settings?view=activity')}>
-          Activity
+          {tl('Activity')}
         </a>
         <a className="btn" href={href('/transactions?view=trash')}>
-          {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}
+          {trashCount > 0 ? tl('Trash ({0})', trashCount) : tl('Trash')}
         </a>
       </div>
     </section>
@@ -515,8 +489,8 @@ function ScreenLock() {
     e.preventDefault();
     if (busy) return;
     if (mode === 'set') {
-      if (!isValidPin(pin)) return setError('Use 4 to 8 digits.');
-      if (pin !== again) return setError('The two PINs do not match.');
+      if (!isValidPin(pin)) return setError(tl('Use 4 to 8 digits.'));
+      if (pin !== again) return setError(tl('The two PINs do not match.'));
       setBusy(true);
       await setPin(pin);
       setBusy(false);
@@ -527,7 +501,7 @@ function ScreenLock() {
       setBusy(false);
       if (ok) reset();
       else {
-        setError('That PIN is not right.');
+        setError(tl('That PIN is not right.'));
         setPinText('');
       }
     }
@@ -537,37 +511,40 @@ function ScreenLock() {
 
   return (
     <section className="card" aria-labelledby="lock-title">
-      <h2 id="lock-title">Screen lock</h2>
+      <h2 id="lock-title">{tl('Screen lock')}</h2>
       <p className="muted small">
-        A 4 to 8 digit PIN, asked when Ledger opens and after 30 seconds in the background. It keeps
-        casual viewers out. It does not encrypt your data.
+        {tl(
+          'A 4 to 8 digit PIN, asked when Ledger opens and after 30 seconds in the background. It keeps casual viewers out. It does not encrypt your data.',
+        )}
       </p>
       <p className="muted small">
-        Forgot it? Tap Forgot PIN on the lock screen. Ledger removes the PIN after 24 hours and
-        keeps every entry. Entering the right PIN before then cancels it.
+        {tl(
+          'Forgot it? Tap Forgot PIN on the lock screen. Ledger removes the PIN after 24 hours and keeps every entry. Entering the right PIN before then cancels it.',
+        )}
       </p>
       {mode === 'idle' && (
         <div className="btn-row">
           {hasLock ? (
             <>
               <button type="button" className="btn" onClick={lockNow}>
-                Lock now
+                {tl('Lock now')}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setMode('remove')}>
-                Turn off
+                {tl('Turn off')}
               </button>
             </>
           ) : (
             <button type="button" className="btn" onClick={() => setMode('set')}>
-              Set a PIN
+              {tl('Set a PIN')}
             </button>
           )}
         </div>
       )}
+      {mode === 'idle' && hasLock && <PasskeySetting />}
       {mode !== 'idle' && (
         <form className="lock-settings" onSubmit={(e) => void submit(e)}>
           <div className="field">
-            <label htmlFor="pin-1">{mode === 'set' ? 'New PIN' : 'Current PIN'}</label>
+            <label htmlFor="pin-1">{mode === 'set' ? tl('New PIN') : tl('Current PIN')}</label>
             <input
               id="pin-1"
               className="input pin-input"
@@ -584,7 +561,7 @@ function ScreenLock() {
           </div>
           {mode === 'set' && (
             <div className="field">
-              <label htmlFor="pin-2">Repeat the PIN</label>
+              <label htmlFor="pin-2">{tl('Repeat the PIN')}</label>
               <input
                 id="pin-2"
                 className="input pin-input"
@@ -606,10 +583,10 @@ function ScreenLock() {
           )}
           <div className="btn-row">
             <button type="submit" className="btn btn-primary" disabled={busy}>
-              {mode === 'set' ? 'Turn on lock' : 'Turn off lock'}
+              {mode === 'set' ? tl('Turn on lock') : tl('Turn off lock')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={reset}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </form>
@@ -625,24 +602,28 @@ function LearnedRules() {
   const entries = Object.entries(rules).sort(([a], [b]) => a.localeCompare(b));
   return (
     <section className="card" aria-labelledby="rules-title">
-      <h2 id="rules-title">Learned categories</h2>
+      <h2 id="rules-title">{tl('Learned categories')}</h2>
       {entries.length === 0 ? (
         <p className="muted small">
-          When you pick a category for a merchant Ledger did not recognise, it remembers it here.
+          {tl(
+            'When you pick a category for a merchant Ledger did not recognise, it remembers it here.',
+          )}
         </p>
       ) : (
         <ul className="rule-list">
           {entries.map(([key, categoryId]) => (
             <li key={key} className="rule-row">
               <span>{key}</span>
-              <span className="muted">{categoryById(categories, categoryId)?.name ?? 'Other'}</span>
+              <span className="muted">
+                {categoryById(categories, categoryId)?.name ?? tl('Other')}
+              </span>
               <button
                 type="button"
                 className="btn btn-ghost"
-                aria-label={`Forget ${key}`}
+                aria-label={tl('Forget {0}', key)}
                 onClick={() => void forgetRule(key)}
               >
-                Forget
+                {tl('Forget')}
               </button>
             </li>
           ))}
@@ -673,16 +654,18 @@ function Storage() {
 
   return (
     <section className="card" aria-labelledby="storage-title">
-      <h2 id="storage-title">Storage</h2>
+      <h2 id="storage-title">{tl('Storage')}</h2>
       {!supported ? (
-        <p className="muted small">This browser does not report storage details.</p>
+        <p className="muted small">{tl('This browser does not report storage details.')}</p>
       ) : (
         <>
           <p className="muted small">
             {persisted
-              ? 'Protected: the browser will not clear your data to free space.'
-              : 'Not protected yet: the browser may clear data when the device runs low on space.'}
-            {usage && ` Using ${usage}.`}
+              ? tl('Protected: the browser will not clear your data to free space.')
+              : tl(
+                  'Not protected yet: the browser may clear data when the device runs low on space.',
+                )}
+            {usage && ' ' + tl('Using {0}.', usage)}
           </p>
           {!persisted && (
             <button
@@ -690,7 +673,7 @@ function Storage() {
               className="btn"
               onClick={() => void navigator.storage.persist().then(setPersisted)}
             >
-              Keep my data
+              {tl('Keep my data')}
             </button>
           )}
         </>
@@ -704,10 +687,13 @@ function About() {
   const [result, setResult] = useState<string | null>(null);
   return (
     <section className="card" aria-labelledby="about-title">
-      <h2 id="about-title">About</h2>
+      <h2 id="about-title">{tl('About')}</h2>
       <p className="muted small">
-        Ledger {__APP_VERSION__}.{' '}
-        {pwa.installed ? 'Installed as an app.' : 'Running in the browser.'}
+        {tl(
+          'Ledger {0}. {1}',
+          __APP_VERSION__,
+          pwa.installed ? tl('Installed as an app.') : tl('Running in the browser.'),
+        )}
       </p>
       <InstallText />
       <div className="btn-row">
@@ -720,11 +706,11 @@ function About() {
           disabled={pwa.checking}
           onClick={() =>
             void checkForUpdates().then((found) =>
-              setResult(found ? 'An update is ready.' : 'You have the latest version.'),
+              setResult(found ? tl('An update is ready.') : tl('You have the latest version.')),
             )
           }
         >
-          Check for updates
+          {tl('Check for updates')}
         </button>
       </div>
       {result && (
@@ -742,7 +728,7 @@ export function Settings({ view, merchant }: { view?: string | null; merchant?: 
     return (
       <>
         <p>
-          <a href={href('/settings')}>Back to settings</a>
+          <a href={href('/settings')}>{tl('Back to settings')}</a>
         </p>
         <RulesCard startText={merchant} />
         <LearnedRules />
@@ -754,11 +740,12 @@ export function Settings({ view, merchant }: { view?: string | null; merchant?: 
       <Privacy />
       <Experience />
       <MoneySettings />
+      <SpacesCard />
       <CategoryManager />
       <Favourites />
       <RulesCard />
       <LearnedRules />
-      <Data />
+      <BackupCard />
       <SampleCard />
       <CsvImport />
       <Records />

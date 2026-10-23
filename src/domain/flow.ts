@@ -1,6 +1,7 @@
 import { INCOME_KINDS, type Flow, type IncomeKind } from './accounts';
 import { normalizeMerchantKey } from './categoriser';
 import type { Category, CategoryId, ISODate, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Money flow (Drop 11, after Monarch's Sankey): money in on the left, where it went in the middle, and,
@@ -55,7 +56,7 @@ export function moneyFlow(input: {
   const byCat = new Map<CategoryId, number>();
   for (const t of spending) byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amountMinor);
   const spentMinor = [...byCat.values()].reduce((a, b) => a + b, 0);
-  const name = (id: CategoryId) => input.categories.find((c) => c.id === id)?.name ?? 'Other';
+  const name = (id: CategoryId) => input.categories.find((c) => c.id === id)?.name ?? tl('Other');
 
   const nodes: FlowNode[] = [];
   for (const [k, v] of [...income.entries()].sort((a, b) => b[1] - a[1]))
@@ -63,7 +64,7 @@ export function moneyFlow(input: {
   if (spentMinor > inMinor)
     nodes.push({
       id: 'savings',
-      label: inMinor === 0 ? 'Spending' : 'Not covered by money in',
+      label: inMinor === 0 ? tl('Spending') : tl('Not covered by money in'),
       valueMinor: spentMinor - inMinor,
       column: 0,
       kind: 'savings',
@@ -84,7 +85,7 @@ export function moneyFlow(input: {
   if (rest > 0)
     nodes.push({
       id: 'cat:rest',
-      label: 'Other categories',
+      label: tl('Other categories'),
       valueMinor: rest,
       column: 1,
       kind: 'rest',
@@ -92,7 +93,7 @@ export function moneyFlow(input: {
   if (inMinor > spentMinor)
     nodes.push({
       id: 'left',
-      label: 'Left over',
+      label: tl('Left over'),
       valueMinor: inMinor - spentMinor,
       column: 1,
       kind: 'left',
@@ -121,7 +122,7 @@ export function moneyFlow(input: {
     for (const t of spending) {
       if (t.categoryId !== expand) continue;
       const key = normalizeMerchantKey(t.merchant) || 'untitled';
-      const m = byMerchant.get(key) ?? { label: t.merchant || 'Untitled', value: 0 };
+      const m = byMerchant.get(key) ?? { label: t.merchant || tl('Untitled'), value: 0 };
       m.value += t.amountMinor;
       byMerchant.set(key, m);
     }
@@ -141,7 +142,7 @@ export function moneyFlow(input: {
     if (others > 0) {
       nodes.push({
         id: 'm:others',
-        label: 'Others',
+        label: tl('Others'),
         valueMinor: others,
         column: 2,
         kind: 'merchant',

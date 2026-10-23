@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useLedger } from '../data/store';
 import { promptInstall, useInstallMode } from '../pwa/install';
 import { href } from './router';
+import { tl } from '../domain/i18n';
+import { tr } from './tr';
 
 const DISMISS_KEY = 'ledger.installDismissed';
 
@@ -19,19 +21,22 @@ export function InstallText() {
   const count = useLedger((s) => s.transactions.length);
   switch (mode) {
     case 'prompt':
-      return <p>Install Ledger for a home screen icon, full screen and offline use.</p>;
+      return <p>{tl('Install Ledger for a home screen icon, full screen and offline use.')}</p>;
     case 'ios':
       return (
         <>
           <p>
-            To install, tap Share, then Add to Home Screen. The installed app keeps its own data,
-            separate from this browser, so install first, then add entries.
+            {tl(
+              'To install, tap Share, then Add to Home Screen. The installed app keeps its own data, separate from this browser, so install first, then add entries.',
+            )}
           </p>
           {count > 0 && (
             <p>
-              This browser already holds {count === 1 ? '1 entry' : `${count} entries`}. Back them
-              up here, then restore the backup in the installed app.{' '}
-              <a href={href('/settings')}>Back up</a>
+              {tr(
+                'This browser already holds {0}. Back them up here, then restore the backup in the installed app. {1}',
+                count === 1 ? tl('1 entry') : tl('{0} entries', count),
+                <a href={href('/settings')}>{tl('Back up')}</a>,
+              )}
             </p>
           )}
         </>
@@ -39,8 +44,9 @@ export function InstallText() {
     case 'in-app':
       return (
         <p>
-          This is a browser inside another app, which cannot install Ledger. Open this page in
-          Safari or Chrome.
+          {tl(
+            'This is a browser inside another app, which cannot install Ledger. Open this page in Safari or Chrome.',
+          )}
         </p>
       );
     default:
@@ -53,7 +59,7 @@ export function InstallButton() {
   if (mode !== 'prompt') return null;
   return (
     <button type="button" className="btn btn-primary" onClick={() => void promptInstall()}>
-      Install Ledger
+      {tl('Install Ledger')}
     </button>
   );
 }
@@ -67,7 +73,7 @@ export function InstallBanner() {
     <div
       className="banner install-banner"
       role="region"
-      aria-label="Install Ledger"
+      aria-label={tl('Install Ledger')}
       data-testid="install-banner"
     >
       <div className="banner-text">
@@ -87,7 +93,7 @@ export function InstallBanner() {
             setDismissed(true);
           }}
         >
-          Not now
+          {tl('Not now')}
         </button>
       </div>
     </div>

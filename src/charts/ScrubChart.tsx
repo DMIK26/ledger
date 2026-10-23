@@ -3,6 +3,7 @@ import { fmtDate } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { usePrivacy } from '../app/Money';
 import { useSize } from './useSize';
+import { tl } from '../domain/i18n';
 
 export interface DayPoint {
   date: string;
@@ -44,8 +45,13 @@ export function ScrubChart({
   const at = index ?? n - 1;
   const p = points[at];
   const text = p
-    ? `${fmtDate(p.date)}: ${fmtMoney(p.totalMinor, { currency })} so far, ${fmtMoney(p.dayMinor, { currency })} that day`
-    : 'No days yet';
+    ? tl(
+        '{0}: {1} so far, {2} that day',
+        fmtDate(p.date),
+        fmtMoney(p.totalMinor, { currency }),
+        fmtMoney(p.dayMinor, { currency }),
+      )
+    : tl('No days yet');
 
   const fromPointer = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();

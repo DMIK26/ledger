@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useLedger } from '../../data/store';
 import { MAX_SUBCATEGORY_NAME, subcategoryNameProblem } from '../../domain/subcategories';
 import type { Category, Subcategory } from '../../domain/types';
+import { tl } from '../../domain/i18n';
 
 function SubRow({ c, sub }: { c: Category; sub: Subcategory }) {
   const saveSubcategory = useLedger((s) => s.saveSubcategory);
@@ -24,7 +25,7 @@ function SubRow({ c, sub }: { c: Category; sub: Subcategory }) {
         }}
       >
         <label className="visually-hidden" htmlFor={`sub-name-${sub.id}`}>
-          Name of {sub.name}
+          {tl('Name of {0}', sub.name)}
         </label>
         <input
           id={`sub-name-${sub.id}`}
@@ -35,15 +36,17 @@ function SubRow({ c, sub }: { c: Category; sub: Subcategory }) {
           onBlur={save}
         />
       </form>
-      <span className="muted small">{entries === 1 ? '1 entry' : `${entries} entries`}</span>
+      <span className="muted small">
+        {entries === 1 ? tl('1 entry') : tl('{0} entries', entries)}
+      </span>
       <button
         type="button"
         className="btn btn-ghost"
-        aria-label={`Delete ${sub.name}`}
-        title="Its entries stay in the category"
+        aria-label={tl('Delete {0}', sub.name)}
+        title={tl('Its entries stay in the category')}
         onClick={() => void deleteSubcategory(c.id, sub.id)}
       >
-        Delete
+        {tl('Delete')}
       </button>
       {error && (
         <p className="errors" role="alert">
@@ -78,11 +81,11 @@ export function Subcategories({ c }: { c: Category }) {
         onClick={() => setOpen((v) => !v)}
       >
         {subs.length === 0
-          ? 'Subcategories'
-          : `Subcategories (${subs.length}): ${subs.map((s) => s.name).join(', ')}`}
+          ? tl('Subcategories')
+          : tl('Subcategories ({0}): {1}', subs.length, subs.map((s) => s.name).join(', '))}
       </button>
       {open && subs.length > 0 && (
-        <ul className="sub-list" aria-label={`Subcategories of ${c.name}`}>
+        <ul className="sub-list" aria-label={tl('Subcategories of {0}', c.name)}>
           {subs.map((s) => (
             <SubRow key={s.id} c={c} sub={s} />
           ))}
@@ -91,19 +94,19 @@ export function Subcategories({ c }: { c: Category }) {
       {open && (
         <form className="bulk-tag" onSubmit={add}>
           <label className="visually-hidden" htmlFor={`sub-new-${c.id}`}>
-            New subcategory of {c.name}
+            {tl('New subcategory of {0}', c.name)}
           </label>
           <input
             id={`sub-new-${c.id}`}
             className="input"
-            placeholder="New subcategory"
+            placeholder={tl('New subcategory')}
             autoComplete="off"
             maxLength={MAX_SUBCATEGORY_NAME}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <button type="submit" className="btn">
-            Add
+            {tl('Add')}
           </button>
         </form>
       )}

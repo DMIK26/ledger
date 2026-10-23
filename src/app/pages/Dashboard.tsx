@@ -1,9 +1,9 @@
-import { EmptyDoodle } from '../../doodle/Studio';
+import { EmptyDoodle } from '../../doodle/bits';
 import { MoodFace, MOOD_OF } from '../../doodle/faces';
 import { Fragment, lazy, Suspense, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MonthBars, type BarMode } from '../../charts/MonthBars';
 import { Donut } from '../../charts/Donut';
-import { useLedger } from '../../data/store';
+import { useLedger, viewOf } from '../../data/store';
 import {
   categoryTotals,
   inMonth,
@@ -59,6 +59,8 @@ import {
   type DashboardCard,
 } from '../../domain/dashboard';
 import { useUi } from '../../kit/ui';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const Sketchbook = lazy(() =>
   import('../dash/Sketchbook').then((m) => ({ default: m.Sketchbook })),
@@ -81,12 +83,12 @@ function StatusText({
   if (s.kind === 'over')
     return (
       <span className="status-over">
-        Over by <Money minor={s.overMinor} currency={currency} />
+        {tr('Over by {0}', <Money minor={s.overMinor} currency={currency} />)}
       </span>
     );
   return (
     <span className={s.kind === 'near' ? 'status-near' : undefined}>
-      <Money minor={s.leftMinor} currency={currency} /> left
+      {tr('{0} left', <Money minor={s.leftMinor} currency={currency} />)}
     </span>
   );
 }
@@ -127,12 +129,13 @@ function BudgetCard({
   const perDay = Math.round((maxPerDay * (pct ?? startPct)) / 100 / PER_DAY_STEP) * PER_DAY_STEP;
   const projected = forecast;
   const whatIf = whatIfMonthEnd(spent, today, perDay);
-  const endLabel = day === dim ? 'today' : `by ${fmtDate(monthBounds(month).end).slice(0, -5)}`;
+  const endLabel =
+    day === dim ? tl('today') : tl('by {0}', fmtDate(monthBounds(month).end).slice(0, -5));
 
   if (budget === null && pinned) {
     return (
       <section className="card" aria-labelledby="budget-title">
-        <h2 id="budget-title">Budget</h2>
+        <h2 id="budget-title">{tl('Budget')}</h2>
         <p className="muted">{pinned.note}</p>
       </section>
     );
@@ -142,30 +145,36 @@ function BudgetCard({
     const ghost = !dismissed && !hasBudgets(mine) && last.overall !== null ? last.overall : null;
     return (
       <section className="card" aria-labelledby="budget-title">
-        <h2 id="budget-title">Budget</h2>
+        <h2 id="budget-title">{tl('Budget')}</h2>
         {ghost !== null ? (
           <div className="ghost">
             <p>
-              Last month&rsquo;s budget was <Money minor={ghost} currency={currency} />. Use the
-              same budgets for {monthLabel(month)}?
+              {tr(
+                'Last month’s budget was {0}. Use the same budgets for {1}?',
+                <Money minor={ghost} currency={currency} />,
+                monthLabel(month),
+              )}
             </p>
             <div className="btn-row">
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => void setMonthBudgets(month, last, "Copied last month's budgets")}
+                onClick={() => void setMonthBudgets(month, last, tl("Copied last month's budgets"))}
               >
-                Accept
+                {tl('Accept')}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setDismissed(true)}>
-                Reject
+                {tl('Reject')}
               </button>
             </div>
           </div>
         ) : (
           <p className="muted">
-            No budget for {monthLabel(month)}. <a href={href('/budgets')}>Set one</a> to see what is
-            left and where the month is heading.
+            {tr(
+              'No budget for {0}. {1} to see what is left and where the month is heading.',
+              monthLabel(month),
+              <a href={href('/budgets')}>{tl('Set one')}</a>,
+            )}
           </p>
         )}
       </section>
@@ -179,9 +188,9 @@ function BudgetCard({
   return (
     <section className="card budget-card" aria-labelledby="budget-title">
       <div className="card-head">
-        <h2 id="budget-title">Budget</h2>
+        <h2 id="budget-title">{tl('Budget')}</h2>
         <a className="small" href={href('/budgets')}>
-          Edit
+          {tl('Edit')}
         </a>
       </div>
       <p className="big-figure" data-testid="budget-left">
@@ -197,25 +206,38 @@ function BudgetCard({
         <MoodFace mood={MOOD_OF[status.kind]} />
       </div>
       <p className="muted small">
-        <Money minor={spent} currency={currency} /> of <Money minor={budget} currency={currency} />{' '}
-        spent.{' '}
-        {day < dim ? (
-          <>
-            At this pace, <Money minor={projected} currency={currency} /> {endLabel}
-            {projectedStatus.kind === 'over' ? (
-              <>
-                , over by <Money minor={projectedStatus.overMinor} currency={currency} />.
-              </>
-            ) : (
-              <>, within budget.</>
-            )}
-          </>
-        ) : null}
+        {tr(
+          '{0} of {1} spent. {2}',
+          <Money minor={spent} currency={currency} />,
+          <Money minor={budget} currency={currency} />,
+          day < dim ? (
+            <>
+              {tr(
+                'At this pace, {0} {1}{2}',
+                <Money minor={projected} currency={currency} />,
+                endLabel,
+                projectedStatus.kind === 'over' ? (
+                  <>
+                    {tr(
+                      ', over by {0}.',
+                      <Money minor={projectedStatus.overMinor} currency={currency} />,
+                    )}
+                  </>
+                ) : (
+                  <>{tl(', within budget.')}</>
+                ),
+              )}
+            </>
+          ) : null,
+        )}
       </p>
       {left > 0 && (
         <div className="what-if">
           <label htmlFor="what-if">
-            What if I spend <Money minor={perDay} currency={currency} /> a day from tomorrow?
+            {tr(
+              'What if I spend {0} a day from tomorrow?',
+              <Money minor={perDay} currency={currency} />,
+            )}
           </label>
           <input
             id="what-if"
@@ -224,19 +246,29 @@ function BudgetCard({
             max={100}
             step={1}
             value={pct ?? startPct}
-            aria-valuetext={`${fmtMoney(perDay, { currency })} a day`}
+            aria-valuetext={tl('{0} a day', fmtMoney(perDay, { currency }))}
             onChange={(e) => setPct(Number(e.target.value))}
           />
           <p className="small" role="status" data-testid="what-if-result">
-            {monthLabel(month)} ends at <Money minor={whatIf} currency={currency} />
-            {whatIfStatus.kind === 'over' ? (
-              <>
-                , over by <Money minor={whatIfStatus.overMinor} currency={currency} />.
-              </>
-            ) : (
-              <>
-                , <Money minor={whatIfStatus.leftMinor} currency={currency} /> under budget.
-              </>
+            {tr(
+              '{0} ends at {1}{2}',
+              monthLabel(month),
+              <Money minor={whatIf} currency={currency} />,
+              whatIfStatus.kind === 'over' ? (
+                <>
+                  {tr(
+                    ', over by {0}.',
+                    <Money minor={whatIfStatus.overMinor} currency={currency} />,
+                  )}
+                </>
+              ) : (
+                <>
+                  {tr(
+                    ', {0} under budget.',
+                    <Money minor={whatIfStatus.leftMinor} currency={currency} />,
+                  )}
+                </>
+              ),
             )}
           </p>
         </div>
@@ -363,11 +395,13 @@ export function Dashboard() {
       : otherPins
         ? {
             budget: null,
-            note: 'Budgets cover whole categories. Unpin merchants, days, methods and tags to see one.',
+            note: tl(
+              'Budgets cover whole categories. Unpin merchants, days, methods and tags to see one.',
+            ),
           }
         : pinnedCats!.every((id) => mine.categories[id] !== undefined)
           ? { budget: pinnedCats!.reduce((s, id) => s + mine.categories[id]!, 0), note: '' }
-          : { budget: null, note: 'No budget set for the pinned categories this month.' };
+          : { budget: null, note: tl('No budget set for the pinned categories this month.') };
 
   const forecast = useMemo(
     () =>
@@ -382,7 +416,9 @@ export function Dashboard() {
       }).totalMinor,
     [transactions, categories, recurring, pinnedCats, asOf],
   );
-  const planned = current && pins.length === 0;
+  const both = useLedger((s) => viewOf(s.settings) === 'both');
+  // Budgets, safe to spend and month closing belong to one ledger (Drop 13).
+  const planned = current && pins.length === 0 && !both;
 
   const toggleKpi = (id: Exclude<KpiView, null>) =>
     withTransition(() => {
@@ -397,10 +433,12 @@ export function Dashboard() {
         <QuickAdd followMonth />
         <section className="card empty">
           <EmptyDoodle art="notebook" />
-          <h2>Nothing logged yet</h2>
-          <p className="muted">Type your first expense above, something like “chai 20 cash”.</p>
+          <h2>{tl('Nothing logged yet')}</h2>
+          <p className="muted">
+            {tl('Type your first expense above, something like “chai 20 cash”.')}
+          </p>
           <p className="muted small">
-            Or look around first with made-up entries you can remove later.
+            {tl('Or look around first with made-up entries you can remove later.')}
           </p>
           <div className="btn-row empty-actions">
             <LoadSampleButton />
@@ -418,50 +456,55 @@ export function Dashboard() {
     safe: planned ? <SafeToSpendCard today={today} /> : null,
     kpis: (
       <>
-        <section className="kpis" aria-label={`${label}${current ? ' so far' : ''}`}>
+        <section className="kpis" aria-label={`${label}${current ? ' ' + tl('so far') : ''}`}>
           <KpiButton id="spent" open={kpiView === 'spent'} onToggle={toggleKpi}>
-            <h2>{current ? 'Spent this month' : `Spent in ${label.split(' ')[0]}`}</h2>
+            <h2>{current ? tl('Spent this month') : tl('Spent in {0}', label.split(' ')[0])}</h2>
             <p className="kpi-value" data-testid="month-total">
               <Money minor={k.spentMinor} currency={currency} />
             </p>
-            <p className="muted small">{k.entries === 1 ? '1 entry' : `${k.entries} entries`}</p>
+            <p className="muted small">
+              {k.entries === 1 ? tl('1 entry') : tl('{0} entries', k.entries)}
+            </p>
           </KpiButton>
           <KpiButton id="change" open={kpiView === 'change'} onToggle={toggleKpi}>
-            <h2>Against last month</h2>
+            <h2>{tl('Against last month')}</h2>
             <p className="kpi-value" data-testid="kpi-change">
               {k.changePct === null
-                ? 'No comparison'
+                ? tl('No comparison')
                 : k.changePct === 0
-                  ? 'The same'
-                  : `${Math.abs(k.changePct)}% ${k.changePct > 0 ? 'more' : 'less'}`}
+                  ? tl('The same')
+                  : `${Math.abs(k.changePct)}% ${k.changePct > 0 ? tl('more') : tl('less')}`}
             </p>
             <p className="muted small">
-              Than by day {k.daysElapsed} of last month,{' '}
-              <Money minor={k.lastMonthToDateMinor} currency={currency} />
+              {tr(
+                'Than by day {0} of last month, {1}',
+                k.daysElapsed,
+                <Money minor={k.lastMonthToDateMinor} currency={currency} />,
+              )}
             </p>
           </KpiButton>
           <KpiButton id="daily" open={kpiView === 'daily'} onToggle={toggleKpi}>
-            <h2>Daily average</h2>
+            <h2>{tl('Daily average')}</h2>
             <p className="kpi-value">
               <Money minor={k.dailyAvgMinor} currency={currency} />
             </p>
             <p className="muted small">
-              Over {k.daysElapsed === 1 ? '1 day' : `${k.daysElapsed} days`}
+              {tl('Over {0}', k.daysElapsed === 1 ? tl('1 day') : tl('{0} days', k.daysElapsed))}
             </p>
           </KpiButton>
           <KpiButton id="top" open={kpiView === 'top'} onToggle={toggleKpi}>
-            <h2>Top category</h2>
+            <h2>{tl('Top category')}</h2>
             <p
               className="kpi-value kpi-name"
               data-hl={k.topCategory ? entityKey('category', k.topCategory.categoryId) : undefined}
             >
-              {top ? top.name : 'None yet'}
+              {top ? top.name : tl('None yet')}
             </p>
             <p className="muted small">
               {k.topCategory ? (
                 <Money minor={k.topCategory.totalMinor} currency={currency} />
               ) : (
-                'Add an entry to see it'
+                tl('Add an entry to see it')
               )}
             </p>
           </KpiButton>
@@ -470,27 +513,27 @@ export function Dashboard() {
           <section
             className="card"
             id="kpi-breakdown"
-            aria-label="Breakdown"
+            aria-label={tl('Breakdown')}
             style={{ viewTransitionName: 'kpi-open' }}
           >
             <div className="card-head">
               <h2>
                 {
                   {
-                    spent: 'Where it went',
-                    change: 'Against last month',
-                    daily: 'Day by day',
-                    top: 'Top category',
+                    spent: tl('Where it went'),
+                    change: tl('Against last month'),
+                    daily: tl('Day by day'),
+                    top: tl('Top category'),
                   }[kpiView]
                 }
               </h2>
               <button type="button" className="btn btn-ghost" onClick={() => toggleKpi(kpiView)}>
-                Close
+                {tl('Close')}
               </button>
             </div>
             <Breakdown
               root={kpiView === 'daily' ? 'days' : kpiView === 'change' ? 'compare' : 'categories'}
-              rootLabel={kpiView === 'daily' ? 'All days' : 'All categories'}
+              rootLabel={kpiView === 'daily' ? tl('All days') : tl('All categories')}
               entries={monthEntries}
               compareEntries={lastMonthEntries}
               path={kpiPath}
@@ -501,7 +544,7 @@ export function Dashboard() {
         )}
       </>
     ),
-    budget: (
+    budget: both ? null : (
       <BudgetCard
         key={month}
         spent={k.spentMinor}
@@ -525,16 +568,19 @@ export function Dashboard() {
       dayPoints.length > 0 ? (
         <section className="card" aria-labelledby="day-title" data-testid="day-by-day">
           <div className="card-head">
-            <h2 id="day-title">Day by day</h2>
+            <h2 id="day-title">{tl('Day by day')}</h2>
             <span className="muted small" aria-live="polite" data-testid="scrub-label">
               {scrubDate ? (
                 <>
-                  By {fmtDate(scrubDate)}:{' '}
-                  <Money minor={dayPoints[scrub!]!.totalMinor} currency={currency} />
+                  {tr(
+                    'By {0}: {1}',
+                    fmtDate(scrubDate),
+                    <Money minor={dayPoints[scrub!]!.totalMinor} currency={currency} />,
+                  )}
                 </>
               ) : (
                 <>
-                  {current ? 'So far' : 'Whole month'}:{' '}
+                  {current ? tl('So far') : tl('Whole month')}:{' '}
                   <Money minor={dayPoints[dayPoints.length - 1]!.totalMinor} currency={currency} />
                 </>
               )}
@@ -545,23 +591,27 @@ export function Dashboard() {
             index={scrub}
             onScrub={setScrub}
             currency={currency}
-            label={`${label}, spending added up day by day`}
+            label={tl('{0}, spending added up day by day', label)}
           />
           {scrubDate ? (
             <>
               {scrubEntries.length > 0 ? (
-                <TxList label={`Entries on ${fmtDate(scrubDate)}`} transactions={scrubEntries} />
+                <TxList
+                  label={tl('Entries on {0}', fmtDate(scrubDate))}
+                  transactions={scrubEntries}
+                />
               ) : (
-                <p className="muted small">Nothing spent on {fmtDate(scrubDate)}.</p>
+                <p className="muted small">{tl('Nothing spent on {0}.', fmtDate(scrubDate))}</p>
               )}
               <button type="button" className="btn btn-ghost" onClick={() => setScrub(null)}>
-                Back to {current ? 'today' : 'the whole month'}
+                {tl('Back to {0}', current ? tl('today') : tl('the whole month'))}
               </button>
             </>
           ) : (
             <p className="muted small">
-              Point at the line, drag along it, or focus it and use the arrow keys; the donut
-              follows.
+              {tl(
+                'Point at the line, drag along it, or focus it and use the arrow keys; the donut follows.',
+              )}
             </p>
           )}
         </section>
@@ -570,12 +620,12 @@ export function Dashboard() {
       <div className="chart-row">
         <section className="card chart-card" aria-labelledby="donut-title">
           <div className="card-head">
-            <h2 id="donut-title">Where it went</h2>
+            <h2 id="donut-title">{tl('Where it went')}</h2>
             <span className="muted small" aria-live="polite">
               {preview && preview !== month
-                ? `Preview: ${monthLabel(preview)}`
+                ? tl('Preview: {0}', monthLabel(preview))
                 : scrubDate
-                  ? `By ${fmtDate(scrubDate)}`
+                  ? tl('By {0}', fmtDate(scrubDate))
                   : label}
             </span>
           </div>
@@ -587,9 +637,9 @@ export function Dashboard() {
               preview && preview !== month
                 ? monthLabel(preview)
                 : scrubDate
-                  ? `By ${fmtDate(scrubDate).slice(0, -5)}`
+                  ? tl('By {0}', fmtDate(scrubDate).slice(0, -5))
                   : current
-                    ? 'This month'
+                    ? tl('This month')
                     : label
             }
             selected={donutPath[0]?.slice(2) ?? null}
@@ -600,7 +650,7 @@ export function Dashboard() {
           {donutPath.length > 0 && (
             <Breakdown
               root="categories"
-              rootLabel="All categories"
+              rootLabel={tl('All categories')}
               entries={monthEntries}
               path={donutPath}
               onPath={setDonutPath}
@@ -610,21 +660,21 @@ export function Dashboard() {
         </section>
         <section className="card chart-card" aria-labelledby="bars-title">
           <div className="card-head">
-            <h2 id="bars-title">Last six months</h2>
-            <div className="segmented" role="group" aria-label="Show">
+            <h2 id="bars-title">{tl('Last six months')}</h2>
+            <div className="segmented" role="group" aria-label={tl('Show')}>
               <button
                 type="button"
                 aria-pressed={mode === 'total'}
                 onClick={() => setMode('total')}
               >
-                Total
+                {tl('Total')}
               </button>
               <button
                 type="button"
                 aria-pressed={mode === 'category'}
                 onClick={() => setMode('category')}
               >
-                By category
+                {tl('By category')}
               </button>
             </div>
           </div>
@@ -642,12 +692,15 @@ export function Dashboard() {
               setMonth(mm);
             }}
             onBudgetChange={(v) =>
-              setMonthBudgets(month, { ...mine, overall: v }, 'Changed the monthly budget')
+              setMonthBudgets(month, { ...mine, overall: v }, tl('Changed the monthly budget'))
             }
           />
           {pins.length === 0 && mine.overall === null && (
             <p className="muted small">
-              <a href={href('/budgets')}>Set a monthly budget</a> to draw it here and drag it.
+              {tr(
+                '{0} to draw it here and drag it.',
+                <a href={href('/budgets')}>{tl('Set a monthly budget')}</a>,
+              )}
             </p>
           )}
         </section>
@@ -662,19 +715,19 @@ export function Dashboard() {
       transactions.length === 0 ? (
         <section className="card empty">
           <EmptyDoodle art="pin" />
-          <h2>No entries match the pins</h2>
-          <p className="muted">Remove a pin from the bar at the top to see more.</p>
+          <h2>{tl('No entries match the pins')}</h2>
+          <p className="muted">{tl('Remove a pin from the bar at the top to see more.')}</p>
         </section>
       ) : (
         <section className="card" aria-labelledby="recent-title">
           <div className="card-head">
-            <h2 id="recent-title">Recent</h2>
+            <h2 id="recent-title">{tl('Recent')}</h2>
             <a href={href('/transactions')} className="small">
-              See all
+              {tl('See all')}
             </a>
           </div>
           <TxList
-            label="Recent transactions"
+            label={tl('Recent transactions')}
             transactions={recent}
             onDelete={(id) => void removeTransaction(id)}
           />
@@ -728,13 +781,13 @@ export function Dashboard() {
       {customising && (
         <section className="card customise-bar" aria-labelledby="customise-title">
           <div className="card-head">
-            <h2 id="customise-title">Customise the Dashboard</h2>
+            <h2 id="customise-title">{tl('Customise the Dashboard')}</h2>
             <button type="button" className="btn btn-primary" onClick={() => setCustomising(false)}>
-              Done
+              {tl('Done')}
             </button>
           </div>
           <p className="muted small">
-            Move cards up or down, or hide the ones you do not need. Quick add stays first.
+            {tl('Move cards up or down, or hide the ones you do not need. Quick add stays first.')}
           </p>
           <button
             type="button"
@@ -744,7 +797,7 @@ export function Dashboard() {
               void setSetting('dashboardHidden', []);
             }}
           >
-            Reset to the usual layout
+            {tl('Reset to the usual layout')}
           </button>
         </section>
       )}
@@ -777,7 +830,7 @@ export function Dashboard() {
               <span className="dash-name">
                 {DASHBOARD_CARD_LABEL[id]}
                 {!node && !isHidden ? (
-                  <span className="muted small"> (nothing to show now)</span>
+                  <span className="muted small"> {tl('(nothing to show now)')}</span>
                 ) : null}
               </span>
               <span className="btn-row">
@@ -785,28 +838,28 @@ export function Dashboard() {
                   type="button"
                   className="btn btn-ghost"
                   disabled={i === 0}
-                  aria-label={`Move ${DASHBOARD_CARD_LABEL[id]} up`}
+                  aria-label={tl('Move {0} up', DASHBOARD_CARD_LABEL[id])}
                   onClick={() => move(id, -1)}
                 >
-                  Up
+                  {tl('Up')}
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost"
                   disabled={i === order.length - 1}
-                  aria-label={`Move ${DASHBOARD_CARD_LABEL[id]} down`}
+                  aria-label={tl('Move {0} down', DASHBOARD_CARD_LABEL[id])}
                   onClick={() => move(id, 1)}
                 >
-                  Down
+                  {tl('Down')}
                 </button>
                 <button
                   type="button"
                   className="btn"
                   aria-pressed={!isHidden}
-                  aria-label={`Show ${DASHBOARD_CARD_LABEL[id]}`}
+                  aria-label={tl('Show {0}', DASHBOARD_CARD_LABEL[id])}
                   onClick={() => toggleHidden(id)}
                 >
-                  {isHidden ? 'Show' : 'Shown'}
+                  {isHidden ? tl('Show') : tl('Shown')}
                 </button>
               </span>
             </div>
@@ -817,7 +870,7 @@ export function Dashboard() {
       {!customising && (
         <p className="dash-customise">
           <button type="button" className="btn btn-ghost" onClick={() => setCustomising(true)}>
-            Customise the Dashboard
+            {tl('Customise the Dashboard')}
           </button>
         </p>
       )}

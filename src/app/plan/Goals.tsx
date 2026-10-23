@@ -17,6 +17,8 @@ import {
 import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /** A drawn jar that fills as money is put aside. Decorative; the text beside it has the numbers. */
 function Jar({ id, fill }: { id: string; fill: number }) {
@@ -57,10 +59,10 @@ function GoalForm({ editing, onDone }: { editing?: Goal; onDone: () => void }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError('Give it a name, like “New phone” or “Car insurance”');
-    if (target === null || target <= 0) return setError('Enter the amount you need');
-    if (!parseISO(due)) return setError('Pick the date you need it by');
-    if (due <= today) return setError('Pick a date after today');
+    if (!name.trim()) return setError(tl('Give it a name, like “New phone” or “Car insurance”'));
+    if (target === null || target <= 0) return setError(tl('Enter the amount you need'));
+    if (!parseISO(due)) return setError(tl('Pick the date you need it by'));
+    if (due <= today) return setError(tl('Pick a date after today'));
     const draft: GoalDraft = {
       name,
       kind,
@@ -78,19 +80,19 @@ function GoalForm({ editing, onDone }: { editing?: Goal; onDone: () => void }) {
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${prefix}-name`}>Name</label>
+          <label htmlFor={`${prefix}-name`}>{tl('Name')}</label>
           <input
             id={`${prefix}-name`}
             className="input"
             autoComplete="off"
             maxLength={MAX_GOAL_NAME}
-            placeholder="New phone"
+            placeholder={tl('New phone')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor={`${prefix}-kind`}>Kind</label>
+          <label htmlFor={`${prefix}-kind`}>{tl('Kind')}</label>
           <select
             id={`${prefix}-kind`}
             className="input"
@@ -105,11 +107,11 @@ function GoalForm({ editing, onDone }: { editing?: Goal; onDone: () => void }) {
           </select>
         </div>
         <div className="field">
-          <label htmlFor={`${prefix}-target`}>Amount needed</label>
+          <label htmlFor={`${prefix}-target`}>{tl('Amount needed')}</label>
           <AmountInput id={`${prefix}-target`} initialMinor={target} onChange={setTarget} />
         </div>
         <div className="field">
-          <label htmlFor={`${prefix}-due`}>Needed by</label>
+          <label htmlFor={`${prefix}-due`}>{tl('Needed by')}</label>
           <input
             id={`${prefix}-due`}
             className="input"
@@ -122,14 +124,18 @@ function GoalForm({ editing, onDone }: { editing?: Goal; onDone: () => void }) {
       {kind === 'fund' && (
         <label className="check">
           <input type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
-          Comes every year (starts again once paid)
+          {tl('Comes every year (starts again once paid)')}
         </label>
       )}
       <p className="muted small">
-        {kind === 'fund'
-          ? 'A fund is money put aside for a cost you know is coming, like insurance, school fees or Diwali.'
-          : 'A save-up goal is money you keep, like a new phone or an emergency fund.'}{' '}
-        Putting money aside is a note to yourself; it does not move money between accounts.
+        {tl(
+          '{0} Putting money aside is a note to yourself; it does not move money between accounts.',
+          kind === 'fund'
+            ? tl(
+                'A fund is money put aside for a cost you know is coming, like insurance, school fees or Diwali.',
+              )
+            : tl('A save-up goal is money you keep, like a new phone or an emergency fund.'),
+        )}
       </p>
       {error && (
         <p className="errors" role="alert">
@@ -138,10 +144,10 @@ function GoalForm({ editing, onDone }: { editing?: Goal; onDone: () => void }) {
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {editing ? 'Save changes' : 'Add goal'}
+          {editing ? tl('Save changes') : tl('Add goal')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -155,19 +161,19 @@ function PutAside({ goal, onDone }: { goal: Goal; onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (amount === null || amount <= 0) return setError('Enter the amount you put aside');
-    if (!parseISO(date)) return setError('Pick a date');
+    if (amount === null || amount <= 0) return setError(tl('Enter the amount you put aside'));
+    if (!parseISO(date)) return setError(tl('Pick a date'));
     await addToGoal(goal.id, amount, date);
     onDone();
   };
   return (
     <form className="put-aside" onSubmit={(e) => void submit(e)} noValidate>
       <div className="field">
-        <label htmlFor={`put-${goal.id}`}>Amount put aside</label>
+        <label htmlFor={`put-${goal.id}`}>{tl('Amount put aside')}</label>
         <AmountInput id={`put-${goal.id}`} initialMinor={null} onChange={setAmount} />
       </div>
       <div className="field">
-        <label htmlFor={`put-date-${goal.id}`}>Date</label>
+        <label htmlFor={`put-date-${goal.id}`}>{tl('Date')}</label>
         <input
           id={`put-date-${goal.id}`}
           className="input"
@@ -183,10 +189,10 @@ function PutAside({ goal, onDone }: { goal: Goal; onDone: () => void }) {
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Save
+          {tl('Save')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -222,33 +228,36 @@ function GoalCard({ goal, today }: { goal: Goal; today: string }) {
         </div>
         <p className="muted small">
           {GOAL_KIND_LABEL[goal.kind]}
-          {goal.yearly ? ', every year' : ''}
+          {goal.yearly ? tl(', every year') : ''}
           {state === 'paid' && goal.paidOn
-            ? `, paid ${fmtDate(goal.paidOn)}`
-            : `, needed by ${fmtDate(goal.dueDate)}`}
-          {goal.lastPaidOn ? `. Last paid ${fmtDate(goal.lastPaidOn)}` : ''}
+            ? tl(', paid {0}', fmtDate(goal.paidOn))
+            : tl(', needed by {0}', fmtDate(goal.dueDate))}
+          {goal.lastPaidOn ? tl('. Last paid {0}', fmtDate(goal.lastPaidOn)) : ''}
         </p>
         <p data-testid="goal-saved">
-          <Money minor={saved} currency={currency} /> of{' '}
-          <Money minor={goal.targetMinor} currency={currency} /> put aside ({Math.round(fill * 100)}
-          %)
+          {tr(
+            '{0} of {1} put aside ({2}%)',
+            <Money minor={saved} currency={currency} />,
+            <Money minor={goal.targetMinor} currency={currency} />,
+            Math.round(fill * 100),
+          )}
         </p>
         {open && (
           <p className="small" data-testid="goal-need">
             {snoozed ? (
-              'Snoozed this month. The months left share the rest.'
+              tl('Snoozed this month. The months left share the rest.')
             ) : need > 0 ? (
               <>
-                Put aside <Money minor={need} currency={currency} /> this month
-                {thisMonth > 0 ? (
-                  <>
-                    ; <Money minor={thisMonth} currency={currency} /> so far
-                  </>
-                ) : null}
-                .
+                {tr(
+                  'Put aside {0} this month{1}.',
+                  <Money minor={need} currency={currency} />,
+                  thisMonth > 0 ? (
+                    <>{tr('; {0} so far', <Money minor={thisMonth} currency={currency} />)}</>
+                  ) : null,
+                )}
               </>
             ) : (
-              'Nothing more needed this month.'
+              tl('Nothing more needed this month.')
             )}
           </p>
         )}
@@ -258,7 +267,7 @@ function GoalCard({ goal, today }: { goal: Goal; today: string }) {
             {open && (
               <button type="button" className="btn" onClick={() => setMode('put')}>
                 <Icon name="plus" />
-                Put aside
+                {tl('Put aside')}
               </button>
             )}
             {open && (
@@ -267,23 +276,23 @@ function GoalCard({ goal, today }: { goal: Goal; today: string }) {
                 className="btn btn-ghost"
                 onClick={() => void snoozeGoal(goal.id, month, !snoozed)}
               >
-                {snoozed ? 'Unsnooze' : 'Snooze this month'}
+                {snoozed ? tl('Unsnooze') : tl('Snooze this month')}
               </button>
             )}
             {goal.kind === 'fund' && state !== 'paid' && (
               <button type="button" className="btn btn-ghost" onClick={() => void payGoal(goal.id)}>
-                Paid
+                {tl('Paid')}
               </button>
             )}
             <button type="button" className="btn btn-ghost" onClick={() => setMode('edit')}>
-              Edit
+              {tl('Edit')}
             </button>
             <button
               type="button"
               className="btn btn-ghost"
               onClick={() => void deleteGoal(goal.id)}
             >
-              Delete
+              {tl('Delete')}
             </button>
           </div>
         )}
@@ -291,8 +300,8 @@ function GoalCard({ goal, today }: { goal: Goal; today: string }) {
           <details className="goal-history">
             <summary>
               {goal.contributions.length === 1
-                ? '1 amount put aside'
-                : `${goal.contributions.length} amounts put aside`}
+                ? tl('1 amount put aside')
+                : tl('{0} amounts put aside', goal.contributions.length)}
             </summary>
             <ul className="money-list">
               {[...goal.contributions]
@@ -304,7 +313,7 @@ function GoalCard({ goal, today }: { goal: Goal; today: string }) {
                     <button
                       type="button"
                       className="btn btn-ghost btn-icon"
-                      aria-label={`Remove the amount put aside on ${fmtDate(c.date)}`}
+                      aria-label={tl('Remove the amount put aside on {0}', fmtDate(c.date))}
                       onClick={() => void removeFromGoal(goal.id, c.id)}
                     >
                       <Icon name="close" />
@@ -331,27 +340,29 @@ export function GoalsView() {
   return (
     <section className="card" aria-labelledby="goals-title">
       <div className="card-head">
-        <h2 id="goals-title">Goals and funds</h2>
+        <h2 id="goals-title">{tl('Goals and funds')}</h2>
         {!adding && (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Icon name="plus" />
-            Add goal
+            {tl('Add goal')}
           </button>
         )}
       </div>
       {goals.length > 0 && (
         <p className="small" data-testid="goals-month">
-          This month: <Money minor={putAside} currency={currency} /> put aside, plan{' '}
-          <Money minor={needed} currency={currency} />. Safe to spend on the Dashboard already
-          leaves this out.
+          {tr(
+            'This month: {0} put aside, plan {1}. Safe to spend on the Dashboard already leaves this out.',
+            <Money minor={putAside} currency={currency} />,
+            <Money minor={needed} currency={currency} />,
+          )}
         </p>
       )}
       {adding && <GoalForm onDone={() => setAdding(false)} />}
       {goals.length === 0 && !adding && (
         <p className="muted small">
-          Saving for something, or a yearly cost like insurance, school fees or Diwali? Add it with
-          an amount and a date, and Ledger works out what to put aside each month and whether you
-          are on track.
+          {tl(
+            'Saving for something, or a yearly cost like insurance, school fees or Diwali? Add it with an amount and a date, and Ledger works out what to put aside each month and whether you are on track.',
+          )}
         </p>
       )}
       {sorted.map((g) => (

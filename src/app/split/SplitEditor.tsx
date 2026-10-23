@@ -13,6 +13,7 @@ import {
   type SplitRow,
   type SplitState,
 } from './splitForm';
+import { tl } from '../../domain/i18n';
 
 /**
  * Splitting an expense (Drop 11): who shared it, how, and who paid. Your share is what counts as your
@@ -37,15 +38,15 @@ export function SplitEditor({
   const result =
     totalMinor && totalMinor > 0 ? shareAmounts(totalMinor, state.mode, previewParts(state)) : null;
   const problem = splitProblem(state);
-  const label = (r: SplitRow) => (isMe(r) ? 'You' : r.name.trim() || 'Someone');
+  const label = (r: SplitRow) => (isMe(r) ? tl('You') : r.name.trim() || tl('Someone'));
   const mine = result?.ok ? (result.shares[state.rows.findIndex(isMe)] ?? 0) : null;
 
   return (
     <fieldset className="split" data-testid="split">
-      <legend>Split</legend>
+      <legend>{tl('Split')}</legend>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${uid}-mode`}>How</label>
+          <label htmlFor={`${uid}-mode`}>{tl('How')}</label>
           <select
             id={`${uid}-mode`}
             className="select input"
@@ -60,7 +61,7 @@ export function SplitEditor({
           </select>
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-paid`}>Who paid</label>
+          <label htmlFor={`${uid}-paid`}>{tl('Who paid')}</label>
           <select
             id={`${uid}-paid`}
             className="select input"
@@ -84,18 +85,18 @@ export function SplitEditor({
         {state.rows.map((r, i) => (
           <li key={r.key} className="split-row">
             {isMe(r) ? (
-              <span className="split-name">You</span>
+              <span className="split-name">{tl('You')}</span>
             ) : (
               <span className="split-name">
                 <label className="visually-hidden" htmlFor={`${uid}-name-${r.key}`}>
-                  Person {i}
+                  {tl('Person {0}', i)}
                 </label>
                 <input
                   id={`${uid}-name-${r.key}`}
                   className="input"
                   list={`${uid}-people`}
                   autoComplete="off"
-                  placeholder="Name"
+                  placeholder={tl('Name')}
                   value={
                     r.personId ? (people.find((p) => p.id === r.personId)?.name ?? r.name) : r.name
                   }
@@ -114,7 +115,7 @@ export function SplitEditor({
                 <AmountInput
                   key={`${r.key}-exact`}
                   id={`${uid}-v-${r.key}`}
-                  ariaLabel={`Amount for ${label(r)}`}
+                  ariaLabel={tl('Amount for {0}', label(r))}
                   initialMinor={r.minor}
                   onChange={(v) => setRow(r.key, { minor: v })}
                 />
@@ -125,7 +126,11 @@ export function SplitEditor({
                   className="input"
                   inputMode={state.mode === 'percent' ? 'decimal' : 'numeric'}
                   autoComplete="off"
-                  aria-label={`${state.mode === 'percent' ? 'Percentage' : 'Shares'} for ${label(r)}`}
+                  aria-label={tl(
+                    '{0} for {1}',
+                    state.mode === 'percent' ? tl('Percentage') : tl('Shares'),
+                    label(r),
+                  )}
                   placeholder={state.mode === 'percent' ? '%' : '1'}
                   value={r.value}
                   onChange={(e) => setRow(r.key, { value: e.target.value })}
@@ -139,7 +144,7 @@ export function SplitEditor({
               <button
                 type="button"
                 className="btn btn-ghost btn-icon"
-                aria-label={`Remove ${label(r)} from the split`}
+                aria-label={tl('Remove {0} from the split', label(r))}
                 onClick={() =>
                   set({
                     rows: state.rows.filter((x) => x.key !== r.key),
@@ -166,20 +171,27 @@ export function SplitEditor({
         }
       >
         <Icon name="plus" />
-        Add person
+        {tl('Add person')}
       </button>
       <p className="small" aria-live="polite" data-testid="split-summary">
         {problem
           ? problem
           : !result
-            ? 'Enter the whole bill above to see the shares.'
+            ? tl('Enter the whole bill above to see the shares.')
             : !result.ok
               ? result.error
               : mine === 0
-                ? 'Your share is zero; record lending in Udhaar instead.'
+                ? tl('Your share is zero; record lending in Udhaar instead.')
                 : state.paidBy === 'me'
-                  ? `Your share, ${fmtMoney(mine ?? 0, { currency })}, is your spending; the others owe you theirs.`
-                  : `Your share, ${fmtMoney(mine ?? 0, { currency })}, is your spending; you owe it to ${label(state.rows.find((r) => r.key === state.paidBy)!)}.`}
+                  ? tl(
+                      'Your share, {0}, is your spending; the others owe you theirs.',
+                      fmtMoney(mine ?? 0, { currency }),
+                    )
+                  : tl(
+                      'Your share, {0}, is your spending; you owe it to {1}.',
+                      fmtMoney(mine ?? 0, { currency }),
+                      label(state.rows.find((r) => r.key === state.paidBy)!),
+                    )}
       </p>
     </fieldset>
   );

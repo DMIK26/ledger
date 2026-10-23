@@ -7,15 +7,16 @@ import { fmtMoney } from '../domain/money';
 import { parseQuickEntry } from '../domain/parser';
 import { repeatChips } from '../domain/repeat';
 import { INCOME_KINDS, type IncomeKind } from '../domain/accounts';
-import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { usePrivacy } from './Money';
 import { Icon } from './icons';
 import { listen, voiceMode } from './voice';
 import { useView, useViewMonth } from '../kit/view';
+import { tl } from '../domain/i18n';
 
 function dateLabel(date: string, today: string): string {
-  if (date === today) return 'Today';
-  if (date === addDays(today, -1)) return 'Yesterday';
+  if (date === today) return tl('Today');
+  if (date === addDays(today, -1)) return tl('Yesterday');
   return fmtDate(date);
 }
 
@@ -89,7 +90,7 @@ export function QuickAdd({
       await addRepeat(item);
       if (followMonth && monthKey(today) !== viewMonth) {
         setMonth(monthKey(today));
-        announce(`Saved to ${monthLabel(monthKey(today))}. Showing that month.`);
+        announce(tl('Saved to {0}. Showing that month.', monthLabel(monthKey(today))));
       }
     } finally {
       setSaving(false);
@@ -100,7 +101,7 @@ export function QuickAdd({
   const method = methodOverride ?? parsed?.method ?? lastMethod;
   // A picked date replaces a typed one, so the typed date's error no longer applies.
   const errors = parsed ? (dateOverride ? [] : [...parsed.errors]) : [];
-  if (parsed && attempted && parsed.amountMinor === null) errors.push('Add an amount to save');
+  if (parsed && attempted && parsed.amountMinor === null) errors.push(tl('Add an amount to save'));
   const canSave =
     parsed !== null && parsed.amountMinor !== null && parsed.amountMinor > 0 && errors.length === 0;
 
@@ -149,7 +150,7 @@ export function QuickAdd({
       const savedMonth = monthKey(dateOverride ?? parsed.date);
       if (followMonth && savedMonth !== viewMonth) {
         setMonth(savedMonth);
-        announce(`Saved to ${monthLabel(savedMonth)}. Showing that month.`);
+        announce(tl('Saved to {0}. Showing that month.', monthLabel(savedMonth)));
       }
       clear();
     } finally {
@@ -219,7 +220,7 @@ export function QuickAdd({
   return (
     <section className="card quick-add">
       <h2>
-        <label htmlFor="quick-add-input">Quick add</label>
+        <label htmlFor="quick-add-input">{tl('Quick add')}</label>
       </h2>
       <div className={voice !== 'none' ? 'qa-field qa-has-mic' : 'qa-field'}>
         <div className="qa-mirror" ref={mirror} aria-hidden="true">
@@ -242,7 +243,7 @@ export function QuickAdd({
           autoCorrect="off"
           spellCheck={false}
           enterKeyHint="done"
-          placeholder="shawarma 500 on 18th upi"
+          placeholder={tl('shawarma 500 on 18th upi')}
           aria-describedby="quick-add-help"
           value={text}
           onChange={(e) => {
@@ -265,7 +266,7 @@ export function QuickAdd({
             type="button"
             className="btn btn-ghost btn-icon qa-mic"
             aria-pressed={listening}
-            aria-label={listening ? 'Stop listening' : 'Speak an entry'}
+            aria-label={listening ? tl('Stop listening') : tl('Speak an entry')}
             onClick={toggleVoice}
           >
             <Icon name="mic" />
@@ -274,13 +275,14 @@ export function QuickAdd({
       </div>
       {keyboardTip && !text && (
         <p className="muted small" role="status">
-          Tap the mic on your keyboard and say something like “chai twenty cash”.
+          {tl('Tap the mic on your keyboard and say something like “chai twenty cash”.')}
         </p>
       )}
       {listening && (
         <p className="muted small" role="status">
-          Listening. Say something like “chai twenty cash”. Your browser&rsquo;s speech service may
-          process the audio online.
+          {tl(
+            'Listening. Say something like “chai twenty cash”. Your browser’s speech service may process the audio online.',
+          )}
         </p>
       )}
       {voiceError && (
@@ -290,13 +292,13 @@ export function QuickAdd({
       )}
       {!parsed && (
         <p id="quick-add-help" className="muted small">
-          Type what, how much and when. Press Enter to save, Escape to clear.
+          {tl('Type what, how much and when. Press Enter to save, Escape to clear.')}
         </p>
       )}
       {!text && chips.length > 0 && (
         <div className="repeat-row" role="group" aria-labelledby="repeat-label">
           <span id="repeat-label" className="muted small">
-            Repeat for today
+            {tl('Repeat for today')}
           </span>
           <ul className="repeat-chips">
             {chips.map((c, i) => (
@@ -305,7 +307,11 @@ export function QuickAdd({
                   type="button"
                   className="repeat-chip"
                   data-testid="repeat-chip"
-                  aria-label={`Add ${c.merchant}, ${fmtMoney(c.amountMinor, { currency })}, for today`}
+                  aria-label={tl(
+                    'Add {0}, {1}, for today',
+                    c.merchant,
+                    fmtMoney(c.amountMinor, { currency }),
+                  )}
                   disabled={saving}
                   onClick={() => void repeat(i)}
                 >
@@ -323,30 +329,30 @@ export function QuickAdd({
         </div>
       )}
       {parsed && (
-        <ul className="chips" aria-label="What Ledger understood" id="quick-add-help">
+        <ul className="chips" aria-label={tl('What Ledger understood')} id="quick-add-help">
           <li className="chip chip-amount" data-testid="chip-amount">
             {parsed.amountMinor !== null ? (
               <span className="amt">{fmtMoney(parsed.amountMinor, { currency })}</span>
             ) : (
-              <span className="muted">No amount yet</span>
+              <span className="muted">{tl('No amount yet')}</span>
             )}
           </li>
           <li className="chip chip-date" data-testid="chip-date">
             <button
               type="button"
               className="chip-button"
-              aria-label={`Date: ${dateLabel(date, today)}. Change`}
+              aria-label={tl('Date: {0}. Change', dateLabel(date, today))}
               onClick={openDatePicker}
             >
               {dateLabel(date, today)}
             </button>
-            {upcoming && <span className="chip-note">Upcoming</span>}
+            {upcoming && <span className="chip-note">{tl('Upcoming')}</span>}
             <input
               ref={datePicker}
               type="date"
               className="visually-hidden"
               tabIndex={-1}
-              aria-label="Entry date"
+              aria-label={tl('Entry date')}
               value={parseISO(date) ? date : ''}
               onChange={(e) => {
                 if (parseISO(e.target.value)) setDateOverride(e.target.value);
@@ -355,7 +361,7 @@ export function QuickAdd({
           </li>
           {monthKey(date) !== monthKey(today) && (
             <li className="chip chip-note" data-testid="chip-month">
-              Saves to {monthLabel(monthKey(date))}
+              {tl('Saves to {0}', monthLabel(monthKey(date)))}
             </li>
           )}
           {(isIncome || parsed.kind === 'income') && (
@@ -366,14 +372,14 @@ export function QuickAdd({
                 aria-pressed={isIncome}
                 onClick={() => setKindOverride(isIncome ? 'expense' : 'income')}
               >
-                {isIncome ? 'Money in' : 'Spending'}
+                {isIncome ? tl('Money in') : tl('Spending')}
               </button>
             </li>
           )}
           {isIncome && (
             <li className="chip chip-category" data-testid="chip-income-kind">
               <label className="visually-hidden" htmlFor="quick-add-income-kind">
-                Kind of money in
+                {tl('Kind of money in')}
               </label>
               <select
                 id="quick-add-income-kind"
@@ -393,7 +399,7 @@ export function QuickAdd({
             <li className="chip chip-category" data-testid="chip-category">
               {color && !showUnsure && <span className="dot" style={{ background: color }} />}
               <label className="visually-hidden" htmlFor="quick-add-category">
-                Category
+                {tl('Category')}
               </label>
               <select
                 id="quick-add-category"
@@ -401,7 +407,7 @@ export function QuickAdd({
                 value={categoryValue}
                 onChange={(e) => setCategory(e.target.value || undefined)}
               >
-                {showUnsure && <option value="">Pick a category</option>}
+                {showUnsure && <option value="">{tl('Pick a category')}</option>}
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -412,7 +418,7 @@ export function QuickAdd({
           )}
           <li className="chip chip-method" data-testid="chip-method">
             <label className="visually-hidden" htmlFor="quick-add-method">
-              Paid by
+              {tl('Paid by')}
             </label>
             <select
               id="quick-add-method"
@@ -422,7 +428,7 @@ export function QuickAdd({
             >
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {methodLabel(m)}
                 </option>
               ))}
             </select>
@@ -431,13 +437,16 @@ export function QuickAdd({
       )}
       {showUnsure && (
         <p className="muted small">
-          Not sure where this goes. Pick a category and Ledger will remember it.
+          {tl('Not sure where this goes. Pick a category and Ledger will remember it.')}
         </p>
       )}
       {duplicate && confirmDuplicate && (
         <p className="warning" role="alert">
-          This looks like a repeat of {duplicate.merchant} on {fmtDate(duplicate.date)}. Press Enter
-          again to keep both.
+          {tl(
+            'This looks like a repeat of {0} on {1}. Press Enter again to keep both.',
+            duplicate.merchant,
+            fmtDate(duplicate.date),
+          )}
         </p>
       )}
       {errors.length > 0 && (

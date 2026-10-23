@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { newId, useLedger } from '../../data/store';
 import type { SavedReport } from '../../domain/reports';
+import { tl } from '../../domain/i18n';
 
 const MAX_REPORT_NAME = 40;
 
@@ -26,7 +27,7 @@ export function SavedReports({
       {reports.length > 0 && (
         <>
           <label className="visually-hidden" htmlFor="report-select">
-            Saved report
+            {tl('Saved report')}
           </label>
           <select
             id="report-select"
@@ -38,7 +39,7 @@ export function SavedReports({
               if (r) onApply(r);
             }}
           >
-            <option value="">Saved reports</option>
+            <option value="">{tl('Saved reports')}</option>
             {reports.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -54,7 +55,7 @@ export function SavedReports({
                 setActiveId('');
               }}
             >
-              Delete report
+              {tl('Delete report')}
             </button>
           )}
         </>
@@ -74,24 +75,24 @@ export function SavedReports({
           }}
         >
           <label className="visually-hidden" htmlFor="report-name">
-            Report name
+            {tl('Report name')}
           </label>
           <input
             id="report-name"
             className="input"
-            placeholder="Name this report"
+            placeholder={tl('Name this report')}
             maxLength={MAX_REPORT_NAME}
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <button type="submit" className="btn">
-            Save
+            {tl('Save')}
           </button>
         </form>
       ) : (
         <button type="button" className="btn btn-ghost" onClick={() => setNaming(true)}>
-          Save this report
+          {tl('Save this report')}
         </button>
       )}
     </div>

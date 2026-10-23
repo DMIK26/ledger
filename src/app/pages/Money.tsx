@@ -7,11 +7,27 @@ import { NetWorthCard } from '../money/NetWorth';
 import { UdhaarView } from '../money/Udhaar';
 import { SplitsCard } from '../money/SplitsCard';
 import { useMoneyData } from '../money/shared';
+import { tl } from '../../domain/i18n';
 
 const VIEWS = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'udhaar', label: 'Udhaar' },
-  { id: 'loans', label: 'Loans' },
+  {
+    id: 'overview',
+    get label() {
+      return tl('Overview');
+    },
+  },
+  {
+    id: 'udhaar',
+    get label() {
+      return tl('Udhaar');
+    },
+  },
+  {
+    id: 'loans',
+    get label() {
+      return tl('Loans');
+    },
+  },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
@@ -24,7 +40,7 @@ export function MoneyPage({ view }: { view?: string | null }) {
   const { today } = useMoneyData();
   return (
     <>
-      <div className="segmented page-views" role="group" aria-label="Show">
+      <div className="segmented page-views" role="group" aria-label={tl('Show')}>
         {VIEWS.map((v) => (
           <button
             key={v.id}

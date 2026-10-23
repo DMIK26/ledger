@@ -1,7 +1,8 @@
 import { lazy } from 'react';
 
 /**
- * Pages loaded on first visit, so start-up only downloads the Dashboard and Transactions. Every chunk
+ * Pages loaded on first visit, so start-up only downloads the Dashboard (Transactions joined them in
+ * Drop 13). Every chunk
  * is still precached by the service worker, so they open offline too. Tests swap this file for
  * `lazy.eager.tsx` (see vite.config.ts) so pages render in one pass.
  */
@@ -12,4 +13,7 @@ export const Settings = lazy(() => import('./Settings').then((m) => ({ default: 
 export const MoneyPage = lazy(() => import('./Money').then((m) => ({ default: m.MoneyPage })));
 export const MerchantPage = lazy(() =>
   import('./Merchant').then((m) => ({ default: m.MerchantPage })),
+);
+export const Transactions = lazy(() =>
+  import('./Transactions').then((m) => ({ default: m.Transactions })),
 );

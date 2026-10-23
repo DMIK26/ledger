@@ -3,6 +3,7 @@ import { categorise } from '../domain/categoriser';
 import { isoFromYMD, isValidYMD, todayISO } from '../domain/dates';
 import { parseAmountToMinor } from '../domain/money';
 import type { Category, PaymentMethod, Transaction } from '../domain/types';
+import { tl } from '../domain/i18n';
 
 export type AmountUnit = 'major' | 'minor';
 
@@ -244,7 +245,7 @@ export function parseLegacy(json: unknown, opts: LegacyOptions): LegacyPreview |
     });
   }
 
-  if (skipped > 0) warnings.push(`${skipped} record(s) had no usable date or amount and were skipped.`);
+  if (skipped > 0) warnings.push(tl('{0} record(s) had no usable date or amount and were skipped.', skipped));
   const dates = transactions.map((t) => t.date).sort();
   return {
     transactions,

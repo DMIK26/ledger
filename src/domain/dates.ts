@@ -1,3 +1,4 @@
+import { msg, tl } from './i18n';
 import type { ISODate } from './types';
 
 export const MONTHS = [
@@ -7,6 +8,30 @@ export const MONTHS = [
 export const WEEKDAYS = [
   'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 ] as const;
+
+// The names as shown, in the interface language (Drop 13). MONTHS and WEEKDAYS stay English for
+// reading typed dates and for files.
+const MONTH_SHORT = [
+  msg('Jan'), msg('Feb'), msg('Mar'), msg('Apr'), msg('May'), msg('Jun'),
+  msg('Jul'), msg('Aug'), msg('Sep'), msg('Oct'), msg('Nov'), msg('Dec'),
+];
+const MONTH_LONG = [
+  msg('January'), msg('February'), msg('March'), msg('April'), msg('May'), msg('June'),
+  msg('July'), msg('August'), msg('September'), msg('October'), msg('November'), msg('December'),
+];
+const DAY_SHORT = [msg('Sun'), msg('Mon'), msg('Tue'), msg('Wed'), msg('Thu'), msg('Fri'), msg('Sat')];
+const DAY_LONG = [
+  msg('Sunday'), msg('Monday'), msg('Tuesday'), msg('Wednesday'), msg('Thursday'), msg('Friday'),
+  msg('Saturday'),
+];
+/** "October", "అక్టోబర్", "अक्टूबर"; m is 1 to 12. */
+export const monthName = (m: number): string => tl(MONTH_LONG[m - 1] ?? '');
+/** "Oct"; m is 1 to 12. */
+export const monthShort = (m: number): string => tl(MONTH_SHORT[m - 1] ?? '');
+/** "Thursday"; d is 0 (Sunday) to 6. */
+export const dayName = (d: number): string => tl(DAY_LONG[d] ?? '');
+/** "Thu"; d is 0 (Sunday) to 6. */
+export const dayShort = (d: number): string => tl(DAY_SHORT[d] ?? '');
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const MS_PER_DAY = 86_400_000;
@@ -126,7 +151,7 @@ export function monthRangeLabel(key: string): string {
   const { start, end } = monthBounds(key);
   const a = mustParse(start);
   const b = mustParse(end);
-  return `${a.d} ${MONTHS[a.m - 1]!.slice(0, 3)} to ${b.d} ${MONTHS[b.m - 1]!.slice(0, 3)}`;
+  return tl('{0} to {1}', `${a.d} ${monthShort(a.m)}`, `${b.d} ${monthShort(b.m)}`);
 }
 
 export function shiftMonth(y: number, m: number, delta: number): { y: number; m: number } {
@@ -136,12 +161,17 @@ export function shiftMonth(y: number, m: number, delta: number): { y: number; m:
 
 export function fmtDate(iso: ISODate): string {
   const p = mustParse(iso);
-  return `${p.d} ${MONTHS[p.m - 1]!.slice(0, 3)} ${p.y}`;
+  return `${p.d} ${monthShort(p.m)} ${p.y}`;
+}
+
+/** "Oct" for a month key, in the interface language (never a cut-off word in Telugu or Hindi). */
+export function monthShortLabel(key: string): string {
+  return monthShort(Number(key.split('-')[1]) || 1);
 }
 
 export function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number);
-  return `${MONTHS[(m ?? 1) - 1]} ${y}`;
+  return `${monthName(m ?? 1)} ${y}`;
 }
 
 export interface FinancialYear {
@@ -158,7 +188,7 @@ export function fyOf(iso: ISODate, startMonth = 4): FinancialYear {
   const start = isoFromYMD(startYear, startMonth, 1);
   const end = addDays(isoFromYMD(startYear + 1, startMonth, 1), -1);
   const label =
-    startMonth === 1 ? String(startYear) : `FY ${startYear}-${pad2((startYear + 1) % 100)}`;
+    startMonth === 1 ? String(startYear) : tl('FY {0}', `${startYear}-${pad2((startYear + 1) % 100)}`);
   return { label, startYear, start, end };
 }
 

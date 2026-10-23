@@ -1,6 +1,8 @@
 import { daysInMonth, diffDays, isoFromYMD, monthKey, parseISO, shiftMonth } from './dates';
 import type { ISODate, PaymentMethod, Transaction } from './types';
 import { udhaarAccountEffect, type UdhaarEntry } from './udhaar';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 /**
  * Accounts, money in, transfers, fees and the cash-flow view (Drop 9). Spending stays in `transactions`;
@@ -10,14 +12,24 @@ import { udhaarAccountEffect, type UdhaarEntry } from './udhaar';
 export type AccountKind = 'bank' | 'cash' | 'wallet' | 'card';
 
 export const ACCOUNT_KIND_LABEL: Record<AccountKind, string> = {
-  bank: 'Bank account',
-  cash: 'Cash',
-  wallet: 'Wallet',
-  card: 'Credit card',
+  get bank() {
+    return tl('Bank account');
+  },
+  get cash() {
+    return tl('Cash');
+  },
+  get wallet() {
+    return tl('Wallet');
+  },
+  get card() {
+    return tl('Credit card');
+  },
 };
 
 export interface Account {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   kind: AccountKind;
   /** Balance at the start of `openingDate`. For a card: what was owed then (positive). */
@@ -38,12 +50,24 @@ export interface Account {
 export type IncomeKind = 'salary' | 'business' | 'interest' | 'gift' | 'refund' | 'other';
 
 export const INCOME_KINDS: Record<IncomeKind, string> = {
-  salary: 'Salary',
-  business: 'Business',
-  interest: 'Interest',
-  gift: 'Gift',
-  refund: 'Refund',
-  other: 'Other',
+  get salary() {
+    return tl('Salary');
+  },
+  get business() {
+    return tl('Business');
+  },
+  get interest() {
+    return tl('Interest');
+  },
+  get gift() {
+    return tl('Gift');
+  },
+  get refund() {
+    return tl('Refund');
+  },
+  get other() {
+    return tl('Other');
+  },
 };
 
 /**
@@ -55,6 +79,8 @@ export type FlowKind = 'income' | 'transfer' | 'fee' | 'adjust';
 
 export interface Flow {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   kind: FlowKind;
   date: ISODate;
   /** Integer minor units. Positive, except an adjustment, which is signed. */

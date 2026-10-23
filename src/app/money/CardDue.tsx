@@ -4,6 +4,7 @@ import { cardsDueSoon } from '../../domain/accounts';
 import { fmtDate, todayISO } from '../../domain/dates';
 import { Money } from '../Money';
 import { href } from '../router';
+import { tl } from '../../domain/i18n';
 
 /** Dashboard note for credit cards due within a week (or late). Shows nothing otherwise. */
 export function CardDue() {
@@ -19,7 +20,7 @@ export function CardDue() {
   );
   if (due.length === 0) return null;
   return (
-    <section className="card card-due" aria-label="Card payments due" data-testid="card-due">
+    <section className="card card-due" aria-label={tl('Card payments due')} data-testid="card-due">
       <ul className="money-list">
         {due.map(({ card, status }) => (
           <li key={card.id} className="money-row">
@@ -27,10 +28,15 @@ export function CardDue() {
               <span>{card.name}</span>
               <span className={status.overdue ? 'status-over small' : 'muted small'}>
                 {status.overdue
-                  ? `Was due ${fmtDate(status.dueDate!)}`
+                  ? tl('Was due {0}', fmtDate(status.dueDate!))
                   : status.daysToDue === 0
-                    ? 'Due today'
-                    : `Due ${fmtDate(status.dueDate!)}, in ${status.daysToDue} ${status.daysToDue === 1 ? 'day' : 'days'}`}
+                    ? tl('Due today')
+                    : tl(
+                        'Due {0}, in {1} {2}',
+                        fmtDate(status.dueDate!),
+                        status.daysToDue,
+                        status.daysToDue === 1 ? tl('day') : tl('days'),
+                      )}
               </span>
             </span>
             <Money minor={status.dueMinor} currency={currency} />
@@ -38,7 +44,7 @@ export function CardDue() {
         ))}
       </ul>
       <a className="small" href={href('/money')}>
-        Record a payment on Money
+        {tl('Record a payment on Money')}
       </a>
     </section>
   );

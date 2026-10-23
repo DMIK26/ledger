@@ -201,6 +201,7 @@ test('privacy hides every amount on every page', async ({ page }) => {
     await page.goto(`./${r}`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.locator('.page-loading')).toHaveCount(0);
+    await expectNoAmounts(page, r);
     if (r === '#/money') await page.getByRole('button', { name: /^HDFC/ }).click();
     if (r === '#/') {
       await page.getByText('How it is worked out').click();
@@ -212,15 +213,32 @@ test('privacy hides every amount on every page', async ({ page }) => {
     if (r === '#/transactions') await page.getByRole('button', { name: /^Edit Shawarma/ }).click();
     if (r === '#/budgets?view=trips')
       await page.getByRole('button', { name: 'Show entries' }).click();
-    const all = await page.evaluate(() => {
-      const attrs = [...document.querySelectorAll('*')]
-        .flatMap((el) => [...el.attributes].map((a) => a.value))
-        .join(' ');
-      return `${document.body.innerText} ${attrs} ${document.title}`;
-    });
-    for (const real of ['1,234.56', '1234.56', '7,654.32']) expect(all, r).not.toContain(real);
+    await expectNoAmounts(page, r);
+  }
+
+  // The same in Telugu and Hindi (Drop 13).
+  for (const language of ['te', 'hi']) {
+    await page.goto('./#/settings');
+    await page.getByTestId(`language-${language}`).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', language);
+    for (const r of routes) {
+      await page.goto(`./${r}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('.page-loading')).toHaveCount(0);
+      await expectNoAmounts(page, `${language} ${r}`);
+    }
   }
 });
+
+async function expectNoAmounts(page: Page, where: string) {
+  const all = await page.evaluate(() => {
+    const attrs = [...document.querySelectorAll('*')]
+      .flatMap((el) => [...el.attributes].map((a) => a.value))
+      .join(' ');
+    return `${document.body.innerText} ${attrs} ${document.title}`;
+  });
+  for (const real of ['1,234.56', '1234.56', '7,654.32']) expect(all, where).not.toContain(real);
+}
 
 test('screen lock asks for the PIN on the next open', async ({ page }) => {
   await page.goto('./#/settings');

@@ -4,11 +4,27 @@ import { useLedger } from '../data/store';
 import type { AddMode } from '../domain/types';
 import { EntryForm, Keypad, Several } from './deferred';
 import { Icon } from './icons';
+import { tl } from '../domain/i18n';
 
 const MODES: Array<{ id: AddMode; label: string }> = [
-  { id: 'form', label: 'Form' },
-  { id: 'keypad', label: 'Keypad' },
-  { id: 'several', label: 'Several' },
+  {
+    id: 'form',
+    get label() {
+      return tl('Form');
+    },
+  },
+  {
+    id: 'keypad',
+    get label() {
+      return tl('Keypad');
+    },
+  },
+  {
+    id: 'several',
+    get label() {
+      return tl('Several');
+    },
+  },
 ];
 
 /**
@@ -63,17 +79,17 @@ export function AddSheet({
       <div className="sheet-body">
         <div {...snap.handleProps} />
         <div className="sheet-head">
-          <h2 id="add-title">Add expense</h2>
+          <h2 id="add-title">{tl('Add expense')}</h2>
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label="Close"
+            aria-label={tl('Close')}
             onClick={onClose}
           >
             <Icon name="close" />
           </button>
         </div>
-        <div className="segmented add-modes" role="group" aria-label="Add with">
+        <div className="segmented add-modes" role="group" aria-label={tl('Add with')}>
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -88,7 +104,7 @@ export function AddSheet({
         <Suspense
           fallback={
             <p className="muted small" aria-busy="true">
-              Opening…
+              {tl('Opening…')}
             </p>
           }
         >
@@ -98,7 +114,7 @@ export function AddSheet({
               describe
               autoFocus
               initialDate={date}
-              submitLabel="Save"
+              submitLabel={tl('Save')}
               onDone={onClose}
             />
           )}

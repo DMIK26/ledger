@@ -1,5 +1,7 @@
 import { diffDays } from './dates';
 import type { CategoryId, ISODate, Transaction } from './types';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 /**
  * Trips, projects and festival funds (Drop 12): a bucket of entries with its own budget and total.
@@ -10,13 +12,21 @@ import type { CategoryId, ISODate, Transaction } from './types';
 export type ProjectKind = 'trip' | 'project' | 'festival';
 
 export const PROJECT_KIND_LABEL: Record<ProjectKind, string> = {
-  trip: 'Trip',
-  project: 'Project',
-  festival: 'Festival',
+  get trip() {
+    return tl('Trip');
+  },
+  get project() {
+    return tl('Project');
+  },
+  get festival() {
+    return tl('Festival');
+  },
 };
 
 export interface Project {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   kind: ProjectKind;
   start?: ISODate;
@@ -37,16 +47,17 @@ export function projectProblem(
   ignoreId?: string,
 ): string | null {
   const n = draft.name.trim();
-  if (!n) return 'Give it a name';
-  if (n.length > MAX_PROJECT_NAME) return `Keep the name under ${MAX_PROJECT_NAME} characters`;
+  if (!n) return tl('Give it a name');
+  if (n.length > MAX_PROJECT_NAME)
+    return tl('Keep the name under {0} characters', MAX_PROJECT_NAME);
   if (others.some((p) => p.id !== ignoreId && p.name.toLowerCase() === n.toLowerCase()))
-    return 'There is already one with that name';
+    return tl('There is already one with that name');
   if (draft.start && draft.end && draft.end < draft.start)
-    return 'The last day is before the first';
+    return tl('The last day is before the first');
   if (draft.collect && !(draft.start && draft.end))
-    return 'To collect entries by date, give the first and last day';
+    return tl('To collect entries by date, give the first and last day');
   if (draft.budgetMinor !== undefined && draft.budgetMinor < 0)
-    return 'The budget cannot be negative';
+    return tl('The budget cannot be negative');
   return null;
 }
 

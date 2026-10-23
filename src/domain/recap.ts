@@ -13,6 +13,7 @@ import {
 } from './dates';
 import { weekStart } from './calendar';
 import type { CategoryId, ISODate, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Story recaps (Drop 11, after Spotify Wrapped, minus the nagging): last week, last month and the last
@@ -41,7 +42,7 @@ export function lastWeek(today: ISODate): RecapPeriod {
     id: `week:${start}`,
     start,
     end,
-    label: `Week of ${fmtDate(start)}`,
+    label: tl('Week of {0}', fmtDate(start)),
     compareStart: addDays(start, -7),
     compareEnd: addDays(start, -1),
   };
@@ -138,7 +139,7 @@ export function buildRecap(
   for (const t of inP) {
     cats.set(t.categoryId, (cats.get(t.categoryId) ?? 0) + t.amountMinor);
     const key = normalizeMerchantKey(t.merchant) || 'untitled';
-    const m = merchants.get(key) ?? { name: t.merchant || 'Untitled', total: 0, count: 0 };
+    const m = merchants.get(key) ?? { name: t.merchant || tl('Untitled'), total: 0, count: 0 };
     m.total += t.amountMinor;
     m.count += 1;
     merchants.set(key, m);
@@ -179,7 +180,7 @@ export function buildRecap(
     busiestDay: busy ? { date: busy[0], totalMinor: busy[1] } : null,
     quietDays,
     biggest: big
-      ? { merchant: big.merchant || 'Untitled', amountMinor: big.amountMinor, date: big.date }
+      ? { merchant: big.merchant || tl('Untitled'), amountMinor: big.amountMinor, date: big.date }
       : null,
     inMinor,
     leftMinor: inMinor > 0 ? inMinor - totalMinor - fees : null,

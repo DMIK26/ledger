@@ -3,6 +3,7 @@ import { Money, usePrivacy } from '../app/Money';
 import type { FlowNode, MoneyFlow } from '../domain/flow';
 import { fmtMoney } from '../domain/money';
 import { useSize } from './useSize';
+import { tl } from '../domain/i18n';
 
 const NODE_W = 10;
 const GAP = 8;
@@ -110,14 +111,19 @@ export function FlowChart({
           ))}
         </svg>
       </div>
-      <div className="table-wrap" tabIndex={0} role="region" aria-label="Money flow as a table">
+      <div
+        className="table-wrap"
+        tabIndex={0}
+        role="region"
+        aria-label={tl('Money flow as a table')}
+      >
         <table className="report-table flow-table">
           <thead>
             <tr>
-              <th scope="col">From</th>
-              <th scope="col">To</th>
+              <th scope="col">{tl('From')}</th>
+              <th scope="col">{tl('To')}</th>
               <th scope="col" className="num">
-                Amount
+                {tl('Amount')}
               </th>
             </tr>
           </thead>
@@ -136,7 +142,7 @@ export function FlowChart({
           </tbody>
         </table>
       </div>
-      <div className="flow-pick-row" role="group" aria-label="Show a category's merchants">
+      <div className="flow-pick-row" role="group" aria-label={tl("Show a category's merchants")}>
         {flow.nodes
           .filter((n) => n.kind === 'category')
           .map((n) => (

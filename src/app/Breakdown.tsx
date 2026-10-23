@@ -11,6 +11,8 @@ import { useView } from '../kit/view';
 import { Money } from './Money';
 import { href } from './router';
 import { TxList } from './TxList';
+import { tl } from '../domain/i18n';
+import { tr } from './tr';
 
 export type BreakdownRoot = 'categories' | 'days' | 'compare';
 
@@ -49,7 +51,7 @@ function Rows({
   onStep: (s: string) => void;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
-  if (rows.length === 0) return <p className="muted small">Nothing here.</p>;
+  if (rows.length === 0) return <p className="muted small">{tl('Nothing here.')}</p>;
   return (
     <ul className="hbars drill-rows">
       {rows.map((r) => (
@@ -79,7 +81,7 @@ function PinButton({ pin }: { pin: Pin }) {
   const togglePin = useView((s) => s.togglePin);
   return (
     <button type="button" className="btn" aria-pressed={pinned} onClick={() => togglePin(pin)}>
-      {pinned ? `Unpin ${pin.label}` : `Pin ${pin.label} to every page`}
+      {pinned ? tl('Unpin {0}', pin.label) : tl('Pin {0} to every page', pin.label)}
     </button>
   );
 }
@@ -99,7 +101,7 @@ export function Breakdown({
 }: Props) {
   const categories = useLedger((s) => s.categories);
   const currency = useLedger((s) => s.settings.currency);
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   const go = (next: BreakdownPath) => withTransition(() => onPath(next));
   const step = (s: string) => go([...path, s]);
 
@@ -142,7 +144,7 @@ export function Breakdown({
               label: fmtDate(d),
               hl: entityKey('day', d),
               value: ts.reduce((s, t) => s + t.amountMinor, 0),
-              sub: ts.length === 1 ? '1 entry' : `${ts.length} entries`,
+              sub: ts.length === 1 ? tl('1 entry') : tl('{0} entries', ts.length),
               step: `d:${d}`,
             }))}
         />
@@ -167,8 +169,7 @@ export function Breakdown({
             sub:
               root === 'compare' ? (
                 <>
-                  Last month by now:{' '}
-                  <Money minor={before.get(c.categoryId) ?? 0} currency={currency} />
+                  {tr('Last month by now: {0}', <Money minor={before.get(c.categoryId) ?? 0} currency={currency} />)}
                 </>
               ) : undefined,
             step: `c:${c.categoryId}`,
@@ -191,10 +192,10 @@ export function Breakdown({
           rows={[...byMerchant.entries()]
             .map(([k, ts]) => ({
               key: k,
-              label: ts[0]!.merchant || 'Untitled',
+              label: ts[0]!.merchant || tl('Untitled'),
               hl: merchantKey(ts[0]!.merchant),
               value: ts.reduce((s, t) => s + t.amountMinor, 0),
-              sub: ts.length === 1 ? '1 entry' : `${ts.length} entries`,
+              sub: ts.length === 1 ? tl('1 entry') : tl('{0} entries', ts.length),
               step: `m:${k}`,
             }))
             .sort((a, b) => b.value - a.value)}
@@ -205,8 +206,7 @@ export function Breakdown({
             className="btn btn-ghost"
             href={href(`/transactions?category=${id}&from=${range.from}&to=${range.to}`)}
           >
-            Open in Transactions
-          </a>
+            {tl('Open in Transactions')}</a>
         </div>
       </>
     );
@@ -230,7 +230,7 @@ export function Breakdown({
 
   return (
     <div className="breakdown" data-testid="breakdown">
-      <nav aria-label="Breakdown" className="crumbs">
+      <nav aria-label={tl('Breakdown')} className="crumbs">
         <ol>
           {crumbs.map((c, i) => (
             <li key={c.to.join('/') || 'root'}>
@@ -246,8 +246,7 @@ export function Breakdown({
         </ol>
       </nav>
       <p className="muted small" aria-live="polite">
-        <Money minor={list.reduce((s, t) => s + t.amountMinor, 0)} currency={currency} /> in{' '}
-        {list.length === 1 ? '1 entry' : `${list.length} entries`}
+        {tr('{0} in {1}', <Money minor={list.reduce((s, t) => s + t.amountMinor, 0)} currency={currency} />, list.length === 1 ? tl('1 entry') : tl('{0} entries', list.length))}
       </p>
       {body}
     </div>

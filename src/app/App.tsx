@@ -1,9 +1,19 @@
 import { Suspense } from 'react';
+import { useLedger } from '../data/store';
 import { Layout } from './Layout';
 import { Dashboard } from './pages/Dashboard';
-import { Budgets, MerchantPage, MoneyPage, Recurring, Reports, Settings } from './pages/lazy';
-import { filtersFromQuery, Transactions } from './pages/Transactions';
+import {
+  Budgets,
+  MerchantPage,
+  MoneyPage,
+  Recurring,
+  Reports,
+  Settings,
+  Transactions,
+} from './pages/lazy';
+import { filtersFromQuery } from '../domain/filters';
 import { useRoute, type RoutePath } from './router';
+import { tl } from '../domain/i18n';
 
 function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
   switch (path) {
@@ -41,12 +51,14 @@ export function App() {
   pageQuery.delete('action');
   pageQuery.delete('on');
   const key = `${path}?${pageQuery.toString()}`;
+  // A new language re-draws everything, including text worked out once and kept.
+  const language = useLedger((s) => s.settings.language);
   return (
-    <Layout path={path} adding={adding} addDate={addDate}>
+    <Layout key={language} path={path} adding={adding} addDate={addDate}>
       <Suspense
         fallback={
           <p className="muted page-loading" aria-busy="true">
-            Opening…
+            {tl('Opening…')}
           </p>
         }
       >

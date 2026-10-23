@@ -6,6 +6,7 @@ import { fmtMoney } from '../domain/money';
 import type { Category } from '../domain/types';
 import { fillFor } from './fills';
 import { tick } from '../kit/haptics';
+import { tl } from '../domain/i18n';
 
 interface Props {
   segments: Segment[];
@@ -35,7 +36,7 @@ export function AllocationBar({
   );
   const shown = draft ?? segments;
   const total = shown.reduce((s, x) => s + x.amountMinor, 0) + Math.max(0, unallocatedMinor);
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   const pct = (v: number) => (total > 0 ? (v / total) * 100 : 0);
 
   const onPointerDown = (index: number) => (e: PointerEvent<HTMLButtonElement>) => {
@@ -97,7 +98,7 @@ export function AllocationBar({
               className="alloc-divider"
               style={{ left: `${left}%` }}
               role="slider"
-              aria-label={`Move budget between ${name(s.id)} and ${name(next.id)}`}
+              aria-label={tl('Move budget between {0} and {1}', name(s.id), name(next.id))}
               aria-valuetext={`${name(s.id)} ${fmtMoney(s.amountMinor, { currency })}, ${name(next.id)} ${fmtMoney(next.amountMinor, { currency })}`}
               aria-valuemin={masked ? undefined : 0}
               aria-valuemax={
@@ -128,7 +129,7 @@ export function AllocationBar({
               className="dot"
               style={{ background: 'var(--fill)', outline: '1px solid var(--border)' }}
             />
-            <span className="legend-name">Not given to a category</span>
+            <span className="legend-name">{tl('Not given to a category')}</span>
             <Money minor={unallocatedMinor} currency={currency} />
           </li>
         )}

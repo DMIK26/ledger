@@ -8,12 +8,13 @@ import {
   monthLabel,
   monthBounds,
   monthKey,
-  MONTHS,
+  monthShort,
   parseISO,
   shiftMonth,
   shiftMonthKey,
 } from './dates';
 import type { ISODate } from './types';
+import { tl } from './i18n';
 
 export type PeriodKind = 'month' | 'quarter' | 'fy' | 'custom';
 
@@ -24,7 +25,7 @@ export interface Period {
   label: string;
 }
 
-const short = (m: number) => MONTHS[m - 1]!.slice(0, 3);
+const short = (m: number) => monthShort(m);
 
 /** A month follows Settings > Month starts on; with a start day other than 1 it spans two months. */
 function monthPeriod(key: string): Period {
@@ -42,8 +43,8 @@ function quarterPeriod(y: number, m: number, fyStart: number): Period {
   const fy = fyOf(start, fyStart).label;
   const span =
     first.y === last.y
-      ? `${short(first.m)} to ${short(last.m)} ${last.y}`
-      : `${short(first.m)} ${first.y} to ${short(last.m)} ${last.y}`;
+      ? tl('{0} to {1} {2}', short(first.m), short(last.m), last.y)
+      : tl('{0} {1} to {2} {3}', short(first.m), first.y, short(last.m), last.y);
   return { kind: 'quarter', start, end, label: `Q${index + 1} ${fy} (${span})` };
 }
 
@@ -71,7 +72,7 @@ export function periodFor(
 
 export function customPeriod(start: ISODate, end: ISODate): Period {
   const [a, b] = start <= end ? [start, end] : [end, start];
-  return { kind: 'custom', start: a, end: b, label: `${fmtDate(a)} to ${fmtDate(b)}` };
+  return { kind: 'custom', start: a, end: b, label: tl('{0} to {1}', fmtDate(a), fmtDate(b)) };
 }
 
 export const periodDays = (p: Pick<Period, 'start' | 'end'>): number =>
@@ -128,11 +129,21 @@ export const RELATIVE_RANGES = [
 export type RelativeRange = (typeof RELATIVE_RANGES)[number];
 
 export const RELATIVE_LABEL: Record<RelativeRange, string> = {
-  'last-30-days': 'Last 30 days',
-  'last-3-months': 'Last 3 months',
-  'last-6-months': 'Last 6 months',
-  'last-12-months': 'Last 12 months',
-  'this-year': 'This calendar year',
+  get 'last-30-days'() {
+    return tl('Last 30 days');
+  },
+  get 'last-3-months'() {
+    return tl('Last 3 months');
+  },
+  get 'last-6-months'() {
+    return tl('Last 6 months');
+  },
+  get 'last-12-months'() {
+    return tl('Last 12 months');
+  },
+  get 'this-year'() {
+    return tl('This calendar year');
+  },
 };
 
 /**

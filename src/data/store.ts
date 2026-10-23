@@ -31,6 +31,10 @@ import { projectForDate, type Project } from '../domain/projects';
 import { applyRule, firstRule, moveRule, ruleExtras, type CustomRule } from '../domain/rules';
 import type { SavedReport } from '../domain/reports';
 import { makeSubcategory, subcategoryFits } from '../domain/subcategories';
+import { hasShopRows, inSpace, spaceOf, type Space, type SpaceView } from '../domain/spaces';
+import type { LockPasskey, PasskeyAssertion } from '../domain/passkey';
+import type { Language } from '../domain/i18n';
+import { loadLanguage } from '../i18n/load';
 import {
   myShare,
   shareAmounts,
@@ -38,7 +42,14 @@ import {
   type Split,
   type SplitMode,
 } from '../domain/splits';
-import { isDefaultCategory, makeCategory, OTHER_ID, recolor, reorder } from '../domain/categories';
+import {
+  isDefaultCategory,
+  makeCategory,
+  OTHER_ID,
+  recolor,
+  reorder,
+  shownCategory,
+} from '../domain/categories';
 import type { ImportPlan } from '../domain/csvImport';
 import type { RecurringItem } from '../domain/recurring';
 import type { AuditEvent } from '../domain/types';
@@ -93,6 +104,9 @@ import {
   CUSTOM_RULES_KEY,
   SAVED_REPORTS_KEY,
   NUDGES_DISMISSED_KEY,
+  setWriteSpace,
+  getWriteSpace,
+  stampSpace,
   putRow,
   removeRow,
   putNote,
@@ -109,6 +123,7 @@ import {
   type RowStore,
 } from './commands';
 import { DB_NAME, openLedgerDB, type Db, type LedgerDB } from './db';
+import { tl } from '../domain/i18n';
 
 type LedgerRow<S extends RowStore> = LedgerDB[S]['value'];
 
@@ -135,6 +150,40 @@ export interface EntryDraft {
 }
 
 export type ProjectDraft = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface Everything {
+  transactions: Transaction[];
+  flows: Flow[];
+  accounts: Account[];
+  people: Person[];
+  udhaar: UdhaarEntry[];
+  loans: Loan[];
+  goals: Goal[];
+  wishlist: WishItem[];
+  assets: Asset[];
+  budgets: Budget[];
+  recurring: RecurringItem[];
+  projects: Project[];
+}
+
+const NOTHING: Everything = {
+  transactions: [],
+  flows: [],
+  accounts: [],
+  people: [],
+  udhaar: [],
+  loans: [],
+  goals: [],
+  wishlist: [],
+  assets: [],
+  budgets: [],
+  recurring: [],
+  projects: [],
+};
+
+/** The space the switcher shows, given the settings: Personal unless spaces are on. */
+export const viewOf = (s: Pick<Settings, 'spacesOn' | 'space'>): SpaceView =>
+  s.spacesOn ? s.space : 'personal';
 
 /** A person in a split: someone known (personId), a new name, or you (personId null, no name). */
 export interface SplitPerson {
@@ -214,6 +263,8 @@ export type ReceiptChange = Blob | null | undefined;
 export const LOCK_KEY = 'lock';
 /** When "Forgot PIN?" was pressed (epoch ms). Cleared by the right PIN, a new PIN or the reset itself. */
 export const LOCK_RESET_KEY = 'lockReset';
+/** The Face ID or fingerprint passkey for the lock; on this device only, never in a backup (Drop 13). */
+export const PASSKEY_KEY = 'lockPasskey';
 
 export interface LedgerState {
   ready: boolean;
@@ -256,6 +307,8 @@ export interface LedgerState {
   customRules: CustomRule[];
   savedReports: SavedReport[];
   nudgesDismissed: string[];
+  /** Every space's rows, unfiltered (Drop 13): for backups, the app badge and Both. */
+  everything: Everything;
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -370,6 +423,8 @@ export interface LedgerState {
   saveSubcategory: (categoryId: string, name: string, id?: string) => Promise<string | null>;
   deleteSubcategory: (categoryId: string, subId: string) => Promise<void>;
   setCategoryNeed: (categoryId: string, need: 'need' | 'want') => Promise<void>;
+  /** Drop 13: moves entries (and a split's udhaar) to the other ledger. */
+  moveToSpace: (ids: string[], space: Space) => Promise<void>;
   /** What the activity log holds about one entry, newest first. */
   getEntryHistory: (id: string) => Promise<AuditEvent[]>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
@@ -386,6 +441,11 @@ export interface LedgerState {
   setPin: (pin: string) => Promise<void>;
   removePin: (pin: string) => Promise<boolean>;
   unlock: (pin: string) => Promise<boolean>;
+  /** The passkey that can unlock instead of the PIN, or null (Drop 13). */
+  lockPasskey: LockPasskey | null;
+  setLockPasskey: (passkey: LockPasskey | null) => Promise<void>;
+  /** Unlocks when the device's signature checks out against the saved passkey. */
+  unlockWithPasskey: (assertion: PasskeyAssertion) => Promise<boolean>;
   lockNow: () => void;
   /** Replaces a month's budgets in one undoable step. Zero amounts are removed. */
   setMonthBudgets: (month: string, next: MonthBudgets, label?: string) => Promise<void>;
@@ -458,6 +518,10 @@ export function applyBoot(
   }
 }
 
+/** The last "Undid…" message, so the toast does not offer to undo again (in any language). */
+let undidNotice: string | null = null;
+export const isUndidNotice = (notice: string): boolean => notice === undidNotice;
+
 export const newId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -479,22 +543,31 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       const out: Command[] = [];
       const favs = mergeFavourites(get().favourites, file.data.favourites ?? []);
       if (favs.length !== get().favourites.length)
-        out.push(setSettingsList(FAVOURITES_KEY, favs, get().favourites, 'Restored favourites'));
+        out.push(
+          setSettingsList(FAVOURITES_KEY, favs, get().favourites, tl('Restored favourites')),
+        );
       const days = mergeDays(get().noSpendDays, file.data.noSpendDays ?? []);
       if (days.length !== get().noSpendDays.length)
-        out.push(setSettingsList(NO_SPEND_KEY, days, get().noSpendDays, 'Restored no-spend days'));
+        out.push(
+          setSettingsList(NO_SPEND_KEY, days, get().noSpendDays, tl('Restored no-spend days')),
+        );
       const closed = mergeDays(get().closedMonths, file.data.closedMonths ?? []);
       if (closed.length !== get().closedMonths.length)
         out.push(
-          setSettingsList(CLOSED_MONTHS_KEY, closed, get().closedMonths, 'Restored closed months'),
+          setSettingsList(
+            CLOSED_MONTHS_KEY,
+            closed,
+            get().closedMonths,
+            tl('Restored closed months'),
+          ),
         );
       const rules = mergeById(get().customRules, file.data.customRules ?? []);
       if (rules.length !== get().customRules.length)
-        out.push(setSettingsList(CUSTOM_RULES_KEY, rules, get().customRules, 'Restored rules'));
+        out.push(setSettingsList(CUSTOM_RULES_KEY, rules, get().customRules, tl('Restored rules')));
       const reports = mergeById(get().savedReports, file.data.savedReports ?? []);
       if (reports.length !== get().savedReports.length)
         out.push(
-          setSettingsList(SAVED_REPORTS_KEY, reports, get().savedReports, 'Restored reports'),
+          setSettingsList(SAVED_REPORTS_KEY, reports, get().savedReports, tl('Restored reports')),
         );
       const settled = mergeDays(get().settledSplits, file.data.settledSplits ?? []);
       if (settled.length !== get().settledSplits.length)
@@ -503,7 +576,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             SETTLED_SPLITS_KEY,
             settled,
             get().settledSplits,
-            'Restored settled splits',
+            tl('Restored settled splits'),
           ),
         );
       return out;
@@ -524,7 +597,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       if (found) return found.id;
       const person: Person = { id: newId(), name, createdAt: now };
       made.push(person);
-      steps.push(putRow('people', person, undefined, `Added ${name}`));
+      steps.push(putRow('people', person, undefined, tl('Added {0}', name)));
       return person.id;
     };
 
@@ -557,12 +630,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         kind: o.kind,
         date: base.date,
         amountMinor: o.amountMinor,
-        note: `Split: ${base.merchant}`,
+        note: tl('Split: {0}', base.merchant),
         accountId: o.kind === 'lent' ? accountId : undefined,
         createdAt: now,
         updatedAt: now,
       }));
-      for (const e of entries) steps.push(putRow('udhaar', e, undefined, 'Split'));
+      for (const e of entries) steps.push(putRow('udhaar', e, undefined, tl('Split')));
       const split: Split = {
         totalMinor,
         mode: draft.mode,
@@ -580,7 +653,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       (tx.split?.udhaarIds ?? [])
         .map((id) => get().udhaar.find((u) => u.id === id))
         .filter((u): u is UdhaarEntry => u !== undefined)
-        .map((u) => removeRow('udhaar', u, 'Split'));
+        .map((u) => removeRow('udhaar', u, tl('Split')));
 
     /** Puts a split's udhaar back (when its entry comes back from Trash). */
     const restoreSplitRows = (tx: Transaction): Command[] => {
@@ -589,12 +662,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       const accountId = tx.accountId ?? accountForMethod(get().accounts, tx.method)?.id;
       return udhaarForSplit(tx.split)
         .map((o, i): UdhaarEntry => ({
+          ...(tx.space ? { space: tx.space } : {}),
           id: tx.split!.udhaarIds[i] ?? newId(),
           personId: o.personId,
           kind: o.kind,
           date: tx.date,
           amountMinor: o.amountMinor,
-          note: `Split: ${tx.merchant}`,
+          note: tl('Split: {0}', tx.merchant),
           accountId: o.kind === 'lent' ? accountId : undefined,
           createdAt: now,
           updatedAt: now,
@@ -604,7 +678,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             get().people.some((p) => p.id === e.personId) &&
             !get().udhaar.some((u) => u.id === e.id),
         )
-        .map((e) => putRow('udhaar', e, undefined, 'Split'));
+        .map((e) => putRow('udhaar', e, undefined, tl('Split')));
     };
 
     /** The rule change a category decision teaches, by the two-of-three rule (Drop 11), if any. */
@@ -624,6 +698,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         rule ? { key, categoryId: rule, updatedAt: now } : undefined,
       );
     };
+
+    /** Budgets made in the Shop get their own ids, so they never meet Personal's (Drop 13). */
+    const spaceBudgets = (rows: Budget[]): Budget[] =>
+      getWriteSpace() === 'shop'
+        ? rows.map((b) => ({ ...b, id: `shop|${b.id}`, space: 'shop' as const }))
+        : rows;
 
     /** The trip or project collecting entries on this date, if any (Drop 12). */
     const autoProject = (date: ISODate): string | undefined =>
@@ -655,6 +735,15 @@ export function createLedgerStore(dbName: string = DB_NAME) {
     const putList = async <T>(key: string, next: T[], previous: T[], label: string) =>
       get().run(setSettingsList(key, next, previous, label), label);
 
+    /** A backup with Shop rows turns Spaces on, so nothing it brought stays out of sight (Drop 13). */
+    const showShopFrom = async (file: BackupFile) => {
+      if (get().settings.spacesOn || !hasShopRows(file.data)) return;
+      const name = (file.data.settings as Partial<Settings> | undefined)?.shopName;
+      if (typeof name === 'string' && name.trim() !== '')
+        await get().setSetting('shopName', name.trim().slice(0, 30));
+      await get().setSetting('spacesOn', true);
+    };
+
     /** Drop 9 rows a merged backup adds: accounts, money in and transfers, people, udhaar, loans. */
     const rowMerges = (file: BackupFile): Command[] => {
       const out: Command[] = [];
@@ -665,17 +754,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       ) => {
         const ids = new Set(have.map((x) => x.id));
         for (const row of incoming ?? [])
-          if (!ids.has(row.id)) out.push(putRow(store, row, undefined, 'Imported'));
+          if (!ids.has(row.id)) out.push(putRow(store, row, undefined, tl('Imported'), true));
       };
-      add('accounts', get().accounts, file.data.accounts);
-      add('flows', get().flows, file.data.flows);
-      add('people', get().people, file.data.people);
-      add('udhaar', get().udhaar, file.data.udhaar);
-      add('loans', get().loans, file.data.loans);
-      add('goals', get().goals, file.data.goals);
-      add('wishlist', get().wishlist, file.data.wishlist);
-      add('assets', get().assets, file.data.assets);
-      add('projects', get().projects, file.data.projects);
+      const all = get().everything;
+      add('accounts', all.accounts, file.data.accounts);
+      add('flows', all.flows, file.data.flows);
+      add('people', all.people, file.data.people);
+      add('udhaar', all.udhaar, file.data.udhaar);
+      add('loans', all.loans, file.data.loans);
+      add('goals', all.goals, file.data.goals);
+      add('wishlist', all.wishlist, file.data.wishlist);
+      add('assets', all.assets, file.data.assets);
+      add('projects', all.projects, file.data.projects);
       return out;
     };
 
@@ -752,13 +842,31 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       trash.sort((a, b) => b.deletedAt - a.deletedAt);
       transactions.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
       categories.sort((a, b) => a.order - b.order);
+      // Each space is its own ledger (Drop 13); Both reads them together, but has no budgets.
+      const view = viewOf(get().settings);
+      const sp = <T extends { space?: Space }>(rows: T[]): T[] =>
+        view === 'both' ? rows : rows.filter((r) => inSpace(r, view));
       set({
-        transactions,
-        categories,
+        everything: {
+          transactions,
+          flows,
+          accounts,
+          people,
+          udhaar,
+          loans,
+          goals,
+          wishlist,
+          assets,
+          budgets,
+          recurring,
+          projects,
+        },
+        transactions: sp(transactions),
+        categories: categories.map(shownCategory),
         rules: Object.fromEntries(rules.map((r) => [r.key, r.categoryId])),
-        trash,
-        budgets,
-        recurring,
+        trash: trash.filter((item) => view === 'both' || spaceOf(item.tx) === view),
+        budgets: view === 'both' ? [] : sp(budgets),
+        recurring: sp(recurring),
         recurringIgnored: Array.isArray(ignored) ? (ignored as string[]) : [],
         views: Array.isArray(views) ? (views as SavedView[]) : [],
         notes,
@@ -766,17 +874,17 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         sample: (sample as SampleMarker | undefined) ?? null,
         favourites: Array.isArray(favourites) ? (favourites as Favourite[]) : [],
         noSpendDays: Array.isArray(noSpend) ? (noSpend as ISODate[]) : [],
-        accounts,
-        flows,
-        people,
-        udhaar,
-        loans,
-        goals,
-        wishlist,
-        assets,
+        accounts: sp(accounts),
+        flows: sp(flows),
+        people: sp(people),
+        udhaar: sp(udhaar),
+        loans: sp(loans),
+        goals: sp(goals),
+        wishlist: sp(wishlist),
+        assets: sp(assets),
         closedMonths: Array.isArray(closedMonths) ? (closedMonths as string[]) : [],
         settledSplits: Array.isArray(settledSplits) ? (settledSplits as string[]) : [],
-        projects,
+        projects: sp(projects),
         customRules: Array.isArray(customRules) ? (customRules as CustomRule[]) : [],
         savedReports: Array.isArray(savedReports) ? (savedReports as SavedReport[]) : [],
         nudgesDismissed: Array.isArray(nudgesDismissed) ? (nudgesDismissed as string[]) : [],
@@ -818,10 +926,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       customRules: [],
       savedReports: [],
       nudgesDismissed: [],
+      everything: NOTHING,
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
       lockReset: null,
+      lockPasskey: null,
       canUndo: false,
       canRedo: false,
       undoLabel: null,
@@ -844,19 +954,24 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             setMonthStartDay(settings.monthStartDay);
             const lock = ((await db.get('settings', LOCK_KEY)) as LockConfig | undefined) ?? null;
             const reset = await db.get('settings', LOCK_RESET_KEY);
+            const passkey = (await db.get('settings', PASSKEY_KEY)) as LockPasskey | undefined;
+            if (settings.language !== 'en') await loadLanguage(settings.language);
             applyBoot(settings);
+            set({ settings });
+            setWriteSpace(viewOf(settings) === 'shop' ? 'shop' : 'personal');
             await refresh();
             set({
               settings,
               lock,
               locked: lock !== null,
               lockReset: typeof reset === 'number' ? reset : null,
+              lockPasskey: lock && passkey ? passkey : null,
               ready: true,
               error: null,
             });
             await get().applyPinResetIfDue();
           } catch (e) {
-            set({ error: e instanceof Error ? e.message : 'Could not open local storage.' });
+            set({ error: e instanceof Error ? e.message : tl('Could not open local storage.') });
           }
         })();
         return starting;
@@ -908,8 +1023,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           );
         }
         await get().run(
-          commands.length === 1 ? commands[0]! : composite(`Added ${tx.merchant}`, commands),
-          `Added ${tx.merchant}`,
+          commands.length === 1 ? commands[0]! : composite(tl('Added {0}', tx.merchant), commands),
+          tl('Added {0}', tx.merchant),
         );
         const method = extra.method ?? (parsed.methodTyped ? parsed.method : undefined);
         if (method && method !== settings.lastMethod) await get().setSetting('lastMethod', method);
@@ -942,7 +1057,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (key && guess.confidence === 'none' && draft.categoryId !== guess.categoryId) {
           steps.push(setRule({ key, categoryId: draft.categoryId, updatedAt: now }));
         }
-        const label = `Added ${tx.merchant}`;
+        const label = tl('Added {0}', tx.merchant);
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         if (draft.method !== settings.lastMethod)
           await get().setSetting('lastMethod', draft.method);
@@ -979,7 +1094,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           const learn = learnStep(after, now);
           if (learn) steps.push(learn);
         }
-        const label = `Edited ${after.merchant}`;
+        const label = tl('Edited {0}', after.merchant);
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
       },
 
@@ -1001,7 +1116,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: now,
           updatedAt: now,
         };
-        await get().run(addTransaction(tx), `Added ${tx.merchant}`);
+        await get().run(addTransaction(tx), tl('Added {0}', tx.merchant));
       },
 
       addMany: async (entries) => {
@@ -1034,7 +1149,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             ),
           ),
         );
-        const label = `Added ${ok.length} ${ok.length === 1 ? 'entry' : 'entries'}`;
+        const label = tl('Added {0} {1}', ok.length, ok.length === 1 ? tl('entry') : tl('entries'));
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return ok.length;
       },
@@ -1061,7 +1176,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             updatedAt: now + i,
           }),
         );
-        const label = `Copied ${list.length} ${list.length === 1 ? 'entry' : 'entries'} to today`;
+        const label = tl(
+          'Copied {0} {1} to today',
+          list.length,
+          list.length === 1 ? tl('entry') : tl('entries'),
+        );
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
       },
 
@@ -1070,11 +1189,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const key = repeatKey(item);
         const existing = previous.find((f) => repeatKey(f) === key);
         if (existing) {
-          set({ notice: `${existing.merchant} is already a favourite` });
+          set({ notice: tl('{0} is already a favourite', existing.merchant) });
           return false;
         }
         if (previous.length >= MAX_FAVOURITES) {
-          set({ notice: `Up to ${MAX_FAVOURITES} favourites. Remove one in Settings first.` });
+          set({
+            notice: tl('Up to {0} favourites. Remove one in Settings first.', MAX_FAVOURITES),
+          });
           return false;
         }
         const fav: Favourite = {
@@ -1091,7 +1212,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             FAVOURITES_KEY,
             [...previous, fav],
             previous,
-            `Saved ${fav.merchant} as a favourite`,
+            tl('Saved {0} as a favourite', fav.merchant),
           ),
         );
         return true;
@@ -1106,7 +1227,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             FAVOURITES_KEY,
             previous.filter((f) => f.id !== id),
             previous,
-            `Removed ${fav.merchant} from favourites`,
+            tl('Removed {0} from favourites', fav.merchant),
           ),
         );
       },
@@ -1119,7 +1240,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const next = [...previous];
         const [moved] = next.splice(from, 1);
         next.splice(to, 0, moved!);
-        await get().run(setSettingsList(FAVOURITES_KEY, next, previous, 'Reordered favourites'));
+        await get().run(
+          setSettingsList(FAVOURITES_KEY, next, previous, tl('Reordered favourites')),
+        );
       },
 
       markNoSpend: async (dates) => {
@@ -1129,8 +1252,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const next = [...previous, ...add].sort();
         const label =
           add.length === 1
-            ? 'Marked a day with no spending'
-            : `Marked ${add.length} days with no spending`;
+            ? tl('Marked a day with no spending')
+            : tl('Marked {0} days with no spending', add.length);
         await get().run(setSettingsList(NO_SPEND_KEY, next, previous, label));
       },
 
@@ -1158,11 +1281,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
                 'accounts',
                 { ...other, methods: kept, updatedAt: now },
                 other,
-                'Moved methods',
+                tl('Moved methods'),
               ),
             );
         }
-        const label = previous ? `Updated ${next.name}` : `Added ${next.name}`;
+        const label = previous ? tl('Updated {0}', next.name) : tl('Added {0}', next.name);
         steps.unshift(putRow('accounts', next, previous, label));
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
         return next.id;
@@ -1171,7 +1294,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       setAccountArchived: async (id, archived) => {
         const a = get().accounts.find((x) => x.id === id);
         if (!a || Boolean(a.archived) === archived) return;
-        const label = archived ? `Archived ${a.name}` : `Brought back ${a.name}`;
+        const label = archived ? tl('Archived {0}', a.name) : tl('Brought back {0}', a.name);
         await get().run(
           putRow(
             'accounts',
@@ -1191,7 +1314,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           udhaar.some((u) => u.accountId === id) ||
           transactions.some((t) => t.accountId === id);
         if (used) return false;
-        await get().run(removeRow('accounts', a, `Deleted ${a.name}`));
+        await get().run(removeRow('accounts', a, tl('Deleted {0}', a.name)));
         return true;
       },
 
@@ -1202,7 +1325,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           kind: 'income',
           date: draft.date,
           amountMinor: draft.amountMinor,
-          label: draft.label.trim() || 'Money in',
+          label: draft.label.trim() || tl('Money in'),
           incomeKind: draft.incomeKind,
           accountId: draft.accountId,
           raw: draft.raw,
@@ -1210,8 +1333,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           updatedAt: now,
         };
         await get().run(
-          putRow('flows', flow, undefined, `Added ${flow.label}`),
-          `Money in: ${flow.label}`,
+          putRow('flows', flow, undefined, tl('Added {0}', flow.label)),
+          tl('Money in: {0}', flow.label),
         );
       },
 
@@ -1235,7 +1358,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!from || !to || fromId === toId || amountMinor <= 0) return;
         const now = Date.now();
         const text =
-          label?.trim() || (to.kind === 'card' ? `Paid ${to.name}` : `${from.name} to ${to.name}`);
+          label?.trim() ||
+          (to.kind === 'card' ? tl('Paid {0}', to.name) : tl('{0} to {1}', from.name, to.name));
         const flow: Flow = {
           id: newId(),
           kind: 'transfer',
@@ -1258,17 +1382,17 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           kind: 'fee',
           date,
           amountMinor,
-          label: label.trim() || 'Interest or fee',
+          label: label.trim() || tl('Interest or fee'),
           accountId,
           createdAt: now,
           updatedAt: now,
         };
-        await get().run(putRow('flows', flow, undefined, `Added ${flow.label}`));
+        await get().run(putRow('flows', flow, undefined, tl('Added {0}', flow.label)));
       },
 
       deleteFlow: async (id) => {
         const f = get().flows.find((x) => x.id === id);
-        if (f) await get().run(removeRow('flows', f, `Deleted ${f.label}`));
+        if (f) await get().run(removeRow('flows', f, tl('Deleted {0}', f.label)));
       },
 
       resolveCashCheck: async (accountId, countedMinor, mode) => {
@@ -1279,7 +1403,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const expected = balances(accounts, { transactions, flows, udhaar }, today)[accountId] ?? 0;
         const { differenceMinor } = cashCheck(expected, countedMinor);
         if (differenceMinor === 0) {
-          set({ notice: `${account.name} matches. Nothing to change.` });
+          set({ notice: tl('{0} matches. Nothing to change.', account.name) });
           return 0;
         }
         const now = Date.now();
@@ -1289,30 +1413,30 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             date: today,
             amountMinor: -differenceMinor,
             currency: settings.currency,
-            merchant: 'Cash not logged',
+            merchant: tl('Cash not logged'),
             categoryId: OTHER_ID,
             method: 'Cash',
             accountId,
-            notes: 'From a cash check',
+            notes: tl('From a cash check'),
             tags: [],
             source: 'form',
             unsure: false,
             createdAt: now,
             updatedAt: now,
           };
-          await get().run(addTransaction(tx), 'Recorded the difference as spending');
+          await get().run(addTransaction(tx), tl('Recorded the difference as spending'));
         } else {
           const flow: Flow = {
             id: newId(),
             kind: 'adjust',
             date: today,
             amountMinor: differenceMinor,
-            label: 'Cash check',
+            label: tl('Cash check'),
             accountId,
             createdAt: now,
             updatedAt: now,
           };
-          await get().run(putRow('flows', flow, undefined, `Corrected ${account.name}`));
+          await get().run(putRow('flows', flow, undefined, tl('Corrected {0}', account.name)));
         }
         return differenceMinor;
       },
@@ -1330,7 +1454,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
               name: draft.personName.trim().replace(/\s+/g, ' '),
               createdAt: now,
             };
-            steps.push(putRow('people', person, undefined, `Added ${person.name}`));
+            steps.push(putRow('people', person, undefined, tl('Added {0}', person.name)));
           }
         }
         if (!person) return;
@@ -1346,10 +1470,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           updatedAt: now,
         };
         const words: Record<UdhaarKind, string> = {
-          lent: `Lent to ${person.name}`,
-          borrowed: `Borrowed from ${person.name}`,
-          'got-back': `${person.name} paid back`,
-          'paid-back': `Paid back ${person.name}`,
+          lent: tl('Lent to {0}', person.name),
+          borrowed: tl('Borrowed from {0}', person.name),
+          'got-back': tl('{0} paid back', person.name),
+          'paid-back': tl('Paid back {0}', person.name),
         };
         const label = words[draft.kind];
         steps.push(putRow('udhaar', entry, undefined, label));
@@ -1358,13 +1482,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
       deleteUdhaar: async (id) => {
         const e = get().udhaar.find((x) => x.id === id);
-        if (e) await get().run(removeRow('udhaar', e, 'Deleted an udhaar entry'));
+        if (e) await get().run(removeRow('udhaar', e, tl('Deleted an udhaar entry')));
       },
 
       deletePerson: async (id) => {
         const person = get().people.find((p) => p.id === id);
         if (!person) return;
-        const label = `Removed ${person.name}`;
+        const label = tl('Removed {0}', person.name);
         const steps: Command[] = [
           ...get()
             .udhaar.filter((e) => e.personId === id)
@@ -1381,13 +1505,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ? { ...previous, ...draft, name: draft.name.trim(), updatedAt: now }
           : { id: newId(), ...draft, name: draft.name.trim(), createdAt: now, updatedAt: now };
         await get().run(
-          putRow('loans', next, previous, previous ? `Updated ${next.name}` : `Added ${next.name}`),
+          putRow(
+            'loans',
+            next,
+            previous,
+            previous ? tl('Updated {0}', next.name) : tl('Added {0}', next.name),
+          ),
         );
       },
 
       deleteLoan: async (id) => {
         const l = get().loans.find((x) => x.id === id);
-        if (l) await get().run(removeRow('loans', l, `Deleted ${l.name}`));
+        if (l) await get().run(removeRow('loans', l, tl('Deleted {0}', l.name)));
       },
 
       setCategoryPlan: async (id, patch) => {
@@ -1398,8 +1527,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           return;
         const label =
           patch.rollover !== undefined
-            ? `${patch.rollover ? 'Turned on' : 'Turned off'} rollover for ${before.name}`
-            : `Made ${before.name} ${(patch.budgetKind ?? 'flexible').replace('-', ' ')}`;
+            ? tl(
+                '{0} rollover for {1}',
+                patch.rollover ? tl('Turned on') : tl('Turned off'),
+                before.name,
+              )
+            : tl('Made {0} {1}', before.name, (patch.budgetKind ?? 'flexible').replace('-', ' '));
         await get().run(putCategories([before], [after], label));
       },
 
@@ -1407,7 +1540,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         await get().setMonthBudgets(
           month,
           { overall: null, categories: {} },
-          `Cleared the budgets for ${monthLabel(month)}`,
+          tl('Cleared the budgets for {0}', monthLabel(month)),
         );
       },
 
@@ -1430,14 +1563,19 @@ export function createLedgerStore(dbName: string = DB_NAME) {
               updatedAt: now,
             };
         await get().run(
-          putRow('goals', next, previous, previous ? `Updated ${next.name}` : `Added ${next.name}`),
+          putRow(
+            'goals',
+            next,
+            previous,
+            previous ? tl('Updated {0}', next.name) : tl('Added {0}', next.name),
+          ),
         );
         return next.id;
       },
 
       deleteGoal: async (id) => {
         const g = get().goals.find((x) => x.id === id);
-        if (g) await get().run(removeRow('goals', g, `Deleted ${g.name}`));
+        if (g) await get().run(removeRow('goals', g, tl('Deleted {0}', g.name)));
       },
 
       addToGoal: async (id, amountMinor, date) => {
@@ -1448,7 +1586,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           contributions: [...g.contributions, { id: newId(), date, amountMinor }],
           updatedAt: Date.now(),
         };
-        await get().run(putRow('goals', next, g, `Put money aside for ${g.name}`));
+        await get().run(putRow('goals', next, g, tl('Put money aside for {0}', g.name)));
       },
 
       removeFromGoal: async (id, contributionId) => {
@@ -1459,7 +1597,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           contributions: g.contributions.filter((c) => c.id !== contributionId),
           updatedAt: Date.now(),
         };
-        await get().run(putRow('goals', next, g, `Took back an amount from ${g.name}`));
+        await get().run(putRow('goals', next, g, tl('Took back an amount from {0}', g.name)));
       },
 
       snoozeGoal: async (id, month, snoozed) => {
@@ -1475,7 +1613,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             'goals',
             next,
             g,
-            `${snoozed ? 'Snoozed' : 'Unsnoozed'} ${g.name} for ${monthLabel(month)}`,
+            tl(
+              '{0} {1} for {2}',
+              snoozed ? tl('Snoozed') : tl('Unsnoozed'),
+              g.name,
+              monthLabel(month),
+            ),
           ),
         );
       },
@@ -1484,7 +1627,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const g = get().goals.find((x) => x.id === id);
         if (!g || g.paidOn) return;
         const next = { ...payFund(g, todayISO(), newId()), updatedAt: Date.now() };
-        await get().run(putRow('goals', next, g, `Paid ${g.name}`));
+        await get().run(putRow('goals', next, g, tl('Paid {0}', g.name)));
       },
 
       saveWish: async (draft, id) => {
@@ -1506,7 +1649,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             'wishlist',
             next,
             previous,
-            previous ? `Updated ${next.name}` : `Added ${next.name} to the wishlist`,
+            previous ? tl('Updated {0}', next.name) : tl('Added {0} to the wishlist', next.name),
           ),
         );
       },
@@ -1532,7 +1675,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: now,
           updatedAt: now,
         };
-        const label = `Bought ${w.name}`;
+        const label = tl('Bought {0}', w.name);
         await get().run(
           composite(label, [
             addTransaction(tx),
@@ -1555,14 +1698,15 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             'wishlist',
             { ...w, status: 'skipped', decidedOn: todayISO(), updatedAt: Date.now() },
             w,
-            `Skipped ${w.name}`,
+            tl('Skipped {0}', w.name),
           ),
         );
       },
 
       deleteWish: async (id) => {
         const w = get().wishlist.find((x) => x.id === id);
-        if (w) await get().run(removeRow('wishlist', w, `Removed ${w.name} from the wishlist`));
+        if (w)
+          await get().run(removeRow('wishlist', w, tl('Removed {0} from the wishlist', w.name)));
       },
 
       saveAsset: async (draft, id) => {
@@ -1580,7 +1724,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
               updatedAt: now,
             };
         await get().run(
-          putRow('assets', next, previous, previous ? `Updated ${name}` : `Added ${name}`),
+          putRow(
+            'assets',
+            next,
+            previous,
+            previous ? tl('Updated {0}', name) : tl('Added {0}', name),
+          ),
         );
       },
 
@@ -1594,18 +1743,18 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ),
           updatedAt: Date.now(),
         };
-        await get().run(putRow('assets', next, a, `Updated the value of ${a.name}`));
+        await get().run(putRow('assets', next, a, tl('Updated the value of {0}', a.name)));
       },
 
       deleteAsset: async (id) => {
         const a = get().assets.find((x) => x.id === id);
-        if (a) await get().run(removeRow('assets', a, `Deleted ${a.name}`));
+        if (a) await get().run(removeRow('assets', a, tl('Deleted {0}', a.name)));
       },
 
       closeMonth: async (month, note = '') => {
         const previous = get().closedMonths;
         if (previous.includes(month)) return;
-        const label = `Closed ${monthLabel(month)}`;
+        const label = tl('Closed {0}', monthLabel(month));
         const close = setSettingsList(
           CLOSED_MONTHS_KEY,
           [...previous, month].sort(),
@@ -1643,11 +1792,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const steps: Command[] = [updateTransaction(before, after)];
         const learn = learnStep(after, now);
         if (learn) steps.push(learn);
-        const name = get().categories.find((c) => c.id === target)?.name ?? 'Other';
+        const name = get().categories.find((c) => c.id === target)?.name ?? tl('Other');
         const label =
           target === before.categoryId
-            ? `Confirmed ${before.merchant} as ${name}`
-            : `Moved ${before.merchant} to ${name}`;
+            ? tl('Confirmed {0} as {1}', before.merchant, name)
+            : tl('Moved {0} to {1}', before.merchant, name);
         await get().run(composite(label, steps), label);
       },
 
@@ -1663,7 +1812,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             perPerson.set(u.personId, (perPerson.get(u.personId) ?? 0) + owedEffect(u));
         const now = Date.now();
         const today = todayISO();
-        const label = 'Settled all splits';
+        const label = tl('Settled all splits');
         const steps: Command[] = [...perPerson]
           .filter(([, v]) => v !== 0)
           .map(([personId, v]) =>
@@ -1675,7 +1824,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
                 kind: v > 0 ? 'got-back' : 'paid-back',
                 date: today,
                 amountMinor: Math.abs(v),
-                note: 'Settled splits',
+                note: tl('Settled splits'),
                 createdAt: now,
                 updatedAt: now,
               },
@@ -1704,7 +1853,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: previous?.createdAt ?? now,
           updatedAt: now,
         };
-        const label = previous ? `Changed ${next.name}` : `Added ${next.name}`;
+        const label = previous ? tl('Changed {0}', next.name) : tl('Added {0}', next.name);
         await get().run(putRow('projects', next, previous, label), label);
         return next.id;
       },
@@ -1713,7 +1862,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const project = get().projects.find((p) => p.id === id);
         if (!project) return;
         const now = Date.now();
-        const label = `Deleted ${project.name}; its entries stay`;
+        const label = tl('Deleted {0}; its entries stay', project.name);
         const steps: Command[] = get()
           .transactions.filter((t) => t.projectId === id)
           .map((t) => updateTransaction(t, { ...t, projectId: undefined, updatedAt: now }));
@@ -1727,8 +1876,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const list = get().transactions.filter((t) => ids.includes(t.id) && t.projectId !== target);
         if (list.length === 0) return;
         const name = get().projects.find((p) => p.id === projectId)?.name;
-        const n = `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
-        const label = name ? `Added ${n} to ${name}` : `Took ${n} out of their trip or project`;
+        const n = `${list.length} ${list.length === 1 ? tl('entry') : tl('entries')}`;
+        const label = name
+          ? tl('Added {0} to {1}', n, name)
+          : tl('Took {0} out of their trip or project', n);
         await get().run(
           composite(
             label,
@@ -1738,8 +1889,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         );
       },
 
-      saveCustomRule: async (rule, applyTo = []) => {
+      saveCustomRule: async (draft, applyTo = []) => {
         const previous = get().customRules;
+        // A new rule is stamped here, so the editor stays free of clocks.
+        const rule = draft.createdAt ? draft : { ...draft, createdAt: Date.now() };
         const exists = previous.some((r) => r.id === rule.id);
         const next = exists
           ? previous.map((r) => (r.id === rule.id ? rule : r))
@@ -1750,10 +1903,17 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           .map((t) =>
             updateTransaction(t, { ...applyRule(t, rule, get().categories), updatedAt: now }),
           );
-        const base = exists ? `Changed the rule for ${rule.text}` : `Added a rule for ${rule.text}`;
+        const base = exists
+          ? tl('Changed the rule for {0}', rule.text)
+          : tl('Added a rule for {0}', rule.text);
         const label =
           changes.length > 0
-            ? `${base}, changed ${changes.length} ${changes.length === 1 ? 'entry' : 'entries'}`
+            ? tl(
+                '{0}, changed {1} {2}',
+                base,
+                changes.length,
+                changes.length === 1 ? tl('entry') : tl('entries'),
+              )
             : base;
         await get().run(
           composite(label, [setSettingsList(CUSTOM_RULES_KEY, next, previous, label), ...changes]),
@@ -1769,7 +1929,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             CUSTOM_RULES_KEY,
             previous.filter((r) => r.id !== id),
             previous,
-            `Deleted the rule for ${rule.text}`,
+            tl('Deleted the rule for {0}', rule.text),
           );
       },
 
@@ -1777,13 +1937,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const previous = get().customRules;
         const next = moveRule(previous, id, delta);
         if (next.every((r, i) => r === previous[i])) return;
-        await putList(CUSTOM_RULES_KEY, next, previous, 'Reordered rules');
+        await putList(CUSTOM_RULES_KEY, next, previous, tl('Reordered rules'));
       },
 
       saveReport: async (report) => {
         const previous = get().savedReports;
         const next = [...previous.filter((r) => r.id !== report.id), report];
-        await putList(SAVED_REPORTS_KEY, next, previous, `Saved report ${report.name}`);
+        await putList(SAVED_REPORTS_KEY, next, previous, tl('Saved report {0}', report.name));
       },
 
       deleteReport: async (id) => {
@@ -1794,7 +1954,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             SAVED_REPORTS_KEY,
             previous.filter((r) => r.id !== id),
             previous,
-            `Deleted report ${report.name}`,
+            tl('Deleted report {0}', report.name),
           );
       },
 
@@ -1806,7 +1966,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           NUDGES_DISMISSED_KEY,
           [...previous, id].slice(-300),
           previous,
-          'Put away a nudge',
+          tl('Put away a nudge'),
         );
       },
 
@@ -1818,7 +1978,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const next = made
           ? [...subs, made]
           : subs.map((x) => (x.id === id ? { ...x, name: name.trim() } : x));
-        const label = made ? `Added ${made.name} under ${before.name}` : `Renamed a subcategory`;
+        const label = made
+          ? tl('Added {0} under {1}', made.name, before.name)
+          : tl('Renamed a subcategory');
         await get().run(
           putCategories([before], [{ ...before, subcategories: next }], label),
           label,
@@ -1831,7 +1993,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const sub = before?.subcategories?.find((x) => x.id === subId);
         if (!before || !sub) return;
         const now = Date.now();
-        const label = `Deleted ${sub.name}; its entries stay in ${before.name}`;
+        const label = tl('Deleted {0}; its entries stay in {1}', sub.name, before.name);
         const steps: Command[] = [
           putCategories(
             [before],
@@ -1848,8 +2010,33 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       setCategoryNeed: async (categoryId, need) => {
         const before = get().categories.find((c) => c.id === categoryId);
         if (!before) return;
-        const label = `${before.name} counts as a ${need}`;
+        const label = tl('{0} counts as a {1}', before.name, need);
         await get().run(putCategories([before], [{ ...before, need }], label), label);
+      },
+
+      moveToSpace: async (ids, space) => {
+        const now = Date.now();
+        const list = get().transactions.filter((t) => ids.includes(t.id) && spaceOf(t) !== space);
+        if (list.length === 0) return;
+        // The default name 'Shop' is shown in the interface language; a name of their own stays as typed.
+        const name = space === 'shop' ? tl(get().settings.shopName || 'Shop') : tl('Personal');
+        const n = `${list.length} ${list.length === 1 ? tl('entry') : tl('entries')}`;
+        const label = tl('Moved {0} to {1}', n, name);
+        const mark = <T extends { space?: Space }>(row: T): T => {
+          const { space: _old, ...rest } = row;
+          void _old;
+          return (space === 'shop' ? { ...rest, space } : rest) as T;
+        };
+        const steps: Command[] = [];
+        for (const t of list) {
+          steps.push(updateTransaction(t, { ...mark(t), updatedAt: now }));
+          // A split's udhaar goes with its entry.
+          for (const id of t.split?.udhaarIds ?? []) {
+            const u = get().everything.udhaar.find((x) => x.id === id);
+            if (u) steps.push(putRow('udhaar', { ...mark(u), updatedAt: now }, u, label));
+          }
+        }
+        await get().run(composite(label, steps), label);
       },
 
       getEntryHistory: async (id) => {
@@ -1862,7 +2049,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       bulkDelete: async (ids) => {
         const list = get().transactions.filter((t) => ids.includes(t.id));
         if (list.length === 0) return;
-        const label = `Deleted ${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
+        const label = tl(
+          'Deleted {0} {1}',
+          list.length,
+          list.length === 1 ? tl('entry') : tl('entries'),
+        );
         await get().run(
           composite(
             label,
@@ -1878,8 +2069,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           (t) => ids.includes(t.id) && t.categoryId !== categoryId,
         );
         if (list.length === 0) return;
-        const name = get().categories.find((c) => c.id === categoryId)?.name ?? 'Other';
-        const label = `Moved ${list.length} to ${name}`;
+        const name = get().categories.find((c) => c.id === categoryId)?.name ?? tl('Other');
+        const label = tl('Moved {0} to {1}', list.length, name);
         await get().run(
           composite(
             label,
@@ -1895,7 +2086,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const now = Date.now();
         const list = get().transactions.filter((t) => ids.includes(t.id) && !t.tags.includes(tag));
         if (!tag || list.length === 0) return;
-        const label = `Tagged ${list.length} with ${tag}`;
+        const label = tl('Tagged {0} with {1}', list.length, tag);
         await get().run(
           composite(
             label,
@@ -1932,7 +2123,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       saveView: async (view) => {
         const previous = get().views;
         const next = [...previous.filter((v) => v.id !== view.id), view];
-        await get().run(setViews(next, previous, `Saved view ${view.name}`));
+        await get().run(setViews(next, previous, tl('Saved view {0}', view.name)));
       },
 
       deleteView: async (id) => {
@@ -1943,7 +2134,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           setViews(
             previous.filter((v) => v.id !== id),
             previous,
-            `Deleted view ${view.name}`,
+            tl('Deleted view {0}', view.name),
           ),
         );
       },
@@ -1952,7 +2143,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const lock = await hashPin(pin);
         await requireDb().put('settings', lock, LOCK_KEY);
         await requireDb().delete('settings', LOCK_RESET_KEY);
-        set({ lock, lockReset: null, notice: 'Screen lock is on' });
+        set({ lock, lockReset: null, notice: tl('Screen lock is on') });
       },
 
       removePin: async (pin) => {
@@ -1960,8 +2151,37 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!lock || !(await verifyPin(pin, lock))) return false;
         await requireDb().delete('settings', LOCK_KEY);
         await requireDb().delete('settings', LOCK_RESET_KEY);
-        set({ lock: null, lockReset: null, locked: false, notice: 'Screen lock is off' });
+        await requireDb().delete('settings', PASSKEY_KEY);
+        set({
+          lock: null,
+          lockReset: null,
+          lockPasskey: null,
+          locked: false,
+          notice: tl('Screen lock is off'),
+        });
         return true;
+      },
+
+      setLockPasskey: async (passkey) => {
+        if (!get().lock) return;
+        if (passkey) await requireDb().put('settings', passkey, PASSKEY_KEY);
+        else await requireDb().delete('settings', PASSKEY_KEY);
+        set({
+          lockPasskey: passkey,
+          notice: passkey
+            ? tl('Face ID or fingerprint can unlock Ledger')
+            : tl('Unlock with the PIN only'),
+        });
+      },
+
+      unlockWithPasskey: async (assertion) => {
+        const { lock, lockPasskey } = get();
+        if (!lock || !lockPasskey) return false;
+        // Loaded when first used, so it costs nothing at start-up.
+        const { verifyAssertion } = await import('../domain/passkey');
+        const ok = await verifyAssertion(lockPasskey, assertion);
+        if (ok) set({ locked: false });
+        return ok;
       },
 
       unlock: async (pin) => {
@@ -1975,7 +2195,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           // Remembering the PIN cancels a pending "Forgot PIN?" reset.
           if (get().lockReset !== null) {
             await requireDb().delete('settings', LOCK_RESET_KEY);
-            set({ lockReset: null, notice: 'PIN reset cancelled' });
+            set({ lockReset: null, notice: tl('PIN reset cancelled') });
           }
           set({ locked: false });
         }
@@ -2001,11 +2221,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const d = requireDb();
         await d.delete('settings', LOCK_KEY);
         await d.delete('settings', LOCK_RESET_KEY);
+        await d.delete('settings', PASSKEY_KEY);
         set({
           lock: null,
           lockReset: null,
+          lockPasskey: null,
           locked: false,
-          notice: 'Your PIN was removed after the 24-hour wait. All your entries are here.',
+          notice: tl('Your PIN was removed after the 24-hour wait. All your entries are here.'),
         });
         return true;
       },
@@ -2017,7 +2239,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       removeTransaction: async (id) => {
         const tx = get().transactions.find((t) => t.id === id);
         if (!tx) return;
-        const label = `Deleted ${tx.merchant}`;
+        const label = tl('Deleted {0}', tx.merchant);
         const extra = dropSplitRows(tx);
         await get().run(
           extra.length === 0
@@ -2027,9 +2249,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         );
       },
 
-      setMonthBudgets: async (month, next, label = 'Updated budgets') => {
+      setMonthBudgets: async (month, next, label = tl('Updated budgets')) => {
         const previous = get().budgets.filter((b) => b.month === month);
-        const rows = toBudgetRows(month, next);
+        const rows = spaceBudgets(toBudgetRows(month, next));
         const same =
           JSON.stringify(budgetsForMonth(previous, month)) ===
           JSON.stringify(budgetsForMonth(rows, month));
@@ -2039,7 +2261,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
 
       addCategory: async (name) => {
         const c = makeCategory(name, get().categories);
-        await get().run(putCategories([], [c], `Added category ${c.name}`));
+        await get().run(putCategories([], [c], tl('Added category {0}', c.name)));
         return c.id;
       },
 
@@ -2047,7 +2269,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const before = get().categories.find((c) => c.id === id);
         if (!before || isDefaultCategory(id) || before.name === name.trim()) return;
         await get().run(
-          putCategories([before], [{ ...before, name: name.trim() }], `Renamed ${before.name}`),
+          putCategories(
+            [before],
+            [{ ...before, name: name.trim() }],
+            tl('Renamed {0}', before.name),
+          ),
         );
       },
 
@@ -2057,7 +2283,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const changed = after.filter((c, i) => c.color !== before[i]?.color);
         if (changed.length === 0) return;
         const old = before.filter((c) => changed.some((x) => x.id === c.id));
-        await get().run(putCategories(old, changed, 'Changed a category colour'));
+        await get().run(putCategories(old, changed, tl('Changed a category colour')));
       },
 
       moveCategory: async (id, toIndex) => {
@@ -2066,7 +2292,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const changed = after.filter((c) => before.find((b) => b.id === c.id)?.order !== c.order);
         if (changed.length === 0) return;
         const old = before.filter((c) => changed.some((x) => x.id === c.id));
-        await get().run(putCategories(old, changed, 'Reordered categories'));
+        await get().run(putCategories(old, changed, tl('Reordered categories')));
       },
 
       deleteCategory: async (id, moveTo) => {
@@ -2106,14 +2332,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           steps.push(
             setMonthBudgetsCommand(
               budgets.filter((b) => b.month === month),
-              toBudgetRows(month, { overall: mb.overall, categories: next }),
-              'Moved budget',
+              spaceBudgets(toBudgetRows(month, { overall: mb.overall, categories: next })),
+              tl('Moved budget'),
             ),
           );
         }
         steps.push(removeCategoryRow(cat));
         const target = categories.find((c) => c.id === moveTo)!;
-        const label = `Deleted ${cat.name}, moved its entries to ${target.name}`;
+        const label = tl('Deleted {0}, moved its entries to {1}', cat.name, target.name);
         await get().run(composite(label, steps), label);
       },
 
@@ -2125,7 +2351,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             item,
             previous,
             label ??
-              (previous ? `Updated ${item.merchant}` : `Added ${item.merchant} to recurring`),
+              (previous
+                ? tl('Updated {0}', item.merchant)
+                : tl('Added {0} to recurring', item.merchant)),
           ),
         );
       },
@@ -2139,20 +2367,24 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const item = get().recurring.find((r) => r.id === id);
         if (!item || days === 0) return;
         const anchor = addDays(item.anchor, days);
-        await get().run(putRecurring({ ...item, anchor }, item, `Moved ${item.merchant}`));
+        await get().run(putRecurring({ ...item, anchor }, item, tl('Moved {0}', item.merchant)));
       },
 
       ignoreRecurring: async (key) => {
         const previous = get().recurringIgnored;
         if (previous.includes(key)) return;
-        await get().run(setIgnoredRecurring([...previous, key], previous, `Not recurring: ${key}`));
+        await get().run(
+          setIgnoredRecurring([...previous, key], previous, tl('Not recurring: {0}', key)),
+        );
       },
 
       importCsv: async (plan) => {
         if (plan.transactions.length === 0) return;
         const n = plan.transactions.length;
-        const label = `Imported ${n} ${n === 1 ? 'entry' : 'entries'} from CSV`;
-        await get().run(importTransactions(plan.transactions, plan.newCategories, label), label);
+        const label = tl('Imported {0} {1} from CSV', n, n === 1 ? tl('entry') : tl('entries'));
+        // A CSV goes into the ledger on screen.
+        const rows = plan.transactions.map((t) => stampSpace(t));
+        await get().run(importTransactions(rows, plan.newCategories, label), label);
       },
 
       restoreBackup: async (file) => {
@@ -2195,16 +2427,17 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const extra: Command[] = [
           ...(file.data.notes ?? [])
             .filter((n) => !haveNotes.has(n.id))
-            .map((n) => putNote(n, undefined, 'Restored a note')),
+            .map((n) => putNote(n, undefined, tl('Restored a note'))),
           ...(file.data.sketches ?? [])
             .filter((k) => !haveSketches.has(k.id))
-            .map((k) => putSketch(k, undefined, 'Restored a drawing')),
+            .map((k) => putSketch(k, undefined, tl('Restored a drawing'))),
           ...listMerges(file),
         ];
         const replace = replaceEverything(before, after);
         await get().run(
           extra.length === 0 ? replace : composite(replace.label, [replace, ...extra]),
         );
+        await showShopFrom(file);
       },
 
       getActivity: async () => {
@@ -2213,7 +2446,9 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       },
 
       importFromBackup: async (file) => {
-        const { transactions, categories, rules, budgets } = get();
+        const { categories, rules } = get();
+        // Every space counts as already here, so nothing from another ledger is added twice.
+        const { transactions, budgets, recurring } = get().everything;
         const haveTx = new Set(transactions.map((t) => t.id));
         const haveCat = new Set(categories.map((c) => c.id));
         const newTx = file.data.transactions.filter((t) => !haveTx.has(t.id));
@@ -2221,7 +2456,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const newRules = file.data.rules.filter((r) => !(r.key in rules));
         const haveBudget = new Set(budgets.map((b) => b.id));
         const newBudgets = (file.data.budgets ?? []).filter((b) => !haveBudget.has(b.id));
-        const haveRecurring = new Set(get().recurring.map((r) => r.id));
+        const haveRecurring = new Set(recurring.map((r) => r.id));
         const newRecurring = (file.data.recurring ?? []).filter((r) => !haveRecurring.has(r.id));
         const haveNotes = new Set(get().notes.map((n) => n.id));
         const newNotes = (file.data.notes ?? []).filter((n) => !haveNotes.has(n.id));
@@ -2240,13 +2475,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           newNotes.length === 0 &&
           newSketches.length === 0
         ) {
-          set({ notice: 'Nothing new in that backup' });
+          set({ notice: tl('Nothing new in that backup') });
           return 0;
         }
         const label =
           newTx.length > 0
-            ? `Imported ${newTx.length} ${newTx.length === 1 ? 'entry' : 'entries'}`
-            : 'Imported categories, rules, budgets, recurring payments and notes';
+            ? tl('Imported {0} {1}', newTx.length, newTx.length === 1 ? tl('entry') : tl('entries'))
+            : tl('Imported categories, rules, budgets, recurring payments and notes');
         const steps: Command[] = [
           importTransactions(newTx, newCats, label),
           ...newRules.map((r) => setRule(r)),
@@ -2258,6 +2493,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           ...rows,
         ];
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
+        await showShopFrom(file);
         return newTx.length;
       },
 
@@ -2269,7 +2505,11 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const next: Note = previous
           ? { ...previous, text: clean, stamp, updatedAt: now }
           : { id: newId(), anchor, page, text: clean, stamp, createdAt: now, updatedAt: now };
-        const label = previous ? 'Edited a note' : clean ? 'Added a note' : 'Added a stamp';
+        const label = previous
+          ? tl('Edited a note')
+          : clean
+            ? tl('Added a note')
+            : tl('Added a stamp');
         await get().run(putNote(next, previous, label));
       },
 
@@ -2283,7 +2523,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const previous = get().sketches.find((s) => s.id === id);
         const strokes = fitCap([...(previous?.strokes ?? []), stroke]);
         const next: Sketch = { id, page, month, strokes, updatedAt: Date.now() };
-        await get().run(putSketch(next, previous, 'Drew a stroke'), '');
+        await get().run(putSketch(next, previous, tl('Drew a stroke')), '');
       },
 
       eraseStrokes: async (page, month, ids) => {
@@ -2293,7 +2533,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const strokes = previous.strokes.filter((s) => !ids.includes(s.id));
         if (strokes.length === previous.strokes.length) return;
         const next: Sketch = { ...previous, strokes, updatedAt: Date.now() };
-        await get().run(putSketch(next, previous, 'Erased'), '');
+        await get().run(putSketch(next, previous, tl('Erased')), '');
       },
 
       clearSketch: async (page, month) => {
@@ -2301,8 +2541,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const previous = get().sketches.find((s) => s.id === id);
         if (!previous) return;
         await get().run(
-          putSketch({ ...previous, strokes: [], updatedAt: Date.now() }, previous, 'Cleared'),
-          'Cleared the drawing',
+          putSketch({ ...previous, strokes: [], updatedAt: Date.now() }, previous, tl('Cleared')),
+          tl('Cleared the drawing'),
         );
       },
 
@@ -2311,7 +2551,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const data = buildSample(todayISO(), get().budgets);
         await get().run(
           loadSampleCommand(data, undefined),
-          `Loaded ${data.transactions.length} sample entries. Remove them in Settings any time.`,
+          tl(
+            'Loaded {0} sample entries. Remove them in Settings any time.',
+            data.transactions.length,
+          ),
         );
       },
 
@@ -2341,7 +2584,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             marker.budgets.some((m) => m.id === b.id && m.amountMinor === b.amountMinor),
           ),
         };
-        await get().run(removeSampleCommand(marker, removed), 'Removed the sample data');
+        await get().run(removeSampleCommand(marker, removed), tl('Removed the sample data'));
       },
 
       undoMany: async (steps) => {
@@ -2351,24 +2594,35 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           if (!label) break;
           last = label;
         }
-        if (last)
-          set({
-            notice:
-              steps === 1 ? `Undid: ${last}` : `Undid ${steps} changes, back to before ${last}`,
-          });
+        if (last) {
+          undidNotice =
+            steps === 1
+              ? tl('Undid: {0}', last)
+              : tl('Undid {0} changes, back to before {1}', steps, last);
+          set({ notice: undidNotice });
+        }
       },
 
       undo: async () => {
         const label = await bus?.undo();
-        if (label && !label.startsWith(SKETCH_LABEL)) set({ notice: `Undid: ${label}` });
+        if (label && !label.startsWith(SKETCH_LABEL)) {
+          undidNotice = tl('Undid: {0}', label);
+          set({ notice: undidNotice });
+        }
       },
       redo: async () => {
         const label = await bus?.redo();
-        if (label && !label.startsWith(SKETCH_LABEL)) set({ notice: `Redid: ${label}` });
+        if (label && !label.startsWith(SKETCH_LABEL)) set({ notice: tl('Redid: {0}', label) });
       },
 
       setSetting: async (key, value) => {
         await requireDb().put('settings', value, key);
+        // The words load before anything re-renders, so a page never shows half of each language.
+        if (key === 'language') {
+          await loadLanguage(value as Language);
+          // A message from before would stay in the old language.
+          set({ notice: null });
+        }
         const settings = { ...get().settings, [key]: value };
         if (key === 'monthStartDay') {
           // Before anything re-renders. Month totals are memoised on the entry list, so a new list
@@ -2377,6 +2631,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           set({ settings, transactions: [...get().transactions] });
         } else set({ settings });
         applyBoot(settings);
+        // A new language re-reads the lists too, so built-in category names follow (Drop 13).
+        if (key === 'space' || key === 'spacesOn' || key === 'language') {
+          // The switcher changes which ledger is on screen and where new rows go (Drop 13).
+          setWriteSpace(viewOf(settings) === 'shop' ? 'shop' : 'personal');
+          await refresh();
+        }
       },
 
       dismissNotice: () => set({ notice: null }),

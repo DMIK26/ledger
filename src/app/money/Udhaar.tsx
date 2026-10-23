@@ -14,6 +14,7 @@ import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money, usePrivacy } from '../Money';
 import { AccountSelect } from './shared';
+import { tl } from '../../domain/i18n';
 
 const KINDS = Object.keys(UDHAAR_LABEL) as UdhaarKind[];
 
@@ -41,9 +42,9 @@ function UdhaarForm({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError('Who is it with?');
-    if (amount === null || amount <= 0) return setError('Enter an amount above zero');
-    if (!parseISO(date)) return setError('Pick a valid date');
+    if (!name.trim()) return setError(tl('Who is it with?'));
+    if (amount === null || amount <= 0) return setError(tl('Enter an amount above zero'));
+    if (!parseISO(date)) return setError(tl('Pick a valid date'));
     await saveUdhaar({
       personName: name,
       kind,
@@ -59,7 +60,7 @@ function UdhaarForm({
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="ud-person">Person</label>
+          <label htmlFor="ud-person">{tl('Person')}</label>
           <input
             id="ud-person"
             className="input"
@@ -75,7 +76,7 @@ function UdhaarForm({
           </datalist>
         </div>
         <div className="field">
-          <label htmlFor="ud-kind">What happened</label>
+          <label htmlFor="ud-kind">{tl('What happened')}</label>
           <select
             id="ud-kind"
             className="select input"
@@ -90,11 +91,11 @@ function UdhaarForm({
           </select>
         </div>
         <div className="field">
-          <label htmlFor="ud-amount">Amount</label>
+          <label htmlFor="ud-amount">{tl('Amount')}</label>
           <AmountInput id="ud-amount" initialMinor={amount} onChange={setAmount} />
         </div>
         <div className="field">
-          <label htmlFor="ud-date">Date</label>
+          <label htmlFor="ud-date">{tl('Date')}</label>
           <input
             id="ud-date"
             className="input"
@@ -104,18 +105,18 @@ function UdhaarForm({
           />
         </div>
         <div className="field">
-          <label htmlFor="ud-note">Note</label>
+          <label htmlFor="ud-note">{tl('Note')}</label>
           <input
             id="ud-note"
             className="input"
             autoComplete="off"
-            placeholder="Movie tickets"
+            placeholder={tl('Movie tickets')}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor="ud-account">Account</label>
+          <label htmlFor="ud-account">{tl('Account')}</label>
           <AccountSelect
             id="ud-account"
             value={accountId}
@@ -131,10 +132,10 @@ function UdhaarForm({
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Save
+          {tl('Save')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -163,7 +164,7 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
         setShared('Shared.');
       } else {
         await navigator.clipboard.writeText(text);
-        setShared('Copied. Paste it into WhatsApp or a message.');
+        setShared(tl('Copied. Paste it into WhatsApp or a message.'));
       }
     } catch {
       setShared(null); // cancelled
@@ -181,8 +182,8 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
         <span className="money-main">
           <span>{person.name}</span>
           <span className="muted small">
-            {balanceMinor > 0 ? 'Owes you' : balanceMinor < 0 ? 'You owe' : 'Settled'}
-            {summary.lastDate ? ` · last ${fmtDate(summary.lastDate)}` : ''}
+            {balanceMinor > 0 ? tl('Owes you') : balanceMinor < 0 ? tl('You owe') : tl('Settled')}
+            {summary.lastDate ? ' ' + tl('· last {0}', fmtDate(summary.lastDate)) : ''}
           </span>
         </span>
         {balanceMinor !== 0 && (
@@ -199,7 +200,7 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
             <div className="btn-row">
               {settle && (
                 <button type="button" className="btn btn-primary" onClick={() => setSettling(true)}>
-                  Settle up
+                  {tl('Settle up')}
                 </button>
               )}
               {balanceMinor > 0 && (
@@ -207,10 +208,10 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
                   type="button"
                   className="btn"
                   disabled={masked}
-                  title={masked ? 'Turn off privacy mode to share an amount' : undefined}
+                  title={masked ? tl('Turn off privacy mode to share an amount') : undefined}
                   onClick={() => void remind()}
                 >
-                  Remind
+                  {tl('Remind')}
                 </button>
               )}
               <button
@@ -218,13 +219,13 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
                 className="btn btn-ghost"
                 onClick={() => void deletePerson(person.id)}
               >
-                Remove {person.name}
+                {tl('Remove {0}', person.name)}
               </button>
             </div>
           )}
           {masked && balanceMinor > 0 && (
             <p className="muted small">
-              Reminders show the amount, so they are off in privacy mode.
+              {tl('Reminders show the amount, so they are off in privacy mode.')}
             </p>
           )}
           {shared && (
@@ -240,7 +241,7 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
               onDone={() => setSettling(false)}
             />
           )}
-          <ul className="money-list" aria-label={`Entries with ${person.name}`}>
+          <ul className="money-list" aria-label={tl('Entries with {0}', person.name)}>
             {entries.map((e) => (
               <li key={e.id} className="money-row">
                 <span className="money-main">
@@ -254,7 +255,11 @@ function PersonRow({ summary }: { summary: PersonSummary }) {
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon"
-                  aria-label={`Delete ${UDHAAR_LABEL[e.kind].toLowerCase()} on ${fmtDate(e.date)}`}
+                  aria-label={tl(
+                    'Delete {0} on {1}',
+                    UDHAAR_LABEL[e.kind].toLowerCase(),
+                    fmtDate(e.date),
+                  )}
                   onClick={() => void deleteUdhaar(e.id)}
                 >
                   <Icon name="trash" />
@@ -280,23 +285,23 @@ export function UdhaarView() {
   return (
     <section className="card" aria-labelledby="udhaar-title">
       <div className="card-head">
-        <h2 id="udhaar-title">Udhaar</h2>
+        <h2 id="udhaar-title">{tl('Udhaar')}</h2>
         {!adding && (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Icon name="plus" />
-            Add entry
+            {tl('Add entry')}
           </button>
         )}
       </div>
       <dl className="cashflow-figures">
         <div>
-          <dt>Owed to you</dt>
+          <dt>{tl('Owed to you')}</dt>
           <dd data-testid="owed-to-you">
             <Money minor={totals.owedToYouMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>You owe</dt>
+          <dt>{tl('You owe')}</dt>
           <dd data-testid="you-owe">
             <Money minor={totals.youOweMinor} currency={currency} />
           </dd>
@@ -305,11 +310,12 @@ export function UdhaarView() {
       {adding && <UdhaarForm onDone={() => setAdding(false)} />}
       {summary.length === 0 ? (
         <p className="muted small">
-          Lent someone money, or borrowed some? Add it here and settle it in parts. It never counts
-          as spending.
+          {tl(
+            'Lent someone money, or borrowed some? Add it here and settle it in parts. It never counts as spending.',
+          )}
         </p>
       ) : (
-        <ul className="account-list" aria-label="People">
+        <ul className="account-list" aria-label={tl('People')}>
           {summary.map((s) => (
             <PersonRow key={s.person.id} summary={s} />
           ))}

@@ -64,10 +64,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
-        // Font subsets for scripts Ledger never shows (Cyrillic, Greek, Vietnamese) are not precached;
-        // the browser still fetches them if such text ever appears while online.
-        globIgnores: ['**/*-cyrillic*', '**/*-greek*', '**/*-vietnamese*'],
+        // Icons and the manifest are added once by the plugin itself (includeAssets and manifest).
+        globPatterns: ['**/*.{js,css,html,woff2,svg,ico}'],
+        // Font subsets for scripts Ledger never shows (Cyrillic, Greek, Vietnamese) are not precached,
+        // nor the accented handwriting set (Drop 13); the browser still fetches them if such text
+        // ever appears while online. Telugu and Hindi use the device's own fonts.
+        globIgnores: ['**/*-cyrillic*', '**/*-greek*', '**/*-vietnamese*', '**/caveat-latin-ext*'],
         navigateFallback: `${BASE}index.html`,
         cleanupOutdatedCaches: true,
       },

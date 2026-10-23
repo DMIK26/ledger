@@ -1,6 +1,7 @@
 import { daysInMonth, isoFromYMD, parseISO, shiftMonth } from './dates';
 import { parseAmountToMinor } from './money';
 import type { ISODate } from './types';
+import type { Space } from './spaces';
 
 /**
  * Loans and EMIs: the standard reducing-balance schedule banks in India use. Interest for a month is the
@@ -10,6 +11,8 @@ import type { ISODate } from './types';
 
 export interface Loan {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   lender: string;
   principalMinor: number;

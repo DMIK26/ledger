@@ -1,11 +1,12 @@
 # Handoff: where the build stands
 
-Updated 23 Oct 2026. **Drops 1 to 11 are complete and published** at
-https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 12 is built and verified here; it goes live
-once Dhaarmik commits and pushes it with GitHub Desktop.** Next is Drop 13 (reach and polish, v1.1.0).
+Updated 23 Oct 2026. **Drops 1 to 12 are complete and published** at
+https://dmik26.github.io/ledger/ (v1.0.0 was tagged after Drop 7). **Drop 13 (reach and polish) is built
+and verified here as version 1.1.0; it goes live once Dhaarmik commits and pushes it with GitHub Desktop
+and tags it v1.1.0.** No further drop is planned.
 Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
-## Verified
+## Verified at 1.0 (Drop 7)
 
 `npm run lint`, `npm run typecheck`, `npm test` (220 tests, 24 files) and `npm run build` pass; the build
 now ends with a size check (`scripts/budget.mjs`: JavaScript 152 of 170 KB gzipped, CSS 10 of 16 KB,
@@ -37,7 +38,53 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 12: insight (23 Oct 2026, built, awaiting publish)
+## Drop 13: reach and polish, v1.1.0 (23 Oct 2026, built, awaiting publish and tag)
+
+- **Spaces** (Settings > Spaces, off by default): "Keep a Shop ledger as well" and the shop's name. A
+  switcher in the context bar picks Personal, the shop or Both (remembered on the device). Each ledger
+  keeps its own entries, money in, accounts, budgets, recurring payments, udhaar, loans, goals, wishlist,
+  assets and trips; categories, rules, settings and the lock are shared. In Both, what you add goes to
+  Personal, Budgets asks you to pick a ledger and the Dashboard leaves out the budget card. Transactions
+  moves selected entries to the other ledger (one undo). The default name "Shop" follows the language.
+- **Profit and loss** (Reports, in the Shop or Both): sales (money in), spending by category, fees,
+  profit or loss and margin, a row per month for longer periods, CSV export; Both adds Personal beside it.
+- **Backups**: an optional password (typed twice, 8+ characters) encrypts the file with AES-GCM and
+  PBKDF2-SHA-256 at 600,000 rounds; restoring asks for it and says plainly when it is wrong. The phone
+  reminder's "Back up now" saves at once (share sheet, or a download). Where the browser can write to a
+  folder (Chrome on a computer or Android), "Back up to a folder every week" writes
+  `ledger-backup-YYYY-MM-DD.json` when Ledger opens after a week, or asks with one tap when the browser
+  wants permission again. Folder backups are not password-protected (the password is never stored).
+- **App badge** (Settings > Experience, only where `setAppBadge` exists): recurring and card payments due
+  in the next seven days. On an iPhone it asks for notification permission and never sends any.
+- **Face ID or fingerprint** (Settings > Screen lock, with a PIN, where a platform authenticator exists):
+  a passkey made on the device; the lock screen offers "Use Face ID or fingerprint"; the PIN always
+  works; removing the PIN removes the passkey. The setting says it is not yet tried on a real iPhone
+  home-screen app.
+- **Telugu and Hindi** (Settings > Appearance > Language): 1,626 texts translated into each, dates and
+  month names follow, built-in category names and payment methods are shown translated (stored English),
+  amounts keep Western digits and ₹, `<html lang>` follows (also before first paint, from `boot.js`).
+  Text with no translation shows in English. Quick-add examples stay English, as the parser reads
+  English, Telugu and Hindi words anyway. Devices use their own Telugu and Devanagari fonts.
+- **Polish**: start-up JavaScript 153 of 160 KB (Transactions and the sketch tools now load on first
+  use; the charts' scales replace d3-scale); all other JavaScript 253 of 300 KB; the two language chunks
+  72 of 80 KB gzipped and 290 of 320 KB offline; CSS 14 of 16 KB; the rest of the precache 1,230 of 1,300
+  KB (icons were listed twice; the accented handwriting font is no longer precached). Fixed on the way:
+  the category colour button overlapped the name on phones; short month names are whole words; "1st"
+  is a plain number in Telugu and Hindi. Version 1.1.0.
+
+Verified: lint, typecheck, 501 unit tests (49 files, including the translation coverage test and a
+passkey signature test), build with budgets, Playwright 115 passed and 21 skipped with `CI=1` (new
+`e2e/drop13.spec.ts`: Shop ledger, profit and loss and privacy in Both; a protected backup round trip;
+Telugu and Hindi across pages and a reload; passkey unlock through Chrome's virtual authenticator; the
+one-tap reminder). axe runs on every page in English, Telugu and Hindi; the phone-size check runs at 360,
+390 and 430px in English and at 360px in Telugu and Hindi; the privacy sweep runs in all three.
+
+Not verified on real devices: Face ID or fingerprint in the iPhone home-screen app (and Android), the
+badge on an iPhone with notifications allowed, the weekly folder backup in Chrome on Android, the share
+sheet for "Back up now" on an iPhone, and how Telugu and Hindi read to a native speaker (the
+translations are mine; a quick read by Dhaarmik is worth it).
+
+## Drop 12: insight (23 Oct 2026, published)
 
 - **Search** (Transactions, `?q=`; the palette's "Search entries for …"): `src/domain/search.ts` reads
   periods, amounts, methods, categories and subcategories, tags, people ("for amma"), trips, tax
@@ -483,8 +530,10 @@ backups, CSV import; installable and offline on iPhone and Android.
 
 ## Next
 
-1. Try the unverified items above on a real iPhone and Android phone.
-2. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
+1. Publish Drop 13 with GitHub Desktop and tag v1.1.0 (`docs/PUBLISHING.md`).
+2. Try the unverified items above on a real iPhone and Android phone, and read the Telugu and Hindi
+   screens once.
+3. Nothing else is planned. New features need a line in `docs/REQUIREMENTS.md` first.
 
 ## Notes
 

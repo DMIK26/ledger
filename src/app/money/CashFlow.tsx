@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { useLedger } from '../../data/store';
 import { cashFlow, type CashFlow } from '../../domain/accounts';
 import { lastMonths } from '../../domain/aggregates';
-import { monthBounds, monthKey, monthLabel } from '../../domain/dates';
+import { monthBounds, monthKey, monthLabel, monthShortLabel } from '../../domain/dates';
 import { fmtMoney } from '../../domain/money';
 import { useViewMonth } from '../../kit/view';
 import { Money, usePrivacy } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /** In, out and left for the month on screen, then six months of in and out side by side. */
 export function CashFlowCard({ today }: { today: string }) {
@@ -32,32 +34,32 @@ export function CashFlowCard({ today }: { today: string }) {
   const max = Math.max(1, ...series.flatMap((p) => [p.inMinor, p.outMinor]));
   const money = (m: number) => fmtMoney(m, { currency });
   const describe = (p: CashFlow) =>
-    `${monthLabel(p.month)}: ${money(p.inMinor)} in, ${money(p.outMinor)} out`;
+    tl('{0}: {1} in, {2} out', monthLabel(p.month), money(p.inMinor), money(p.outMinor));
 
   return (
     <section className="card cashflow" aria-labelledby="cashflow-title">
       <div className="card-head">
-        <h2 id="cashflow-title">Cash flow</h2>
+        <h2 id="cashflow-title">{tl('Cash flow')}</h2>
         <span className="muted small">
           {monthLabel(month)}
-          {current ? ' so far' : ''}
+          {current ? ' ' + tl('so far') : ''}
         </span>
       </div>
       <dl className="cashflow-figures">
         <div>
-          <dt>In</dt>
+          <dt>{tl('In')}</dt>
           <dd data-testid="cashflow-in">
             <Money minor={now.inMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Out</dt>
+          <dt>{tl('Out')}</dt>
           <dd data-testid="cashflow-out">
             <Money minor={now.outMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Left</dt>
+          <dt>{tl('Left')}</dt>
           <dd data-testid="cashflow-left" className={now.leftMinor < 0 ? 'status-over' : undefined}>
             <Money minor={now.leftMinor} currency={currency} />
           </dd>
@@ -65,21 +67,25 @@ export function CashFlowCard({ today }: { today: string }) {
       </dl>
       {now.feesMinor > 0 && (
         <p className="muted small">
-          Out includes <Money minor={now.feesMinor} currency={currency} /> of interest and fees,
-          which are not spending.
+          {tr(
+            'Out includes {0} of interest and fees, which are not spending.',
+            <Money minor={now.feesMinor} currency={currency} />,
+          )}
         </p>
       )}
       {now.inMinor === 0 && (
         <p className="muted small">
-          No money in yet for {monthLabel(month)}. Add your salary below, or type “salary 40k” in
-          quick add.
+          {tl(
+            'No money in yet for {0}. Add your salary below, or type “salary 40k” in quick add.',
+            monthLabel(month),
+          )}
         </p>
       )}
-      <ul className="cashflow-bars" aria-label="Six months of money in and out">
+      <ul className="cashflow-bars" aria-label={tl('Six months of money in and out')}>
         {series.map((p) => (
           <li key={p.month} aria-label={describe(p)}>
             <span className="cashflow-month" aria-hidden="true">
-              {monthLabel(p.month).slice(0, 3)}
+              {monthShortLabel(p.month)}
             </span>
             <span className="cashflow-pair" aria-hidden="true">
               <span
@@ -95,8 +101,11 @@ export function CashFlowCard({ today }: { today: string }) {
         ))}
       </ul>
       <p className="cashflow-key muted small" aria-hidden="true">
-        <span className="cashflow-swatch cashflow-in" /> In{' '}
-        <span className="cashflow-swatch cashflow-out" /> Out
+        {tr(
+          '{0} In {1} Out',
+          <span className="cashflow-swatch cashflow-in" />,
+          <span className="cashflow-swatch cashflow-out" />,
+        )}
       </p>
     </section>
   );

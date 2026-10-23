@@ -3,6 +3,8 @@ import { useLedger } from '../../data/store';
 import { safeToSpend } from '../../domain/plan';
 import { Money } from '../Money';
 import { href } from '../router';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /**
  * Safe to spend today (Drop 10): the month's plan shared over the days left, after bills and goals.
@@ -24,10 +26,12 @@ export function SafeToSpendCard({ today }: { today: string }) {
   if (s.source === 'none') {
     return (
       <section className="card safe-card" aria-labelledby="safe-title">
-        <h2 id="safe-title">Safe to spend today</h2>
+        <h2 id="safe-title">{tl('Safe to spend today')}</h2>
         <p className="muted small" data-testid="safe-start">
-          <a href={href('/budgets')}>Set a monthly budget</a>, or log money in (type “salary 40k”
-          above), and Ledger works out what you can spend each day and still end the month on plan.
+          {tr(
+            '{0}, or log money in (type “salary 40k” above), and Ledger works out what you can spend each day and still end the month on plan.',
+            <a href={href('/budgets')}>{tl('Set a monthly budget')}</a>,
+          )}
         </p>
       </section>
     );
@@ -37,15 +41,15 @@ export function SafeToSpendCard({ today }: { today: string }) {
   return (
     <section className="card safe-card" aria-labelledby="safe-title">
       <div className="card-head">
-        <h2 id="safe-title">Safe to spend today</h2>
+        <h2 id="safe-title">{tl('Safe to spend today')}</h2>
         <span className="muted small">
-          {s.daysLeft === 1 ? 'Last day of the month' : `${s.daysLeft} days left`}
+          {s.daysLeft === 1 ? tl('Last day of the month') : tl('{0} days left', s.daysLeft)}
         </span>
       </div>
       <p className="big-figure" data-testid="safe-today">
         {over ? (
           <span className="status-over">
-            Over by <Money minor={-s.todayLeftMinor} currency={currency} />
+            {tr('Over by {0}', <Money minor={-s.todayLeftMinor} currency={currency} />)}
           </span>
         ) : (
           <Money minor={s.todayLeftMinor} currency={currency} />
@@ -54,56 +58,67 @@ export function SafeToSpendCard({ today }: { today: string }) {
       <p className="muted small" data-testid="safe-line">
         {s.availableMinor <= 0 ? (
           <>
-            Spending, bills and goals already use this month&rsquo;s{' '}
-            {s.source === 'budget' ? 'budget' : 'money in'}, so nothing more is safe to spend.
+            {tl(
+              'Spending, bills and goals already use this month’s {0}, so nothing more is safe to spend.',
+              s.source === 'budget' ? tl('budget') : tl('money in'),
+            )}
           </>
         ) : over ? (
           <>
-            <Money minor={s.spentTodayMinor} currency={currency} /> spent today against{' '}
-            <Money minor={s.perDayMinor} currency={currency} /> a day. The days after share less to
-            make up for it.
+            {tr(
+              '{0} spent today against {1} a day. The days after share less to make up for it.',
+              <Money minor={s.spentTodayMinor} currency={currency} />,
+              <Money minor={s.perDayMinor} currency={currency} />,
+            )}
           </>
         ) : (
           <>
-            <Money minor={s.perDayMinor} currency={currency} /> a day
-            {s.spentTodayMinor > 0 ? (
-              <>
-                , <Money minor={s.spentTodayMinor} currency={currency} /> spent today
-              </>
-            ) : null}
-            . Spend less today and the coming days get more.
+            {tr(
+              '{0} a day{1}. Spend less today and the coming days get more.',
+              <Money minor={s.perDayMinor} currency={currency} />,
+              s.spentTodayMinor > 0 ? (
+                <>
+                  {tr(', {0} spent today', <Money minor={s.spentTodayMinor} currency={currency} />)}
+                </>
+              ) : null,
+            )}
           </>
         )}
       </p>
       <details className="safe-math">
-        <summary>How it is worked out</summary>
+        <summary>{tl('How it is worked out')}</summary>
         <dl>
           <div>
-            <dt>{s.source === 'budget' ? 'Budget this month' : 'Money in this month'}</dt>
+            <dt>{s.source === 'budget' ? tl('Budget this month') : tl('Money in this month')}</dt>
             <dd>
               <Money minor={s.baseMinor} currency={currency} />
             </dd>
           </div>
           <div>
-            <dt>Spent before today</dt>
+            <dt>{tl('Spent before today')}</dt>
             <dd>
               <Money minor={-s.spentBeforeMinor} currency={currency} signed />
             </dd>
           </div>
           <div>
-            <dt>Bills still to come</dt>
+            <dt>{tl('Bills still to come')}</dt>
             <dd>
               <Money minor={-s.billsMinor} currency={currency} signed />
             </dd>
           </div>
           <div>
-            <dt>Goals this month</dt>
+            <dt>{tl('Goals this month')}</dt>
             <dd>
               <Money minor={-s.goalsMinor} currency={currency} signed />
             </dd>
           </div>
           <div className="safe-total">
-            <dt>Left for {s.daysLeft === 1 ? 'today' : `${s.daysLeft} days, today included`}</dt>
+            <dt>
+              {tl(
+                'Left for {0}',
+                s.daysLeft === 1 ? tl('today') : tl('{0} days, today included', s.daysLeft),
+              )}
+            </dt>
             <dd>
               <Money minor={s.availableMinor} currency={currency} />
             </dd>

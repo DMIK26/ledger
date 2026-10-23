@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { newId, useLedger } from '../../data/store';
 import { categoryById } from '../../domain/categories';
 import { fmtDate } from '../../domain/dates';
@@ -12,9 +12,11 @@ import {
 } from '../../domain/rules';
 import { subcategoriesOf, subcategoryName } from '../../domain/subcategories';
 import { TAX_SECTIONS } from '../../domain/tax';
-import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const EXAMPLES = 5;
 
@@ -24,31 +26,32 @@ function RuleText({ rule }: { rule: CustomRule }) {
   const currency = useLedger((s) => s.settings.currency);
   const s = rule.set;
   const then = [
-    s.categoryId ? (categoryById(categories, s.categoryId)?.name ?? 'Other') : '',
+    s.categoryId ? (categoryById(categories, s.categoryId)?.name ?? tl('Other')) : '',
     s.subcategoryId && s.categoryId
       ? (subcategoryName(categories, {
           categoryId: s.categoryId,
           subcategoryId: s.subcategoryId,
         }) ?? '')
       : '',
-    s.tag ? `tag ${s.tag}` : '',
-    s.forWhom ? `for ${s.forWhom}` : '',
-    s.taxSection ? `tax ${s.taxSection}` : '',
+    s.tag ? tl('tag {0}', s.tag) : '',
+    s.forWhom ? tl('for {0}', s.forWhom) : '',
+    s.taxSection ? tl('tax {0}', s.taxSection) : '',
   ].filter(Boolean);
   return (
     <span>
-      Merchant {RULE_MATCH_LABEL[rule.match]} “{rule.text}”
-      {rule.minMinor !== undefined && (
-        <>
-          , <Money minor={rule.minMinor} currency={currency} /> or more
-        </>
+      {tr(
+        'Merchant {0} “{1}”{2}{3}{4}: {5}',
+        RULE_MATCH_LABEL[rule.match],
+        rule.text,
+        rule.minMinor !== undefined && (
+          <>{tr(', {0} or more', <Money minor={rule.minMinor} currency={currency} />)}</>
+        ),
+        rule.maxMinor !== undefined && (
+          <>{tr(', up to {0}', <Money minor={rule.maxMinor} currency={currency} />)}</>
+        ),
+        rule.method ? tl(', paid by {0}', rule.method) : '',
+        then.join(', '),
       )}
-      {rule.maxMinor !== undefined && (
-        <>
-          , up to <Money minor={rule.maxMinor} currency={currency} />
-        </>
-      )}
-      {rule.method ? `, paid by ${rule.method}` : ''}: {then.join(', ')}
     </span>
   );
 }
@@ -89,14 +92,9 @@ function RuleEditor({
     createdAt: initial?.createdAt ?? 0,
   };
   const problem = ruleProblem(rule);
-  const key = JSON.stringify(rule);
-  // The rule is rebuilt on every render; its JSON says when it really changed.
-  const test = useMemo(
-    () => (problem ? null : testRule(JSON.parse(key) as CustomRule, transactions, categories)),
-    [key, problem, transactions, categories],
-  );
+  const test = problem ? null : testRule(rule, transactions, categories);
   const subs = categoryId ? subcategoriesOf(categories, categoryId) : [];
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -104,7 +102,6 @@ function RuleEditor({
     const saved: CustomRule = {
       ...rule,
       id: initial?.id ?? newId(),
-      createdAt: initial?.createdAt ?? Date.now(),
     };
     const changes = applyPast && test ? test.changes.map((c) => c.before.id) : [];
     await saveCustomRule(saved, changes);
@@ -114,10 +111,10 @@ function RuleEditor({
   return (
     <form className="entry-form rule-form" onSubmit={(e) => void submit(e)} noValidate>
       <fieldset className="facet">
-        <legend>When</legend>
+        <legend>{tl('When')}</legend>
         <div className="form-grid">
           <div className="field">
-            <label htmlFor="rule-match">The merchant</label>
+            <label htmlFor="rule-match">{tl('The merchant')}</label>
             <select
               id="rule-match"
               className="select input"
@@ -132,36 +129,36 @@ function RuleEditor({
             </select>
           </div>
           <div className="field">
-            <label htmlFor="rule-text">These words</label>
+            <label htmlFor="rule-text">{tl('These words')}</label>
             <input
               id="rule-text"
               className="input"
               autoComplete="off"
-              placeholder="amazon"
+              placeholder={tl('amazon')}
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor="rule-min">Amount at least (optional)</label>
+            <label htmlFor="rule-min">{tl('Amount at least (optional)')}</label>
             <AmountInput id="rule-min" initialMinor={initial?.minMinor ?? null} onChange={setMin} />
           </div>
           <div className="field">
-            <label htmlFor="rule-max">Amount at most (optional)</label>
+            <label htmlFor="rule-max">{tl('Amount at most (optional)')}</label>
             <AmountInput id="rule-max" initialMinor={initial?.maxMinor ?? null} onChange={setMax} />
           </div>
           <div className="field">
-            <label htmlFor="rule-method">Paid by</label>
+            <label htmlFor="rule-method">{tl('Paid by')}</label>
             <select
               id="rule-method"
               className="select input"
               value={method}
               onChange={(e) => setMethod(e.target.value as PaymentMethod | '')}
             >
-              <option value="">Any method</option>
+              <option value="">{tl('Any method')}</option>
               {PAYMENT_METHODS.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {methodLabel(m)}
                 </option>
               ))}
             </select>
@@ -169,10 +166,10 @@ function RuleEditor({
         </div>
       </fieldset>
       <fieldset className="facet">
-        <legend>Then</legend>
+        <legend>{tl('Then')}</legend>
         <div className="form-grid">
           <div className="field">
-            <label htmlFor="rule-category">Category</label>
+            <label htmlFor="rule-category">{tl('Category')}</label>
             <select
               id="rule-category"
               className="select input"
@@ -182,7 +179,7 @@ function RuleEditor({
                 setSubcategoryId('');
               }}
             >
-              <option value="">Leave it as it is</option>
+              <option value="">{tl('Leave it as it is')}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -192,14 +189,14 @@ function RuleEditor({
           </div>
           {subs.length > 0 && (
             <div className="field">
-              <label htmlFor="rule-sub">Subcategory</label>
+              <label htmlFor="rule-sub">{tl('Subcategory')}</label>
               <select
                 id="rule-sub"
                 className="select input"
                 value={subcategoryId}
                 onChange={(e) => setSubcategoryId(e.target.value)}
               >
-                <option value="">None</option>
+                <option value="">{tl('None')}</option>
                 {subs.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name}
@@ -209,39 +206,39 @@ function RuleEditor({
             </div>
           )}
           <div className="field">
-            <label htmlFor="rule-tag">Add a tag</label>
+            <label htmlFor="rule-tag">{tl('Add a tag')}</label>
             <input
               id="rule-tag"
               className="input"
               autoComplete="off"
-              placeholder="online"
+              placeholder={tl('online')}
               value={tag}
               onChange={(e) => setTag(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor="rule-for">For</label>
+            <label htmlFor="rule-for">{tl('For')}</label>
             <input
               id="rule-for"
               className="input"
               autoComplete="off"
-              placeholder="Shop"
+              placeholder={tl('Shop')}
               value={forWhom}
               onChange={(e) => setForWhom(e.target.value)}
             />
           </div>
           <div className="field">
-            <label htmlFor="rule-tax">Tax deduction</label>
+            <label htmlFor="rule-tax">{tl('Tax deduction')}</label>
             <select
               id="rule-tax"
               className="select input"
               value={taxSection}
               onChange={(e) => setTaxSection(e.target.value)}
             >
-              <option value="">None</option>
+              <option value="">{tl('None')}</option>
               {TAX_SECTIONS.map((x) => (
                 <option key={x.id} value={x.id}>
-                  {x.id === 'Other' ? 'Other deduction' : x.id}
+                  {x.id === 'Other' ? tl('Other deduction') : x.id}
                 </option>
               ))}
             </select>
@@ -255,12 +252,14 @@ function RuleEditor({
           <>
             <p className="small">
               {test.matches === 0
-                ? 'Matches no past entries yet; it will apply to new ones.'
-                : `Matches ${test.matches === 1 ? '1 past entry' : `${test.matches} past entries`}; ${
+                ? tl('Matches no past entries yet; it will apply to new ones.')
+                : tl(
+                    'Matches {0}; {1}',
+                    test.matches === 1 ? tl('1 past entry') : tl('{0} past entries', test.matches),
                     test.changes.length === 0
-                      ? 'none would change.'
-                      : `${test.changes.length} would change.`
-                  }`}
+                      ? tl('none would change.')
+                      : tl('{0} would change.', test.changes.length),
+                  )}
             </p>
             {test.changes.length > 0 && (
               <>
@@ -269,15 +268,19 @@ function RuleEditor({
                     <li key={before.id} className="small">
                       {before.merchant}, {fmtDate(before.date)}: {name(before.categoryId)}
                       {after.categoryId !== before.categoryId
-                        ? ` to ${name(after.categoryId)}`
+                        ? ' ' + tl('to {0}', name(after.categoryId))
                         : ''}
-                      {after.tags.length > before.tags.length ? `, tag ${rule.set.tag}` : ''}
-                      {after.forWhom !== before.forWhom ? `, for ${after.forWhom}` : ''}
-                      {after.taxSection !== before.taxSection ? `, tax ${after.taxSection}` : ''}
+                      {after.tags.length > before.tags.length ? tl(', tag {0}', rule.set.tag) : ''}
+                      {after.forWhom !== before.forWhom ? tl(', for {0}', after.forWhom) : ''}
+                      {after.taxSection !== before.taxSection
+                        ? tl(', tax {0}', after.taxSection)
+                        : ''}
                     </li>
                   ))}
                   {test.changes.length > EXAMPLES && (
-                    <li className="muted small">and {test.changes.length - EXAMPLES} more</li>
+                    <li className="muted small">
+                      {tl('and {0} more', test.changes.length - EXAMPLES)}
+                    </li>
                   )}
                 </ul>
                 <label className="check">
@@ -286,7 +289,10 @@ function RuleEditor({
                     checked={applyPast}
                     onChange={(e) => setApplyPast(e.target.checked)}
                   />
-                  Also change those {test.changes.length === 1 ? 'entry' : 'entries'}
+                  {tl(
+                    'Also change those {0}',
+                    test.changes.length === 1 ? tl('entry') : tl('entries'),
+                  )}
                 </label>
               </>
             )}
@@ -300,10 +306,10 @@ function RuleEditor({
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Save rule
+          {tl('Save rule')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -322,16 +328,17 @@ export function RulesCard({ startText }: { startText?: string | null }) {
   return (
     <section className="card" aria-labelledby="custom-rules-title">
       <div className="card-head">
-        <h2 id="custom-rules-title">Your rules</h2>
+        <h2 id="custom-rules-title">{tl('Your rules')}</h2>
         {editing === null && (
           <button type="button" className="btn" onClick={() => setEditing('new')}>
-            Add a rule
+            {tl('Add a rule')}
           </button>
         )}
       </div>
       <p className="muted small">
-        Your rules come first, top to bottom; the first that matches wins. Then come the categories
-        Ledger learned, then its built-in words.
+        {tl(
+          'Your rules come first, top to bottom; the first that matches wins. Then come the categories Ledger learned, then its built-in words.',
+        )}
       </p>
       {editing === 'new' && (
         <RuleEditor startText={startText ?? undefined} onDone={() => setEditing(null)} />
@@ -351,35 +358,35 @@ export function RulesCard({ startText }: { startText?: string | null }) {
                     type="button"
                     className="btn btn-ghost"
                     disabled={i === 0}
-                    aria-label={`Move the rule for ${r.text} up`}
+                    aria-label={tl('Move the rule for {0} up', r.text)}
                     onClick={() => void moveCustomRule(r.id, -1)}
                   >
-                    Up
+                    {tl('Up')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost"
                     disabled={i === rules.length - 1}
-                    aria-label={`Move the rule for ${r.text} down`}
+                    aria-label={tl('Move the rule for {0} down', r.text)}
                     onClick={() => void moveCustomRule(r.id, 1)}
                   >
-                    Down
+                    {tl('Down')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    aria-label={`Edit the rule for ${r.text}`}
+                    aria-label={tl('Edit the rule for {0}', r.text)}
                     onClick={() => setEditing(r.id)}
                   >
-                    Edit
+                    {tl('Edit')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    aria-label={`Delete the rule for ${r.text}`}
+                    aria-label={tl('Delete the rule for {0}', r.text)}
                     onClick={() => void deleteCustomRule(r.id)}
                   >
-                    Delete
+                    {tl('Delete')}
                   </button>
                 </span>
               </li>

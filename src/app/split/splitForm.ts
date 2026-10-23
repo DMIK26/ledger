@@ -2,6 +2,7 @@ import type { SplitDraft } from '../../data/store';
 import type { Person } from '../../domain/udhaar';
 import { minorToInput, parseAmountToMinor } from '../../domain/money';
 import type { Split, SplitMode, SplitPart } from '../../domain/splits';
+import { tl } from '../../domain/i18n';
 
 /** The split section of the Add and edit form, as the user is filling it in. */
 export interface SplitRow {
@@ -78,10 +79,11 @@ export const previewParts = (state: SplitState): SplitPart[] =>
 /** A problem to fix before saving, or null. */
 export function splitProblem(state: SplitState): string | null {
   const others = state.rows.filter((r) => !isMe(r));
-  if (others.length === 0) return 'Add someone to split with';
-  if (others.some((r) => !r.personId && !r.name.trim())) return 'Give everyone in the split a name';
+  if (others.length === 0) return tl('Add someone to split with');
+  if (others.some((r) => !r.personId && !r.name.trim()))
+    return tl('Give everyone in the split a name');
   const names = others.map((r) => r.personId ?? r.name.trim().toLowerCase());
-  if (new Set(names).size !== names.length) return 'Someone is in the split twice';
+  if (new Set(names).size !== names.length) return tl('Someone is in the split twice');
   return null;
 }
 

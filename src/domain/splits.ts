@@ -1,4 +1,5 @@
 import type { UdhaarKind } from './udhaar';
+import { tl } from './i18n';
 
 /**
  * Splits (Drop 11, after Splitwise). An expense shared with people: the entry's amount is your share,
@@ -9,10 +10,18 @@ import type { UdhaarKind } from './udhaar';
 export type SplitMode = 'equal' | 'exact' | 'percent' | 'shares';
 
 export const SPLIT_MODE_LABEL: Record<SplitMode, string> = {
-  equal: 'Equally',
-  exact: 'Exact amounts',
-  percent: 'Percentages',
-  shares: 'Shares',
+  get equal() {
+    return tl('Equally');
+  },
+  get exact() {
+    return tl('Exact amounts');
+  },
+  get percent() {
+    return tl('Percentages');
+  },
+  get shares() {
+    return tl('Shares');
+  },
 };
 
 export interface SplitPart {
@@ -55,9 +64,9 @@ export function shareAmounts(
   mode: SplitMode,
   parts: readonly SplitPart[],
 ): ShareResult {
-  if (parts.length < 2) return { ok: false, error: 'Add at least one person to split with' };
+  if (parts.length < 2) return { ok: false, error: tl('Add at least one person to split with') };
   if (!Number.isInteger(totalMinor) || totalMinor <= 0)
-    return { ok: false, error: 'Enter the amount first' };
+    return { ok: false, error: tl('Enter the amount first') };
   if (mode === 'equal')
     return {
       ok: true,
@@ -67,12 +76,12 @@ export function shareAmounts(
       ),
     };
   if (parts.some((p) => !Number.isInteger(p.value) || p.value < 0))
-    return { ok: false, error: 'Use whole, positive numbers' };
+    return { ok: false, error: tl('Use whole, positive numbers') };
   if (mode === 'exact') {
     const sum = parts.reduce((s, p) => s + p.value, 0);
     return sum === totalMinor
       ? { ok: true, shares: parts.map((p) => p.value) }
-      : { ok: false, error: 'The amounts must add up to the total' };
+      : { ok: false, error: tl('The amounts must add up to the total') };
   }
   if (mode === 'percent') {
     const sum = parts.reduce((s, p) => s + p.value, 0);
@@ -84,7 +93,7 @@ export function shareAmounts(
             parts.map((p) => p.value),
           ),
         }
-      : { ok: false, error: 'The percentages must add up to 100' };
+      : { ok: false, error: tl('The percentages must add up to 100') };
   }
   const sum = parts.reduce((s, p) => s + p.value, 0);
   return sum > 0
@@ -95,7 +104,7 @@ export function shareAmounts(
           parts.map((p) => p.value),
         ),
       }
-    : { ok: false, error: 'Give at least one share' };
+    : { ok: false, error: tl('Give at least one share') };
 }
 
 export const myShare = (split: Pick<Split, 'parts'>): number =>

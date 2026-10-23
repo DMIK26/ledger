@@ -4,3 +4,5 @@ export { Keypad } from './Keypad';
 export { Several } from './Several';
 export { LockScreen } from './LockScreen';
 export { MonthCloseCard } from './plan/MonthClose';
+export { FolderBackupCheck } from './FolderBackupCheck';
+export { NotesPanel, SketchToolbar } from '../doodle/Studio';

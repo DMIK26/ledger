@@ -1,9 +1,9 @@
 import { Suspense, useRef, useState, type PointerEvent } from 'react';
-import { useLedger } from '../data/store';
+import { useLedger, viewOf } from '../data/store';
 import { categoryById } from '../domain/categories';
 import { subcategoryName } from '../domain/subcategories';
 import { fmtDate } from '../domain/dates';
-import type { Transaction } from '../domain/types';
+import { methodLabel, type Transaction } from '../domain/types';
 import { EntryForm } from './deferred';
 import { Icon } from './icons';
 import { Money, usePrivacy } from './Money';
@@ -11,6 +11,7 @@ import { normalizeMerchantKey } from '../domain/categoriser';
 import type { Pin } from '../domain/pins';
 import { entityKey, merchantKey, txEntities } from '../kit/entityKeys';
 import { usePins, useView } from '../kit/view';
+import { tl } from '../domain/i18n';
 
 export interface RowActions {
   onDelete?: (id: string) => void;
@@ -35,6 +36,10 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
     tx.projectId ? s.projects.find((p) => p.id === tx.projectId) : undefined,
   );
   const masked = usePrivacy();
+  // In Both, a Shop entry says so (Drop 13).
+  const shopLabel = useLedger((s) =>
+    tx.space === 'shop' && viewOf(s.settings) === 'both' ? tl(s.settings.shopName || 'Shop') : '',
+  );
   const [dx, setDx] = useState(0);
   const swipe = useRef<{ x: number; y: number; locked: boolean | null } | null>(null);
   const shift = useRef(false);
@@ -49,16 +54,17 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   const sub = subcategoryName(categories, tx);
   // Drop 12 details: who it was for, the trip, the tax section, a warranty. No amounts here.
   const extras = [
-    tx.forWhom ? `For ${tx.forWhom}` : '',
+    shopLabel,
+    tx.forWhom ? tl('For {0}', tx.forWhom) : '',
     project?.name ?? '',
-    tx.taxSection ? `Tax ${tx.taxSection}` : '',
-    tx.warrantyMonths ? `Warranty ${tx.warrantyMonths} months` : '',
+    tx.taxSection ? tl('Tax {0}', tx.taxSection) : '',
+    tx.warrantyMonths ? tl('Warranty {0} months', tx.warrantyMonths) : '',
   ]
     .filter(Boolean)
     .join(' · ');
   // The typed text holds the amount, so privacy mode hides it along with every other figure.
   const showRaw = !masked && tx.raw && tx.raw.trim().toLowerCase() !== tx.merchant.toLowerCase();
-  const name = tx.merchant || 'entry';
+  const name = tx.merchant || tl('entry');
   const pins = usePins();
   const toggle = useView((s) => s.togglePin);
   const isPinned = (kind: Pin['kind'], id: string) =>
@@ -71,7 +77,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
     const close = () => actions.onEdit?.(null);
     return (
       <li className="tx-row tx-editing" data-testid="tx-edit">
-        <Suspense fallback={<p className="muted small">Opening…</p>}>
+        <Suspense fallback={<p className="muted small">{tl('Opening…')}</p>}>
           <EntryForm
             editing={{
               id: tx.id,
@@ -96,7 +102,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
               },
             }}
             autoFocus
-            submitLabel="Save changes"
+            submitLabel={tl('Save changes')}
             onDone={close}
           />
         </Suspense>
@@ -156,7 +162,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           <input
             type="checkbox"
             className="checkbox"
-            aria-label={`Select ${name} on ${when}`}
+            aria-label={tl('Select {0} on {1}', name, when)}
             checked={actions.selected!.has(tx.id)}
             onClick={(e) => {
               shift.current = e.shiftKey;
@@ -176,10 +182,12 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
             className="link-button"
             data-hl={merchantKey(tx.merchant)}
             aria-pressed={isPinned('merchant', mKey)}
-            title={`Pin ${tx.merchant || 'Untitled'} to every page`}
-            onClick={() => toggle({ kind: 'merchant', id: mKey, label: tx.merchant || 'Untitled' })}
+            title={tl('Pin {0} to every page', tx.merchant || tl('Untitled'))}
+            onClick={() =>
+              toggle({ kind: 'merchant', id: mKey, label: tx.merchant || tl('Untitled') })
+            }
           >
-            {tx.merchant || 'Untitled'}
+            {tx.merchant || tl('Untitled')}
           </button>
         </span>
         {showRaw && <span className="tx-raw">{tx.raw}</span>}
@@ -193,7 +201,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
                 className="tag"
                 data-hl={entityKey('tag', t)}
                 aria-pressed={isPinned('tag', t)}
-                title={`Pin tag ${t} to every page`}
+                title={tl('Pin tag {0} to every page', t)}
                 onClick={() => toggle({ kind: 'tag', id: t, label: `#${t}` })}
               >
                 {t}
@@ -207,21 +215,21 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           type="button"
           className="chip chip-pin"
           aria-pressed={isPinned('category', tx.categoryId)}
-          title={`Pin ${category?.name ?? 'Other'} to every page`}
+          title={tl('Pin {0} to every page', category?.name ?? tl('Other'))}
           onClick={() =>
-            toggle({ kind: 'category', id: tx.categoryId, label: category?.name ?? 'Other' })
+            toggle({ kind: 'category', id: tx.categoryId, label: category?.name ?? tl('Other') })
           }
         >
           <span className="dot" style={{ background: category?.color ?? 'var(--faint)' }} />
-          {category?.name ?? 'Other'}
+          {category?.name ?? tl('Other')}
           {sub && <span className="chip-sub"> · {sub}</span>}
-          {tx.unsure && <span className="chip-note">unsure</span>}
+          {tx.unsure && <span className="chip-note">{tl('unsure')}</span>}
         </button>
         <span className="tx-mobile-meta">
           {when}
-          {hidden.includes('method') ? '' : ` · ${tx.method}`}
+          {hidden.includes('method') ? '' : ` · ${methodLabel(tx.method)}`}
           {account ? ` · ${account.name}` : ''}
-          {tx.split ? ' · split' : ''}
+          {tx.split ? ' ' + tl('· split') : ''}
         </span>
       </span>
       <span className="tx-method">
@@ -230,10 +238,10 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           className="link-button"
           data-hl={entityKey('method', tx.method)}
           aria-pressed={isPinned('method', tx.method)}
-          title={`Pin ${tx.method} to every page`}
+          title={tl('Pin {0} to every page', tx.method)}
           onClick={() => toggle({ kind: 'method', id: tx.method, label: tx.method })}
         >
-          {tx.method}
+          {methodLabel(tx.method)}
         </button>
         {account && <span className="tx-account muted small">{account.name}</span>}
       </span>
@@ -252,7 +260,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label={`Receipt for ${name} on ${when}`}
+            aria-label={tl('Receipt for {0} on {1}', name, when)}
             onClick={() => actions.onReceipt?.(tx.id)}
           >
             <Icon name="receipt" />
@@ -262,7 +270,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label={`Edit ${name} on ${when}`}
+            aria-label={tl('Edit {0} on {1}', name, when)}
             onClick={() => actions.onEdit?.(tx.id)}
           >
             <Icon name="edit" />
@@ -272,7 +280,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label={`Delete ${name} on ${when}`}
+            aria-label={tl('Delete {0} on {1}', name, when)}
             onClick={() => actions.onDelete?.(tx.id)}
           >
             <Icon name="trash" />

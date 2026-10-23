@@ -5,21 +5,34 @@ import { addDays, diffDays, monthBounds, monthKey, monthProgress, shiftMonthKey 
 import { goalsSetAside, type Goal } from './goals';
 import { occurrencesBetween, type RecurringItem } from './recurring';
 import type { Budget, BudgetKind, Category, CategoryId, ISODate, Transaction } from './types';
+import { tl } from './i18n';
 
 /** Drop 10: planning ahead. Budget types, bills still to come, forecast, safe to spend, rollover. */
 
 export const BUDGET_KINDS: readonly BudgetKind[] = ['fixed', 'flexible', 'non-monthly'];
 
 export const BUDGET_KIND_LABEL: Record<BudgetKind, string> = {
-  fixed: 'Fixed',
-  flexible: 'Flexible',
-  'non-monthly': 'Non-monthly',
+  get fixed() {
+    return tl('Fixed');
+  },
+  get flexible() {
+    return tl('Flexible');
+  },
+  get 'non-monthly'() {
+    return tl('Non-monthly');
+  },
 };
 
 export const BUDGET_KIND_HINT: Record<BudgetKind, string> = {
-  fixed: 'About the same every month, like rent, bills and EMIs.',
-  flexible: 'Day-to-day spending that changes with you.',
-  'non-monthly': 'Comes now and then, like fees, insurance and gifts.',
+  get fixed() {
+    return tl('About the same every month, like rent, bills and EMIs.');
+  },
+  get flexible() {
+    return tl('Day-to-day spending that changes with you.');
+  },
+  get 'non-monthly'() {
+    return tl('Comes now and then, like fees, insurance and gifts.');
+  },
 };
 
 const DEFAULT_KIND: Record<string, BudgetKind> = { housing: 'fixed', education: 'non-monthly' };
@@ -169,7 +182,8 @@ export function effectiveBudget(
   month: string,
   category: Pick<Category, 'id' | 'rollover'>,
 ): EffectiveBudget | null {
-  const amounts = new Map(budgets.map((b) => [b.id, b.amountMinor]));
+  // Keyed by month and scope, not by id: a Shop budget's id starts with 'shop|' (Drop 13).
+  const amounts = new Map(budgets.map((b) => [budgetId(b.month, b.scope), b.amountMinor]));
   const base = amounts.get(budgetId(month, category.id));
   if (base === undefined) return null;
   let carryMinor = 0;
@@ -228,7 +242,9 @@ export function safeToSpend(input: SafeToSpendInput): SafeToSpend {
   const month = monthKey(today);
   const { start, end } = monthBounds(month);
   const spentIn = spendIndex(input.transactions);
-  const overall = input.budgets.find((b) => b.id === budgetId(month, 'overall'))?.amountMinor;
+  const overall = input.budgets.find(
+    (b) => b.month === month && b.scope === 'overall',
+  )?.amountMinor;
   const catBudgets = input.categories
     .map((c) => effectiveBudget(input.budgets, spentIn, month, c))
     .filter((b): b is EffectiveBudget => b !== null);
@@ -418,7 +434,7 @@ export function monthReview(input: {
     spentMinor,
     entries: list.length,
     budgetMinor:
-      input.budgets.find((b) => b.id === budgetId(month, 'overall'))?.amountMinor ?? null,
+      input.budgets.find((b) => b.month === month && b.scope === 'overall')?.amountMinor ?? null,
     inMinor,
     outMinor: spentMinor + feesMinor,
     top: topEntry ? { categoryId: topEntry[0], totalMinor: topEntry[1] } : null,

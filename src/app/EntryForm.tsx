@@ -5,7 +5,7 @@ import { fmtDate, parseISO, todayISO } from '../domain/dates';
 import { findDuplicate } from '../domain/duplicates';
 import { parseQuickEntry } from '../domain/parser';
 import { parseTags } from '../domain/tags';
-import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { AmountInput } from './AmountInput';
 import { accountForMethod } from '../domain/accounts';
 import { convertMinor, FX_CURRENCIES, parseRate, rateAsMinor, rateInput } from '../domain/fx';
@@ -29,6 +29,7 @@ import {
   splitToState,
   type SplitState,
 } from './split/splitForm';
+import { tl } from '../domain/i18n';
 
 // The split section loads the first time someone splits an expense.
 const SplitEditor = lazy(() =>
@@ -39,7 +40,7 @@ const SplitEditor = lazy(() =>
 function EntryHistory({ id }: { id: string }) {
   const getEntryHistory = useLedger((s) => s.getEntryHistory);
   const [events, setEvents] = useState<AuditEvent[] | null>(null);
-  const word = { do: '', undo: 'Undone: ', redo: 'Redone: ' } as const;
+  const word = { do: '', undo: tl('Undone:') + ' ', redo: tl('Redone:') + ' ' } as const;
   return (
     <details className="entry-history">
       <summary
@@ -47,10 +48,12 @@ function EntryHistory({ id }: { id: string }) {
           if (events === null) void getEntryHistory(id).then(setEvents);
         }}
       >
-        History
+        {tl('History')}
       </summary>
       {events === null ? null : events.length === 0 ? (
-        <p className="muted small">Nothing recorded yet. The log keeps the last 500 steps.</p>
+        <p className="muted small">
+          {tl('Nothing recorded yet. The log keeps the last 500 steps.')}
+        </p>
       ) : (
         <ul className="history-list" data-testid="entry-history">
           {events.map((e) => (
@@ -226,7 +229,9 @@ export function EntryForm({
   });
   const subs = subcategoriesOf(categories, categoryId);
   const openProjects = projects.filter((p) => !p.archived || p.id === projectId);
-  const names = [...new Set([...forWhomNames(transactions), ...people.map((p) => p.name), 'Shop'])];
+  const names = [
+    ...new Set([...forWhomNames(transactions), ...people.map((p) => p.name), tl('Shop')]),
+  ];
 
   const duplicate =
     effective !== null && effective > 0 && parseISO(date)
@@ -236,15 +241,15 @@ export function EntryForm({
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const problems: string[] = [];
-    if (foreignOn && rate4 === null) problems.push('Enter the rate, rupees for one unit');
-    else if (effective === null || effective <= 0) problems.push('Enter an amount above zero');
-    if (!merchant.trim()) problems.push('Say what it was for');
-    if (!parseISO(date)) problems.push('Pick a valid date');
+    if (foreignOn && rate4 === null) problems.push(tl('Enter the rate, rupees for one unit'));
+    else if (effective === null || effective <= 0) problems.push(tl('Enter an amount above zero'));
+    if (!merchant.trim()) problems.push(tl('Say what it was for'));
+    if (!parseISO(date)) problems.push(tl('Pick a valid date'));
     if (
       warranty &&
       !(/^\d+$/.test(warranty) && Number(warranty) >= 1 && Number(warranty) <= MAX_WARRANTY_MONTHS)
     )
-      problems.push(`Warranty is in whole months, 1 to ${MAX_WARRANTY_MONTHS}`);
+      problems.push(tl('Warranty is in whole months, 1 to {0}', MAX_WARRANTY_MONTHS));
     if (splitOn && effective !== null && effective > 0) {
       const problem = splitProblem(split);
       const shares = shareAmounts(effective, split.mode, previewParts(split));
@@ -255,7 +260,7 @@ export function EntryForm({
           parts: previewParts(split).map((p, i) => ({ ...p, shareMinor: shares.shares[i]! })),
         }) <= 0
       )
-        problems.push('Your share is zero; record lending in Udhaar instead');
+        problems.push(tl('Your share is zero; record lending in Udhaar instead'));
     }
     setErrors(problems);
     if (problems.length > 0 || saving) return;
@@ -281,7 +286,7 @@ export function EntryForm({
       setReceipt(await prepareReceipt(file));
       setReceiptChanged(true);
     } catch (err) {
-      setReceiptError(err instanceof Error ? err.message : 'Could not read that image.');
+      setReceiptError(err instanceof Error ? err.message : tl('Could not read that image.'));
     }
   };
 
@@ -289,7 +294,7 @@ export function EntryForm({
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       {describe && (
         <div className="field">
-          <label htmlFor={f('quick')}>Describe it</label>
+          <label htmlFor={f('quick')}>{tl('Describe it')}</label>
           <input
             id={f('quick')}
             className="input"
@@ -298,12 +303,14 @@ export function EntryForm({
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="done"
-            placeholder="shawarma 500 on 18th upi"
+            placeholder={tl('shawarma 500 on 18th upi')}
             autoFocus={autoFocus}
             value={quick}
             onChange={(e) => fillFromQuick(e.target.value)}
           />
-          <p className="muted small">Fills in the fields below. Adjust anything before saving.</p>
+          <p className="muted small">
+            {tl('Fills in the fields below. Adjust anything before saving.')}
+          </p>
         </div>
       )}
       <label className="check foreign-toggle">
@@ -315,17 +322,17 @@ export function EntryForm({
             setConfirmDuplicate(false);
           }}
         />
-        Paid in another currency
+        {tl('Paid in another currency')}
       </label>
       <label className="check foreign-toggle">
         <input type="checkbox" checked={splitOn} onChange={(e) => setSplitOn(e.target.checked)} />
-        Split with others
+        {tl('Split with others')}
       </label>
       <div className="form-grid">
         {foreignOn ? (
           <>
             <div className="field">
-              <label htmlFor={f('fx-currency')}>Currency</label>
+              <label htmlFor={f('fx-currency')}>{tl('Currency')}</label>
               <select
                 id={f('fx-currency')}
                 className="select input"
@@ -340,11 +347,11 @@ export function EntryForm({
               </select>
             </div>
             <div className="field">
-              <label htmlFor={f('fx-amount')}>Amount in {fxCurrency}</label>
+              <label htmlFor={f('fx-amount')}>{tl('Amount in {0}', fxCurrency)}</label>
               <AmountInput id={f('fx-amount')} initialMinor={fxAmount} onChange={setFxAmount} />
             </div>
             <div className="field">
-              <label htmlFor={f('fx-rate')}>Rate, rupees for 1 {fxCurrency}</label>
+              <label htmlFor={f('fx-rate')}>{tl('Rate, rupees for 1 {0}', fxCurrency)}</label>
               <input
                 id={f('fx-rate')}
                 className="input"
@@ -356,15 +363,18 @@ export function EntryForm({
               />
               {effective !== null && rate4 !== null && (
                 <span className="amt-sum small" aria-live="polite" data-testid="fx-result">
-                  = {fmtMoney(effective, { currency })} at{' '}
-                  {fmtMoney(rateAsMinor(rate4), { currency })}
+                  {tl(
+                    '= {0} at {1}',
+                    fmtMoney(effective, { currency }),
+                    fmtMoney(rateAsMinor(rate4), { currency }),
+                  )}
                 </span>
               )}
             </div>
           </>
         ) : (
           <div className="field">
-            <label htmlFor={f('amount')}>{splitOn ? 'Whole bill' : 'Amount'}</label>
+            <label htmlFor={f('amount')}>{splitOn ? tl('Whole bill') : tl('Amount')}</label>
             <AmountInput
               key={amountKey}
               id={f('amount')}
@@ -378,7 +388,7 @@ export function EntryForm({
           </div>
         )}
         <div className="field">
-          <label htmlFor={f('merchant')}>What for</label>
+          <label htmlFor={f('merchant')}>{tl('What for')}</label>
           <input
             id={f('merchant')}
             className="input"
@@ -390,7 +400,7 @@ export function EntryForm({
           />
         </div>
         <div className="field">
-          <label htmlFor={f('date')}>Date</label>
+          <label htmlFor={f('date')}>{tl('Date')}</label>
           <input
             id={f('date')}
             className="input"
@@ -405,7 +415,7 @@ export function EntryForm({
           />
         </div>
         <div className="field">
-          <label htmlFor={f('category')}>Category</label>
+          <label htmlFor={f('category')}>{tl('Category')}</label>
           <select
             id={f('category')}
             className="select input"
@@ -425,14 +435,14 @@ export function EntryForm({
         </div>
         {subs.length > 0 && (
           <div className="field">
-            <label htmlFor={f('sub')}>Subcategory</label>
+            <label htmlFor={f('sub')}>{tl('Subcategory')}</label>
             <select
               id={f('sub')}
               className="select input"
               value={subcategoryId}
               onChange={(e) => setSubcategoryId(e.target.value)}
             >
-              <option value="">None</option>
+              <option value="">{tl('None')}</option>
               {subs.map((x) => (
                 <option key={x.id} value={x.id}>
                   {x.name}
@@ -442,7 +452,7 @@ export function EntryForm({
           </div>
         )}
         <div className="field">
-          <label htmlFor={f('method')}>Paid by</label>
+          <label htmlFor={f('method')}>{tl('Paid by')}</label>
           <select
             id={f('method')}
             className="select input"
@@ -451,14 +461,14 @@ export function EntryForm({
           >
             {PAYMENT_METHODS.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {methodLabel(m)}
               </option>
             ))}
           </select>
         </div>
         {openAccounts.length > 0 && (
           <div className="field">
-            <label htmlFor={f('account')}>From account</label>
+            <label htmlFor={f('account')}>{tl('From account')}</label>
             <select
               id={f('account')}
               className="select input"
@@ -466,7 +476,9 @@ export function EntryForm({
               onChange={(e) => setAccountId(e.target.value)}
             >
               <option value="">
-                {methodAccount ? `${methodAccount.name} (${method})` : `No account for ${method}`}
+                {methodAccount
+                  ? `${methodAccount.name} (${method})`
+                  : tl('No account for {0}', method)}
               </option>
               {openAccounts
                 .filter((a) => a.id !== methodAccount?.id || accountId === a.id)
@@ -479,20 +491,20 @@ export function EntryForm({
           </div>
         )}
         <div className="field">
-          <label htmlFor={f('tags')}>Tags</label>
+          <label htmlFor={f('tags')}>{tl('Tags')}</label>
           <input
             id={f('tags')}
             className="input"
             type="text"
             autoComplete="off"
-            placeholder="work, trip"
+            placeholder={tl('work, trip')}
             value={tags}
             onChange={(e) => setTags(e.target.value)}
           />
         </div>
         {openProjects.length > 0 && (
           <div className="field">
-            <label htmlFor={f('project')}>Trip or project</label>
+            <label htmlFor={f('project')}>{tl('Trip or project')}</label>
             <select
               id={f('project')}
               className="select input"
@@ -502,7 +514,7 @@ export function EntryForm({
                 setProjectTouched(true);
               }}
             >
-              <option value="">None</option>
+              <option value="">{tl('None')}</option>
               {openProjects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -513,17 +525,17 @@ export function EntryForm({
         )}
       </div>
       <details className="more-details" open={moreOpen}>
-        <summary>Who it was for, tax and warranty</summary>
+        <summary>{tl('Who it was for, tax and warranty')}</summary>
         <div className="form-grid">
           <div className="field">
-            <label htmlFor={f('for')}>For</label>
+            <label htmlFor={f('for')}>{tl('For')}</label>
             <input
               id={f('for')}
               className="input"
               type="text"
               autoComplete="off"
               list={f('for-names')}
-              placeholder="You"
+              placeholder={tl('You')}
               value={forWhom}
               onChange={(e) => setForWhom(e.target.value)}
             />
@@ -534,23 +546,23 @@ export function EntryForm({
             </datalist>
           </div>
           <div className="field">
-            <label htmlFor={f('tax')}>Tax deduction</label>
+            <label htmlFor={f('tax')}>{tl('Tax deduction')}</label>
             <select
               id={f('tax')}
               className="select input"
               value={taxSection}
               onChange={(e) => setTaxSection(e.target.value)}
             >
-              <option value="">None</option>
+              <option value="">{tl('None')}</option>
               {TAX_SECTIONS.map((x) => (
                 <option key={x.id} value={x.id}>
-                  {x.id === 'Other' ? 'Other deduction' : `${x.id}, ${x.what}`}
+                  {x.id === 'Other' ? tl('Other deduction') : `${x.id}, ${x.what}`}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor={f('warranty')}>Warranty, months</label>
+            <label htmlFor={f('warranty')}>{tl('Warranty, months')}</label>
             <input
               id={f('warranty')}
               className="input"
@@ -565,17 +577,17 @@ export function EntryForm({
         </div>
         {warranty && !receipt && (
           <p className="muted small">
-            Add a photo of the receipt below to keep it for the warranty.
+            {tl('Add a photo of the receipt below to keep it for the warranty.')}
           </p>
         )}
       </details>
       {splitOn && (
-        <Suspense fallback={<p className="muted small">Opening the split…</p>}>
+        <Suspense fallback={<p className="muted small">{tl('Opening the split…')}</p>}>
           <SplitEditor totalMinor={effective} state={split} onChange={setSplit} />
         </Suspense>
       )}
       <div className="field">
-        <label htmlFor={f('notes')}>Notes</label>
+        <label htmlFor={f('notes')}>{tl('Notes')}</label>
         <textarea
           id={f('notes')}
           className="input textarea"
@@ -589,12 +601,12 @@ export function EntryForm({
           <img
             className="receipt-thumb"
             src={receiptUrl}
-            alt="Receipt"
+            alt={tl('Receipt')}
             data-masked={masked ? '' : undefined}
           />
         )}
         <label className="btn">
-          {receipt ? 'Replace receipt' : 'Add receipt'}
+          {receipt ? tl('Replace receipt') : tl('Add receipt')}
           <input
             type="file"
             accept="image/*"
@@ -614,7 +626,7 @@ export function EntryForm({
               setReceiptChanged(true);
             }}
           >
-            Remove receipt
+            {tl('Remove receipt')}
           </button>
         )}
       </div>
@@ -627,17 +639,20 @@ export function EntryForm({
       )}
       {duplicate && confirmDuplicate && (
         <p className="warning" role="alert">
-          This looks like a repeat of {duplicate.merchant} on {fmtDate(duplicate.date)}. Save again
-          to keep both.
+          {tl(
+            'This looks like a repeat of {0} on {1}. Save again to keep both.',
+            duplicate.merchant,
+            fmtDate(duplicate.date),
+          )}
         </p>
       )}
       {editing && <EntryHistory id={editing.id} />}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary" disabled={saving}>
-          {duplicate && confirmDuplicate ? 'Save anyway' : submitLabel}
+          {duplicate && confirmDuplicate ? tl('Save anyway') : submitLabel}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>

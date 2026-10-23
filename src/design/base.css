@@ -1969,7 +1969,8 @@ dialog::backdrop {
 
 .cat-row {
   display: grid;
-  grid-template-columns: 44px 28px minmax(0, 1fr) auto;
+  /* The colour button is a 44px target on phones, so its column is 44px wide too. */
+  grid-template-columns: 44px 44px minmax(0, 1fr) auto;
   gap: var(--s1) var(--s2);
   align-items: center;
   padding: var(--s1) 0;
@@ -1995,7 +1996,7 @@ dialog::backdrop {
 
 @media (min-width: 720px) {
   .cat-row {
-    grid-template-columns: 44px 28px minmax(0, 1fr) 100px 88px;
+    grid-template-columns: 44px 44px minmax(0, 1fr) 100px 88px;
   }
 
   .cat-count {
@@ -2983,6 +2984,14 @@ g.mood-face {
   font-size: 20px;
   line-height: 1.1;
   pointer-events: none;
+}
+
+/* Telugu and Hindi have no handwriting face, so callouts are smaller and wrap sooner (Drop 13). */
+:lang(te) .callout,
+:lang(hi) .callout {
+  max-width: 11em;
+  font-size: 15px;
+  line-height: 1.3;
 }
 
 .callout-arrow {
@@ -5355,4 +5364,15 @@ button.tree-item:hover {
 .search-box input::-webkit-search-cancel-button {
   -webkit-appearance: none;
   appearance: none;
+}
+
+/* Drop 13: weekly folder backup inside the Backup card. */
+.folder-backup {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.folder-backup h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
 }

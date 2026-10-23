@@ -14,8 +14,21 @@ import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money } from '../Money';
 import { TxList } from '../TxList';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
-const STATUS_LABEL = { upcoming: 'Coming up', on: 'On now', done: 'Done', open: '' } as const;
+const STATUS_LABEL = {
+  get upcoming() {
+    return tl('Coming up');
+  },
+  get on() {
+    return tl('On now');
+  },
+  get done() {
+    return tl('Done');
+  },
+  open: '',
+} as const;
 
 function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => void }) {
   const projects = useLedger((s) => s.projects);
@@ -39,7 +52,9 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
       ...(initial?.archived ? { archived: true } : {}),
     };
     const problem = projectProblem({ ...draft, collect }, projects, initial?.id);
-    if (problem && !(problem.startsWith('To collect') && !start && !end)) return setError(problem);
+    // Without dates there is nothing to collect by, which is fine.
+    const noDates = problem === tl('To collect entries by date, give the first and last day');
+    if (problem && !(noDates && !start && !end)) return setError(problem);
     await saveProject(draft, initial?.id);
     onDone();
   };
@@ -48,19 +63,19 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`p-name-${id}`}>Name</label>
+          <label htmlFor={`p-name-${id}`}>{tl('Name')}</label>
           <input
             id={`p-name-${id}`}
             className="input"
             autoComplete="off"
             maxLength={MAX_PROJECT_NAME}
-            placeholder="Goa trip"
+            placeholder={tl('Goa trip')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor={`p-kind-${id}`}>Kind</label>
+          <label htmlFor={`p-kind-${id}`}>{tl('Kind')}</label>
           <select
             id={`p-kind-${id}`}
             className="select input"
@@ -75,7 +90,7 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
           </select>
         </div>
         <div className="field">
-          <label htmlFor={`p-start-${id}`}>First day (optional)</label>
+          <label htmlFor={`p-start-${id}`}>{tl('First day (optional)')}</label>
           <input
             id={`p-start-${id}`}
             className="input"
@@ -85,7 +100,7 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
           />
         </div>
         <div className="field">
-          <label htmlFor={`p-end-${id}`}>Last day (optional)</label>
+          <label htmlFor={`p-end-${id}`}>{tl('Last day (optional)')}</label>
           <input
             id={`p-end-${id}`}
             className="input"
@@ -96,7 +111,7 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
           />
         </div>
         <div className="field">
-          <label htmlFor={`p-budget-${id}`}>Budget (optional)</label>
+          <label htmlFor={`p-budget-${id}`}>{tl('Budget (optional)')}</label>
           <AmountInput
             id={`p-budget-${id}`}
             initialMinor={initial?.budgetMinor ?? null}
@@ -106,7 +121,7 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
       </div>
       <label className="check">
         <input type="checkbox" checked={collect} onChange={(e) => setCollect(e.target.checked)} />
-        Add entries dated between the first and last day to it by themselves
+        {tl('Add entries dated between the first and last day to it by themselves')}
       </label>
       {error && (
         <p className="errors" role="alert">
@@ -115,10 +130,10 @@ function ProjectForm({ initial, onDone }: { initial?: Project; onDone: () => voi
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {initial ? 'Save changes' : 'Save'}
+          {initial ? tl('Save changes') : tl('Save')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -148,7 +163,7 @@ function ProjectCard({ project }: { project: Project }) {
   const titleId = `project-${project.id}`;
   if (editing)
     return (
-      <section className="card" aria-label={`Edit ${project.name}`}>
+      <section className="card" aria-label={tl('Edit {0}', project.name)}>
         <ProjectForm initial={project} onDone={() => setEditing(false)} />
       </section>
     );
@@ -163,7 +178,7 @@ function ProjectCard({ project }: { project: Project }) {
         <span className="muted small">
           {PROJECT_KIND_LABEL[project.kind]}
           {project.start && project.end
-            ? `, ${fmtDate(project.start)} to ${fmtDate(project.end)}`
+            ? tl(', {0} to {1}', fmtDate(project.start), fmtDate(project.end))
             : ''}
           {STATUS_LABEL[s.status] ? ` · ${STATUS_LABEL[s.status]}` : ''}
         </span>
@@ -172,11 +187,14 @@ function ProjectCard({ project }: { project: Project }) {
         <Money minor={s.spentMinor} currency={currency} />
       </p>
       <p className="small">
-        {s.count === 1 ? '1 entry' : `${s.count} entries`}
+        {s.count === 1 ? tl('1 entry') : tl('{0} entries', s.count)}
         {s.perDayMinor !== null && project.kind === 'trip' && (
           <>
-            , <Money minor={s.perDayMinor} currency={currency} /> a day over{' '}
-            {s.days === 1 ? '1 day' : `${s.days} days`}
+            {tr(
+              ', {0} a day over {1}',
+              <Money minor={s.perDayMinor} currency={currency} />,
+              s.days === 1 ? tl('1 day') : tl('{0} days', s.days),
+            )}
           </>
         )}
         {s.leftMinor !== null && (
@@ -184,12 +202,15 @@ function ProjectCard({ project }: { project: Project }) {
             {'. '}
             {s.leftMinor >= 0 ? (
               <>
-                <Money minor={s.leftMinor} currency={currency} /> left of{' '}
-                <Money minor={project.budgetMinor!} currency={currency} />
+                {tr(
+                  '{0} left of {1}',
+                  <Money minor={s.leftMinor} currency={currency} />,
+                  <Money minor={project.budgetMinor!} currency={currency} />,
+                )}
               </>
             ) : (
               <span className="status-over">
-                Over by <Money minor={-s.leftMinor} currency={currency} />
+                {tr('Over by {0}', <Money minor={-s.leftMinor} currency={currency} />)}
               </span>
             )}
           </>
@@ -206,7 +227,7 @@ function ProjectCard({ project }: { project: Project }) {
           {s.byCategory.slice(0, 5).map((r) => (
             <li key={r.categoryId} className="hbar">
               <span className="hbar-label">
-                {categoryById(categories, r.categoryId)?.name ?? 'Other'}
+                {categoryById(categories, r.categoryId)?.name ?? tl('Other')}
               </span>
               <Money minor={r.totalMinor} currency={currency} />
             </li>
@@ -221,43 +242,45 @@ function ProjectCard({ project }: { project: Project }) {
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
-            {open ? 'Hide entries' : 'Show entries'}
+            {open ? tl('Hide entries') : tl('Show entries')}
           </button>
         )}
         <button type="button" className="btn btn-ghost" onClick={() => setEditing(true)}>
-          Edit
+          {tl('Edit')}
         </button>
         <button
           type="button"
           className="btn btn-ghost"
           onClick={() => void saveProject({ ...draft, archived: !project.archived }, project.id)}
         >
-          {project.archived ? 'Bring back' : 'Archive'}
+          {project.archived ? tl('Bring back') : tl('Archive')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => setDeleting((v) => !v)}>
-          Delete
+          {tl('Delete')}
         </button>
       </div>
       {deleting && (
         <div className="preview">
-          <p className="small">Delete {project.name}? Its entries stay, just without it.</p>
+          <p className="small">
+            {tl('Delete {0}? Its entries stay, just without it.', project.name)}
+          </p>
           <div className="btn-row">
             <button
               type="button"
               className="btn btn-primary"
               onClick={() => void deleteProject(project.id)}
             >
-              Delete {project.name}
+              {tl('Delete {0}', project.name)}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setDeleting(false)}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </div>
       )}
       {open && (
         <TxList
-          label={`Entries in ${project.name}`}
+          label={tl('Entries in {0}', project.name)}
           transactions={s.entries}
           onDelete={(id) => void removeTransaction(id)}
           onEdit={setEditingId}
@@ -280,19 +303,19 @@ export function TripsView() {
     <>
       <section className="card" aria-labelledby="trips-title">
         <div className="card-head">
-          <h2 id="trips-title">Trips, projects and festivals</h2>
+          <h2 id="trips-title">{tl('Trips, projects and festivals')}</h2>
           {!adding && (
             <button type="button" className="btn" onClick={() => setAdding(true)}>
               <Icon name="plus" />
-              Add one
+              {tl('Add one')}
             </button>
           )}
         </div>
         {!adding && active.length === 0 && (
           <p className="muted small">
-            Going to Goa, doing up the kitchen, or planning Diwali? Add it here with dates and a
-            budget. While it is on, what you log joins it by itself; you can also add entries from
-            the form or from Transactions.
+            {tl(
+              'Going to Goa, doing up the kitchen, or planning Diwali? Add it here with dates and a budget. While it is on, what you log joins it by itself; you can also add entries from the form or from Transactions.',
+            )}
           </p>
         )}
         {adding && <ProjectForm onDone={() => setAdding(false)} />}
@@ -302,7 +325,7 @@ export function TripsView() {
       ))}
       {archived.length > 0 && (
         <details className="card archived-projects">
-          <summary>Archived ({archived.length})</summary>
+          <summary>{tl('Archived ({0})', archived.length)}</summary>
           {archived.map((p) => (
             <ProjectCard key={p.id} project={p} />
           ))}

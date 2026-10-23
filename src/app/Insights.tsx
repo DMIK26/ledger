@@ -6,61 +6,82 @@ import { buildInsights, type Insight } from '../domain/insights';
 import { Money } from './Money';
 import { href } from './router';
 import { useScopedTransactions } from '../kit/view';
+import { tl } from '../domain/i18n';
+import { tr } from './tr';
 
 function Text({ insight, currency }: { insight: Insight; currency: string }) {
   const categories = useLedger((s) => s.categories);
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   switch (insight.kind) {
     case 'pace-over':
       return (
         <>
-          At this pace the month ends at{' '}
-          <Money minor={insight.projectedMinor} currency={currency} />, over budget by{' '}
-          <Money minor={insight.overMinor} currency={currency} />.
+          {tr(
+            'At this pace the month ends at {0}, over budget by {1}.',
+            <Money minor={insight.projectedMinor} currency={currency} />,
+            <Money minor={insight.overMinor} currency={currency} />,
+          )}
         </>
       );
     case 'pace-under':
       return (
         <>
-          On track: at this pace you finish with{' '}
-          <Money minor={insight.leftMinor} currency={currency} /> of the budget left.
+          {tr(
+            'On track: at this pace you finish with {0} of the budget left.',
+            <Money minor={insight.leftMinor} currency={currency} />,
+          )}
         </>
       );
     case 'category-up':
       return (
         <>
-          {name(insight.categoryId)} is up <Money minor={insight.deltaMinor} currency={currency} />{' '}
-          ({insight.pct}%) on this point last month.
+          {tr(
+            '{0} is up {1} ({2}%) on this point last month.',
+            name(insight.categoryId),
+            <Money minor={insight.deltaMinor} currency={currency} />,
+            insight.pct,
+          )}
         </>
       );
     case 'category-down':
       return (
         <>
-          {name(insight.categoryId)} is down{' '}
-          <Money minor={insight.deltaMinor} currency={currency} /> ({insight.pct}%) on this point
-          last month.
+          {tr(
+            '{0} is down {1} ({2}%) on this point last month.',
+            name(insight.categoryId),
+            <Money minor={insight.deltaMinor} currency={currency} />,
+            insight.pct,
+          )}
         </>
       );
     case 'largest':
       return (
         <>
-          Biggest expense this month: {insight.tx.merchant},{' '}
-          <Money minor={insight.tx.amountMinor} currency={currency} /> on {fmtDate(insight.tx.date)}
-          .
+          {tr(
+            'Biggest expense this month: {0}, {1} on {2}.',
+            insight.tx.merchant,
+            <Money minor={insight.tx.amountMinor} currency={currency} />,
+            fmtDate(insight.tx.date),
+          )}
         </>
       );
     case 'upcoming':
       return (
         <>
           {insight.count === 1
-            ? `${insight.merchant} is due ${fmtDate(insight.date)}`
-            : `${insight.count} recurring payments are due this week, starting with ${insight.merchant} on ${fmtDate(insight.date)}`}
+            ? tl('{0} is due {1}', insight.merchant, fmtDate(insight.date))
+            : tl(
+                '{0} recurring payments are due this week, starting with {1} on {2}',
+                insight.count,
+                insight.merchant,
+                fmtDate(insight.date),
+              )}
           : <Money minor={insight.totalMinor} currency={currency} />.{' '}
-          <a href={href('/recurring')}>See recurring</a>
+          <a href={href('/recurring')}>{tl('See recurring')}</a>
         </>
       );
     case 'quiet-days':
-      return <>{insight.days} days this month with nothing spent.</>;
+      return <>{tl('{0} days this month with nothing spent.', insight.days)}</>;
   }
 }
 
@@ -78,7 +99,7 @@ export function Insights({ overallBudgetMinor }: { overallBudgetMinor: number | 
   if (insights.length === 0) return null;
   return (
     <section className="card" aria-labelledby="insights-title">
-      <h2 id="insights-title">Worth knowing</h2>
+      <h2 id="insights-title">{tl('Worth knowing')}</h2>
       <ul className="insights" data-testid="insights">
         {insights.map((i) => (
           <li key={i.kind}>

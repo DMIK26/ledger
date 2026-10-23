@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useLedger } from '../../data/store';
 import { balances, type Account } from '../../domain/accounts';
 import { todayISO } from '../../domain/dates';
+import { tl } from '../../domain/i18n';
 
 /** Everything the money views read, with every account's balance as of today. */
 export function useMoneyData() {
@@ -22,7 +23,7 @@ export function AccountSelect({
   onChange,
   accounts,
   allowNone = true,
-  noneLabel = 'No account',
+  noneLabel = tl('No account'),
   exclude,
   filter,
 }: {
@@ -56,4 +57,4 @@ export function AccountSelect({
 }
 
 export const accountName = (accounts: readonly Account[], id: string | undefined): string =>
-  (id && accounts.find((a) => a.id === id)?.name) || 'No account';
+  (id && accounts.find((a) => a.id === id)?.name) || tl('No account');

@@ -10,11 +10,13 @@ import {
 } from '../../domain/accounts';
 import { fmtDate, parseISO, todayISO } from '../../domain/dates';
 import { fmtMoney } from '../../domain/money';
-import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money, usePrivacy } from '../Money';
 import { AccountSelect, accountName, useMoneyData } from './shared';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const DAYS = Array.from({ length: 28 }, (_, i) => i + 1);
 const KINDS = Object.keys(ACCOUNT_KIND_LABEL) as AccountKind[];
@@ -42,8 +44,8 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError('Give the account a name');
-    if (!parseISO(date)) return setError('Pick the date the balance is from');
+    if (!name.trim()) return setError(tl('Give the account a name'));
+    if (!parseISO(date)) return setError(tl('Pick the date the balance is from'));
     const draft: AccountDraft = {
       name,
       kind,
@@ -62,7 +64,7 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="acc-kind">Type</label>
+          <label htmlFor="acc-kind">{tl('Type')}</label>
           <select
             id="acc-kind"
             className="select input"
@@ -78,24 +80,26 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
           </select>
         </div>
         <div className="field">
-          <label htmlFor="acc-name">Name</label>
+          <label htmlFor="acc-name">{tl('Name')}</label>
           <input
             id="acc-name"
             className="input"
             autoComplete="off"
-            placeholder={isCard ? 'SBI card' : kind === 'cash' ? 'Wallet cash' : 'HDFC savings'}
+            placeholder={
+              isCard ? tl('SBI card') : kind === 'cash' ? tl('Wallet cash') : tl('HDFC savings')
+            }
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="field">
           <label htmlFor="acc-opening">
-            {isCard ? 'Owed on that date' : 'Balance on that date'}
+            {isCard ? tl('Owed on that date') : tl('Balance on that date')}
           </label>
           <AmountInput id="acc-opening" initialMinor={opening} onChange={setOpening} />
         </div>
         <div className="field">
-          <label htmlFor="acc-date">Balance date</label>
+          <label htmlFor="acc-date">{tl('Balance date')}</label>
           <input
             id="acc-date"
             className="input"
@@ -107,14 +111,14 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
         {isCard && (
           <>
             <div className="field">
-              <label htmlFor="acc-statement">Statement day</label>
+              <label htmlFor="acc-statement">{tl('Statement day')}</label>
               <select
                 id="acc-statement"
                 className="select input"
                 value={statementDay}
                 onChange={(e) => setStatementDay(Number(e.target.value))}
               >
-                <option value={0}>Not set</option>
+                <option value={0}>{tl('Not set')}</option>
                 {DAYS.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -123,14 +127,14 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
               </select>
             </div>
             <div className="field">
-              <label htmlFor="acc-due">Payment due day</label>
+              <label htmlFor="acc-due">{tl('Payment due day')}</label>
               <select
                 id="acc-due"
                 className="select input"
                 value={dueDay}
                 onChange={(e) => setDueDay(Number(e.target.value))}
               >
-                <option value={0}>Not set</option>
+                <option value={0}>{tl('Not set')}</option>
                 {DAYS.map((d) => (
                   <option key={d} value={d}>
                     {d}
@@ -139,14 +143,14 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
               </select>
             </div>
             <div className="field">
-              <label htmlFor="acc-limit">Credit limit (optional)</label>
+              <label htmlFor="acc-limit">{tl('Credit limit (optional)')}</label>
               <AmountInput id="acc-limit" initialMinor={limit} onChange={setLimit} />
             </div>
           </>
         )}
       </div>
       <fieldset className="method-picks">
-        <legend>Entries paid by these come out of this account</legend>
+        <legend>{tl('Entries paid by these come out of this account')}</legend>
         {PAYMENT_METHODS.map((m) => (
           <label key={m} className="check">
             <input
@@ -158,7 +162,7 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
                 )
               }
             />
-            {m}
+            {methodLabel(m)}
           </label>
         ))}
       </fieldset>
@@ -169,10 +173,10 @@ function AccountForm({ editing, onDone }: { editing?: Account; onDone: () => voi
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {editing ? 'Save account' : 'Add account'}
+          {editing ? tl('Save account') : tl('Add account')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -195,8 +199,8 @@ function TransferForm({ account, onDone }: { account: Account; onDone: () => voi
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!other) return setError('Pick the other account');
-    if (amount === null || amount <= 0) return setError('Enter an amount above zero');
+    if (!other) return setError(tl('Pick the other account'));
+    if (amount === null || amount <= 0) return setError(tl('Enter an amount above zero'));
     await addTransfer(
       isCard
         ? { fromId: other, toId: account.id, amountMinor: amount, date }
@@ -209,7 +213,7 @@ function TransferForm({ account, onDone }: { account: Account; onDone: () => voi
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${uid}-other`}>{isCard ? 'Pay from' : 'Move to'}</label>
+          <label htmlFor={`${uid}-other`}>{isCard ? tl('Pay from') : tl('Move to')}</label>
           <AccountSelect
             id={`${uid}-other`}
             value={other}
@@ -221,11 +225,11 @@ function TransferForm({ account, onDone }: { account: Account; onDone: () => voi
           />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-amount`}>Amount</label>
+          <label htmlFor={`${uid}-amount`}>{tl('Amount')}</label>
           <AmountInput id={`${uid}-amount`} initialMinor={null} onChange={setAmount} />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-date`}>Date</label>
+          <label htmlFor={`${uid}-date`}>{tl('Date')}</label>
           <input
             id={`${uid}-date`}
             className="input"
@@ -242,10 +246,10 @@ function TransferForm({ account, onDone }: { account: Account; onDone: () => voi
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {isCard ? 'Record payment' : 'Move money'}
+          {isCard ? tl('Record payment') : tl('Move money')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -261,33 +265,40 @@ function FeeForm({ account, onDone }: { account: Account; onDone: () => void }) 
   const uid = `fee-${account.id}`;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (amount === null || amount <= 0) return setError('Enter an amount above zero');
-    await addFee({ accountId: account.id, amountMinor: amount, date, label: label || 'Interest' });
+    if (amount === null || amount <= 0) return setError(tl('Enter an amount above zero'));
+    await addFee({
+      accountId: account.id,
+      amountMinor: amount,
+      date,
+      label: label || tl('Interest'),
+    });
     onDone();
   };
   return (
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <p className="muted small">
-        Interest and fees raise what is owed and show in cash flow, but never count as spending.
+        {tl(
+          'Interest and fees raise what is owed and show in cash flow, but never count as spending.',
+        )}
       </p>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${uid}-label`}>What it was</label>
+          <label htmlFor={`${uid}-label`}>{tl('What it was')}</label>
           <input
             id={`${uid}-label`}
             className="input"
             autoComplete="off"
-            placeholder="Interest, late fee, annual fee"
+            placeholder={tl('Interest, late fee, annual fee')}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-amount`}>Amount</label>
+          <label htmlFor={`${uid}-amount`}>{tl('Amount')}</label>
           <AmountInput id={`${uid}-amount`} initialMinor={null} onChange={setAmount} />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-date`}>Date</label>
+          <label htmlFor={`${uid}-date`}>{tl('Date')}</label>
           <input
             id={`${uid}-date`}
             className="input"
@@ -304,10 +315,10 @@ function FeeForm({ account, onDone }: { account: Account; onDone: () => void }) 
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Add interest or fee
+          {tl('Add interest or fee')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -338,40 +349,45 @@ function CashCheck({
     <div className="entry-form cash-check">
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${uid}-counted`}>Cash you have now</label>
+          <label htmlFor={`${uid}-counted`}>{tl('Cash you have now')}</label>
           <AmountInput id={`${uid}-counted`} initialMinor={null} onChange={setCounted} />
         </div>
       </div>
       <p className="small" aria-live="polite" data-testid="cash-check-result">
-        Ledger expects <Money minor={expected} currency={currency} />.
-        {diff !== null && diff === 0 && ' That matches.'}
-        {diff !== null && diff < 0 && (
-          <>
-            {' '}
-            You have <Money minor={-diff} currency={currency} /> less, probably spending that was
-            not logged.
-          </>
-        )}
-        {diff !== null && diff > 0 && (
-          <>
-            {' '}
-            You have <Money minor={diff} currency={currency} /> more than expected.
-          </>
+        {tr(
+          'Ledger expects {0}.{1}{2}{3}',
+          <Money minor={expected} currency={currency} />,
+          diff !== null && diff === 0 && ' ' + tl('That matches.'),
+          diff !== null && diff < 0 && (
+            <>
+              {' '}
+              {tr(
+                'You have {0} less, probably spending that was not logged.',
+                <Money minor={-diff} currency={currency} />,
+              )}
+            </>
+          ),
+          diff !== null && diff > 0 && (
+            <>
+              {' '}
+              {tr('You have {0} more than expected.', <Money minor={diff} currency={currency} />)}
+            </>
+          ),
         )}
       </p>
       <div className="btn-row">
         {diff !== null && diff < 0 && (
           <button type="button" className="btn btn-primary" onClick={() => void act('spending')}>
-            Record {fmtMoney(-diff, { currency })} as spending
+            {tl('Record {0} as spending', fmtMoney(-diff, { currency }))}
           </button>
         )}
         {diff !== null && diff !== 0 && (
           <button type="button" className="btn" onClick={() => void act('adjust')}>
-            Only correct the balance
+            {tl('Only correct the balance')}
           </button>
         )}
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Close
+          {tl('Close')}
         </button>
       </div>
     </div>
@@ -394,14 +410,14 @@ export function CardSummary({
   return (
     <dl className="card-facts" data-testid={`card-${card.id}`}>
       <div>
-        <dt>Owed now</dt>
+        <dt>{tl('Owed now')}</dt>
         <dd>
           <Money minor={s.owedMinor} currency={currency} />
         </dd>
       </div>
       {s.statementDate && (
         <div>
-          <dt>Statement of {fmtDate(s.statementDate)}</dt>
+          <dt>{tl('Statement of {0}', fmtDate(s.statementDate))}</dt>
           <dd>
             <Money minor={s.statementMinor} currency={currency} />
           </dd>
@@ -409,19 +425,23 @@ export function CardSummary({
       )}
       {s.statementDate && s.dueDate && (
         <div>
-          <dt>Due {fmtDate(s.dueDate)}</dt>
+          <dt>{tl('Due {0}', fmtDate(s.dueDate))}</dt>
           <dd className={s.overdue ? 'status-over' : undefined}>
             {s.dueMinor === 0 ? (
-              'Paid'
+              tl('Paid')
             ) : (
               <>
                 <Money minor={s.dueMinor} currency={currency} />
                 <span className="small">
                   {s.overdue
-                    ? `, overdue by ${-(s.daysToDue ?? 0)} ${s.daysToDue === -1 ? 'day' : 'days'}`
+                    ? tl(
+                        ', overdue by {0} {1}',
+                        -(s.daysToDue ?? 0),
+                        s.daysToDue === -1 ? tl('day') : tl('days'),
+                      )
                     : s.daysToDue === 0
-                      ? ', due today'
-                      : `, in ${s.daysToDue} ${s.daysToDue === 1 ? 'day' : 'days'}`}
+                      ? tl(', due today')
+                      : tl(', in {0} {1}', s.daysToDue, s.daysToDue === 1 ? tl('day') : tl('days'))}
                 </span>
               </>
             )}
@@ -430,7 +450,7 @@ export function CardSummary({
       )}
       {s.availableMinor !== null && (
         <div>
-          <dt>Limit left</dt>
+          <dt>{tl('Limit left')}</dt>
           <dd>
             <Money minor={s.availableMinor} currency={currency} />
           </dd>
@@ -477,14 +497,16 @@ function AccountRow({
           <span>{account.name}</span>
           <span className="muted small">
             {ACCOUNT_KIND_LABEL[account.kind]}
-            {account.methods.length > 0 ? ` · used for ${account.methods.join(', ')}` : ''}
-            {account.archived ? ' · archived' : ''}
+            {account.methods.length > 0
+              ? ' ' + tl('· used for {0}', account.methods.join(', '))
+              : ''}
+            {account.archived ? ' ' + tl('· archived') : ''}
           </span>
         </span>
         <span className="account-balance">
           {isCard ? (
             <>
-              <span className="muted small">Owed </span>
+              <span className="muted small">{tl('Owed')} </span>
               <Money minor={Math.max(0, -balance)} currency={currency} />
             </>
           ) : (
@@ -498,41 +520,42 @@ function AccountRow({
           {panel === null && (
             <div className="btn-row">
               <button type="button" className="btn" onClick={() => setPanel('transfer')}>
-                {isCard ? 'Pay this card' : 'Move money'}
+                {isCard ? tl('Pay this card') : tl('Move money')}
               </button>
               {account.kind === 'cash' && (
                 <button type="button" className="btn" onClick={() => setPanel('cash')}>
-                  Check cash
+                  {tl('Check cash')}
                 </button>
               )}
               {(isCard || account.kind === 'bank') && (
                 <button type="button" className="btn" onClick={() => setPanel('fee')}>
-                  Interest or fee
+                  {tl('Interest or fee')}
                 </button>
               )}
               <button type="button" className="btn btn-ghost" onClick={() => setPanel('edit')}>
-                Edit
+                {tl('Edit')}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => void setArchived(account.id, !account.archived)}
               >
-                {account.archived ? 'Bring back' : 'Archive'}
+                {account.archived ? tl('Bring back') : tl('Archive')}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => void deleteAccount(account.id).then((ok) => setBlocked(!ok))}
               >
-                Delete
+                {tl('Delete')}
               </button>
             </div>
           )}
           {blocked && (
             <p className="muted small" role="status">
-              Entries use this account, so it cannot be deleted. Archive it to hide it from lists;
-              its history stays.
+              {tl(
+                'Entries use this account, so it cannot be deleted. Archive it to hide it from lists; its history stays.',
+              )}
             </p>
           )}
           {panel === 'transfer' && <TransferForm account={account} onDone={close} />}
@@ -559,23 +582,24 @@ export function AccountsCard() {
   return (
     <section className="card" aria-labelledby="accounts-title">
       <div className="card-head">
-        <h2 id="accounts-title">Accounts</h2>
+        <h2 id="accounts-title">{tl('Accounts')}</h2>
         {!adding && (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Icon name="plus" />
-            Add account
+            {tl('Add account')}
           </button>
         )}
       </div>
       {adding && <AccountForm onDone={() => setAdding(false)} />}
       {accounts.length === 0 && !adding && (
         <p className="muted small">
-          Add your bank account, cash and cards to see balances. Each payment method belongs to one
-          account, so the entries you already have count straight away.
+          {tl(
+            'Add your bank account, cash and cards to see balances. Each payment method belongs to one account, so the entries you already have count straight away.',
+          )}
         </p>
       )}
       {visible.length > 0 && (
-        <ul className="account-list" aria-label="Accounts">
+        <ul className="account-list" aria-label={tl('Accounts')}>
           {visible.map((a) => (
             <AccountRow
               key={a.id}
@@ -589,19 +613,19 @@ export function AccountsCard() {
       )}
       {accounts.length > 0 && (
         <p className="account-total">
-          <span>All accounts, cards taken off</span>
+          <span>{tl('All accounts, cards taken off')}</span>
           <Money minor={total} currency={currency} />
         </p>
       )}
       {accounts.some((a) => a.archived) && (
         <button type="button" className="btn btn-ghost" onClick={() => setShowArchived((v) => !v)}>
-          {showArchived ? 'Hide archived accounts' : 'Show archived accounts'}
+          {showArchived ? tl('Hide archived accounts') : tl('Show archived accounts')}
         </button>
       )}
       {moves.length > 0 && (
         <>
-          <h3 className="small">Transfers, fees and corrections</h3>
-          <ul className="money-list" aria-label="Transfers, fees and corrections">
+          <h3 className="small">{tl('Transfers, fees and corrections')}</h3>
+          <ul className="money-list" aria-label={tl('Transfers, fees and corrections')}>
             {moves.map((f) => (
               <li key={f.id} className="money-row">
                 <span className="money-main">
@@ -609,7 +633,11 @@ export function AccountsCard() {
                   <span className="muted small">
                     {fmtDate(f.date)} ·{' '}
                     {f.kind === 'transfer'
-                      ? `${accountName(accounts, f.accountId)} to ${accountName(accounts, f.toAccountId)}`
+                      ? tl(
+                          '{0} to {1}',
+                          accountName(accounts, f.accountId),
+                          accountName(accounts, f.toAccountId),
+                        )
                       : accountName(accounts, f.accountId)}
                   </span>
                 </span>
@@ -617,7 +645,7 @@ export function AccountsCard() {
                 <button
                   type="button"
                   className="btn btn-ghost btn-icon"
-                  aria-label={`Delete ${f.label} on ${fmtDate(f.date)}`}
+                  aria-label={tl('Delete {0} on {1}', f.label, fmtDate(f.date))}
                   onClick={() => void deleteFlow(f.id)}
                 >
                   <Icon name="trash" />

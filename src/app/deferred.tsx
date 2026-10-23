@@ -15,3 +15,12 @@ export const LockScreen = lazy(() =>
 export const MonthCloseCard = lazy(() =>
   import('./plan/MonthClose').then((m) => ({ default: m.MonthCloseCard })),
 );
+export const FolderBackupCheck = lazy(() =>
+  import('./FolderBackupCheck').then((m) => ({ default: m.FolderBackupCheck })),
+);
+export const SketchToolbar = lazy(() =>
+  import('../doodle/Studio').then((m) => ({ default: m.SketchToolbar })),
+);
+export const NotesPanel = lazy(() =>
+  import('../doodle/Studio').then((m) => ({ default: m.NotesPanel })),
+);

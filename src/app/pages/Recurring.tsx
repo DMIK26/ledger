@@ -1,4 +1,4 @@
-import { EmptyDoodle } from '../../doodle/Studio';
+import { EmptyDoodle } from '../../doodle/bits';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Timeline } from '../../charts/Timeline';
 import { newId, useLedger } from '../../data/store';
@@ -14,10 +14,12 @@ import {
   type Cadence,
   type Candidate,
 } from '../../domain/recurring';
-import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { usePins, useScopedTransactions } from '../../kit/view';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 function AddForm({ onDone }: { onDone: () => void }) {
   const categories = useLedger((s) => s.categories);
@@ -35,9 +37,9 @@ function AddForm({ onDone }: { onDone: () => void }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!merchant.trim()) return setError('Say what it is for');
-    if (amount === null || amount <= 0) return setError('Enter an amount above zero');
-    if (!parseISO(date)) return setError('Pick the next date it is due');
+    if (!merchant.trim()) return setError(tl('Say what it is for'));
+    if (amount === null || amount <= 0) return setError(tl('Enter an amount above zero'));
+    if (!parseISO(date)) return setError(tl('Pick the next date it is due'));
     await saveRecurring({
       id: newId(),
       merchant: merchant.trim(),
@@ -55,7 +57,7 @@ function AddForm({ onDone }: { onDone: () => void }) {
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="rec-merchant">What for</label>
+          <label htmlFor="rec-merchant">{tl('What for')}</label>
           <input
             id="rec-merchant"
             className="input"
@@ -68,11 +70,11 @@ function AddForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div className="field">
-          <label htmlFor="rec-amount">Amount</label>
+          <label htmlFor="rec-amount">{tl('Amount')}</label>
           <AmountInput id="rec-amount" initialMinor={null} onChange={setAmount} />
         </div>
         <div className="field">
-          <label htmlFor="rec-cadence">How often</label>
+          <label htmlFor="rec-cadence">{tl('How often')}</label>
           <select
             id="rec-cadence"
             className="select input"
@@ -87,7 +89,7 @@ function AddForm({ onDone }: { onDone: () => void }) {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="rec-date">Next due</label>
+          <label htmlFor="rec-date">{tl('Next due')}</label>
           <input
             id="rec-date"
             className="input"
@@ -97,7 +99,7 @@ function AddForm({ onDone }: { onDone: () => void }) {
           />
         </div>
         <div className="field">
-          <label htmlFor="rec-category">Category</label>
+          <label htmlFor="rec-category">{tl('Category')}</label>
           <select
             id="rec-category"
             className="select input"
@@ -115,7 +117,7 @@ function AddForm({ onDone }: { onDone: () => void }) {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="rec-method">Paid by</label>
+          <label htmlFor="rec-method">{tl('Paid by')}</label>
           <select
             id="rec-method"
             className="select input"
@@ -123,7 +125,9 @@ function AddForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setMethod(e.target.value as PaymentMethod)}
           >
             {PAYMENT_METHODS.map((m) => (
-              <option key={m}>{m}</option>
+              <option key={m} value={m}>
+                {methodLabel(m)}
+              </option>
             ))}
           </select>
         </div>
@@ -135,10 +139,10 @@ function AddForm({ onDone }: { onDone: () => void }) {
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Add
+          {tl('Add')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -197,10 +201,10 @@ export function Recurring() {
     <>
       <section className="card" aria-labelledby="timeline-title">
         <div className="card-head">
-          <h2 id="timeline-title">Next 30 days</h2>
+          <h2 id="timeline-title">{tl('Next 30 days')}</h2>
           {!adding && (
             <button type="button" className="btn" onClick={() => setAdding(true)}>
-              Add recurring payment
+              {tl('Add recurring payment')}
             </button>
           )}
         </div>
@@ -209,13 +213,17 @@ export function Recurring() {
           <div className="empty-inline">
             <EmptyDoodle art="calendar" />
             <p className="muted">
-              No recurring payments yet. Add one, or accept one Ledger found in your entries below.
+              {tl(
+                'No recurring payments yet. Add one, or accept one Ledger found in your entries below.',
+              )}
             </p>
           </div>
         ) : (
           <>
             <p className="muted small">
-              Drag a payment sideways, or focus it and use the arrow keys, to move its dates.
+              {tl(
+                'Drag a payment sideways, or focus it and use the arrow keys, to move its dates.',
+              )}
             </p>
             <Timeline
               items={recurring}
@@ -232,9 +240,9 @@ export function Recurring() {
       {recurring.length > 0 && (
         <section className="card" aria-labelledby="rec-list-title">
           <div className="card-head">
-            <h2 id="rec-list-title">Your recurring payments</h2>
+            <h2 id="rec-list-title">{tl('Your recurring payments')}</h2>
             <span className="small">
-              <Money minor={yearly} currency={currency} /> a year
+              {tr('{0} a year', <Money minor={yearly} currency={currency} />)}
             </span>
           </div>
           <ul className="rec-list">
@@ -248,14 +256,18 @@ export function Recurring() {
                     <span>
                       {r.merchant}
                       <span className="muted small rec-sub">
-                        {CADENCE_LABEL[r.cadence]}, next {fmtDate(nextOccurrence(r, today))}
+                        {tl(
+                          '{0}, next {1}',
+                          CADENCE_LABEL[r.cadence],
+                          fmtDate(nextOccurrence(r, today)),
+                        )}
                       </span>
                     </span>
                   </span>
                   <span className="rec-amount">
                     <Money minor={r.amountMinor} currency={currency} />
                     <span className="muted small rec-sub">
-                      <Money minor={yearlyCost(r)} currency={currency} /> a year
+                      {tr('{0} a year', <Money minor={yearlyCost(r)} currency={currency} />)}
                     </span>
                   </span>
                   <span className="rec-actions">
@@ -265,7 +277,7 @@ export function Recurring() {
                         role="switch"
                         className="switch"
                         aria-checked={isOff}
-                        aria-label={`What if I switched off ${r.merchant}`}
+                        aria-label={tl('What if I switched off {0}', r.merchant)}
                         onClick={() =>
                           setOff((s) => {
                             const next = new Set(s);
@@ -275,14 +287,14 @@ export function Recurring() {
                           })
                         }
                       />
-                      <span className="small">Switch off</span>
+                      <span className="small">{tl('Switch off')}</span>
                     </label>
                     <button
                       type="button"
                       className="btn btn-ghost"
                       onClick={() => void deleteRecurring(r.id)}
                     >
-                      Remove
+                      {tl('Remove')}
                     </button>
                   </span>
                 </li>
@@ -292,13 +304,18 @@ export function Recurring() {
           <p className="what-if-saving" role="status" data-testid="rec-saving">
             {off.size === 0 ? (
               <span className="muted small">
-                Use Switch off to see what cancelling a payment would save. Nothing is changed.
+                {tl(
+                  'Use Switch off to see what cancelling a payment would save. Nothing is changed.',
+                )}
               </span>
             ) : (
               <>
-                Switching off {off.size === 1 ? 'this' : `these ${off.size}`} saves{' '}
-                <Money minor={saving} currency={currency} /> a year, about{' '}
-                <Money minor={Math.round(saving / 12)} currency={currency} /> a month.
+                {tr(
+                  'Switching off {0} saves {1} a year, about {2} a month.',
+                  off.size === 1 ? tl('this') : tl('these {0}', off.size),
+                  <Money minor={saving} currency={currency} />,
+                  <Money minor={Math.round(saving / 12)} currency={currency} />,
+                )}
               </>
             )}
           </p>
@@ -306,11 +323,12 @@ export function Recurring() {
       )}
 
       <section className="card" aria-labelledby="found-title">
-        <h2 id="found-title">Found in your entries</h2>
+        <h2 id="found-title">{tl('Found in your entries')}</h2>
         {candidates.length === 0 ? (
           <p className="muted small">
-            Nothing yet. Ledger looks for the same merchant at a steady weekly, monthly or yearly
-            gap with a similar amount, three times or more.
+            {tl(
+              'Nothing yet. Ledger looks for the same merchant at a steady weekly, monthly or yearly gap with a similar amount, three times or more.',
+            )}
           </p>
         ) : (
           <ul className="rec-list">
@@ -324,7 +342,12 @@ export function Recurring() {
                   <span>
                     {c.merchant}
                     <span className="muted small rec-sub">
-                      {CADENCE_LABEL[c.cadence]}, seen {c.count} times, last {fmtDate(c.lastDate)}
+                      {tl(
+                        '{0}, seen {1} times, last {2}',
+                        CADENCE_LABEL[c.cadence],
+                        c.count,
+                        fmtDate(c.lastDate),
+                      )}
                     </span>
                   </span>
                 </span>
@@ -333,14 +356,14 @@ export function Recurring() {
                 </span>
                 <span className="rec-actions">
                   <button type="button" className="btn" onClick={() => void accept(c)}>
-                    Add
+                    {tl('Add')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-ghost"
                     onClick={() => void ignoreRecurring(c.key)}
                   >
-                    Not recurring
+                    {tl('Not recurring')}
                   </button>
                 </span>
               </li>

@@ -11,6 +11,23 @@ import type { WishItem } from '../domain/wishlist';
 import type { Asset } from '../domain/networth';
 import type { Project } from '../domain/projects';
 import type { Db, LedgerDB } from './db';
+import { tl } from '../domain/i18n';
+import { storedCategory } from '../domain/categories';
+
+/**
+ * The space new rows are made in (Drop 13). The store sets it from the switcher, like privacy in
+ * money.ts, so every new entry, account or person lands in the ledger on screen.
+ */
+let writeSpace: 'personal' | 'shop' = 'personal';
+export const setWriteSpace = (space: 'personal' | 'shop'): void => {
+  writeSpace = space;
+};
+export const getWriteSpace = (): 'personal' | 'shop' => writeSpace;
+
+/** A new row gets the Shop's mark when the Shop is on screen, unless it already says where it goes. */
+export function stampSpace<T extends object>(row: T): T {
+  return writeSpace === 'shop' && !('space' in row) ? { ...row, space: 'shop' } : row;
+}
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
 export interface Command {
@@ -21,19 +38,22 @@ export interface Command {
   entities?: string[];
 }
 
-export const addTransaction = (tx: Transaction): Command => ({
-  label: `Added ${tx.merchant}`,
-  entities: [`tx:${tx.id}`],
-  apply: async (db) => {
-    await db.put('transactions', tx);
-  },
-  revert: async (db) => {
-    await db.delete('transactions', tx.id);
-  },
-});
+export const addTransaction = (input: Transaction): Command => {
+  const tx = stampSpace(input);
+  return {
+    label: tl('Added {0}', tx.merchant),
+    entities: [`tx:${tx.id}`],
+    apply: async (db) => {
+      await db.put('transactions', tx);
+    },
+    revert: async (db) => {
+      await db.delete('transactions', tx.id);
+    },
+  };
+};
 
 export const updateTransaction = (before: Transaction, after: Transaction): Command => ({
-  label: `Edited ${after.merchant}`,
+  label: tl('Edited {0}', after.merchant),
   entities: [`tx:${after.id}`],
   apply: async (db) => {
     await db.put('transactions', after);
@@ -45,7 +65,7 @@ export const updateTransaction = (before: Transaction, after: Transaction): Comm
 
 /** Deleting moves the entry to Trash, where it stays restorable for 30 days. */
 export const deleteTransaction = (tx: Transaction, now: number = Date.now()): Command => ({
-  label: `Deleted ${tx.merchant}`,
+  label: tl('Deleted {0}', tx.merchant),
   entities: [`tx:${tx.id}`],
   apply: async (db) => {
     const t = db.transaction(['transactions', 'trash'], 'readwrite');
@@ -62,7 +82,7 @@ export const deleteTransaction = (tx: Transaction, now: number = Date.now()): Co
 });
 
 export const setRule = (rule: MerchantRule, previous?: MerchantRule): Command => ({
-  label: `Remembered ${rule.key}`,
+  label: tl('Remembered {0}', rule.key),
   apply: async (db) => {
     await db.put('rules', rule);
   },
@@ -75,12 +95,12 @@ export const setRule = (rule: MerchantRule, previous?: MerchantRule): Command =>
 export const importTransactions = (
   transactions: Transaction[],
   newCategories: Category[] = [],
-  label = `Imported ${transactions.length} entries`,
+  label = tl('Imported {0} entries', transactions.length),
 ): Command => ({
   label,
   apply: async (db) => {
     const t = db.transaction(['transactions', 'categories'], 'readwrite');
-    for (const c of newCategories) void t.objectStore('categories').put(c);
+    for (const c of newCategories) void t.objectStore('categories').put(storedCategory(c));
     for (const tx of transactions) void t.objectStore('transactions').put(tx);
     await t.done;
   },
@@ -105,7 +125,7 @@ export const composite = (label: string, commands: Command[]): Command => ({
 
 /** Brings an entry back from Trash. */
 export const restoreFromTrash = (item: TrashItem): Command => ({
-  label: `Restored ${item.tx.merchant}`,
+  label: tl('Restored {0}', item.tx.merchant),
   entities: [`tx:${item.id}`],
   apply: async (db) => {
     const t = db.transaction(['transactions', 'trash'], 'readwrite');
@@ -123,7 +143,7 @@ export const restoreFromTrash = (item: TrashItem): Command => ({
 
 /** Removes an entry from Trash for good. Undo still works during this session. */
 export const deleteForever = (item: TrashItem, receipt?: Blob): Command => ({
-  label: `Deleted ${item.tx.merchant} for good`,
+  label: tl('Deleted {0} for good', item.tx.merchant),
   entities: [`tx:${item.id}`],
   apply: async (db) => {
     const t = db.transaction(['trash', 'receipts'], 'readwrite');
@@ -141,7 +161,7 @@ export const deleteForever = (item: TrashItem, receipt?: Blob): Command => ({
 
 /** Stores (or removes, when `next` is null) the receipt for an entry, keyed by the entry id. */
 export const setReceipt = (txId: string, next: Blob | null, previous?: Blob): Command => ({
-  label: next ? 'Attached a receipt' : 'Removed a receipt',
+  label: next ? tl('Attached a receipt') : tl('Removed a receipt'),
   entities: [`tx:${txId}`],
   apply: async (db) => {
     if (next) await db.put('receipts', next, txId);
@@ -154,7 +174,7 @@ export const setReceipt = (txId: string, next: Blob | null, previous?: Blob): Co
 });
 
 export const deleteRule = (rule: MerchantRule): Command => ({
-  label: `Forgot ${rule.key}`,
+  label: tl('Forgot {0}', rule.key),
   apply: async (db) => {
     await db.delete('rules', rule.key);
   },
@@ -198,30 +218,30 @@ export const putCategories = (before: Category[], after: Category[], label: stri
   label,
   apply: async (db) => {
     const t = db.transaction('categories', 'readwrite');
-    for (const c of after) void t.store.put(c);
+    for (const c of after) void t.store.put(storedCategory(c));
     await t.done;
   },
   revert: async (db) => {
     const t = db.transaction('categories', 'readwrite');
     const old = new Set(before.map((c) => c.id));
     for (const c of after) if (!old.has(c.id)) void t.store.delete(c.id);
-    for (const c of before) void t.store.put(c);
+    for (const c of before) void t.store.put(storedCategory(c));
     await t.done;
   },
 });
 
 export const removeCategoryRow = (category: Category): Command => ({
-  label: `Deleted ${category.name}`,
+  label: tl('Deleted {0}', category.name),
   apply: async (db) => {
     await db.delete('categories', category.id);
   },
   revert: async (db) => {
-    await db.put('categories', category);
+    await db.put('categories', storedCategory(category));
   },
 });
 
 export const putTrashItem = (before: TrashItem, after: TrashItem): Command => ({
-  label: 'Updated trash',
+  label: tl('Updated trash'),
   apply: async (db) => {
     await db.put('trash', after);
   },
@@ -247,7 +267,7 @@ export const putRecurring = (
 });
 
 export const removeRecurring = (item: RecurringItem): Command => ({
-  label: `Removed ${item.merchant} from recurring`,
+  label: tl('Removed {0} from recurring', item.merchant),
   apply: async (db) => {
     await db.delete('recurring', item.id);
   },
@@ -269,22 +289,29 @@ export type RowStore =
   | 'projects';
 type RowOf<S extends RowStore> = LedgerDB[S]['value'];
 
-/** Adds or replaces one row; undo puts back the previous version (or removes a new row). */
+/**
+ * Adds or replaces one row; undo puts back the previous version (or removes a new row). A new row goes
+ * to the space on screen unless `keepSpace` (rows from a backup already say where they belong).
+ */
 export const putRow = <S extends RowStore>(
   store: S,
-  next: RowOf<S>,
+  input: RowOf<S>,
   previous: RowOf<S> | undefined,
   label: string,
-): Command => ({
-  label,
-  apply: async (db) => {
-    await db.put(store, next);
-  },
-  revert: async (db) => {
-    if (previous) await db.put(store, previous);
-    else await db.delete(store, next.id);
-  },
-});
+  keepSpace = false,
+): Command => {
+  const next = previous || keepSpace ? input : stampSpace(input);
+  return {
+    label,
+    apply: async (db) => {
+      await db.put(store, next);
+    },
+    revert: async (db) => {
+      if (previous) await db.put(store, previous);
+      else await db.delete(store, next.id);
+    },
+  };
+};
 
 export const removeRow = <S extends RowStore>(store: S, row: RowOf<S>, label: string): Command => ({
   label,
@@ -381,7 +408,7 @@ async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
   const t = db.transaction([...SNAPSHOT_STORES], 'readwrite');
   await Promise.all(SNAPSHOT_STORES.map((name) => t.objectStore(name).clear()));
   for (const x of s.transactions) void t.objectStore('transactions').put(x);
-  for (const x of s.categories) void t.objectStore('categories').put(x);
+  for (const x of s.categories) void t.objectStore('categories').put(storedCategory(x));
   for (const x of s.rules) void t.objectStore('rules').put(x);
   for (const x of s.budgets) void t.objectStore('budgets').put(x);
   for (const x of s.recurring) void t.objectStore('recurring').put(x);
@@ -399,7 +426,7 @@ async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
 
 /** Makes this device match a backup exactly; undo puts back what was here before. */
 export const replaceEverything = (before: LedgerSnapshot, after: LedgerSnapshot): Command => ({
-  label: `Restored a backup (${after.transactions.length} entries)`,
+  label: tl('Restored a backup ({0} entries)', after.transactions.length),
   apply: (db) => writeSnapshot(db, after),
   revert: (db) => writeSnapshot(db, before),
 });
@@ -417,7 +444,7 @@ export const putNote = (next: Note, previous: Note | undefined, label: string): 
 });
 
 export const removeNote = (note: Note): Command => ({
-  label: note.text ? 'Deleted a note' : 'Removed a stamp',
+  label: note.text ? tl('Deleted a note') : tl('Removed a stamp'),
   apply: async (db) => {
     await db.delete('notes', note.id);
   },
@@ -456,7 +483,7 @@ export const loadSample = (
   data: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
   previousMarker: SampleMarker | undefined,
 ): Command => ({
-  label: 'Loaded sample data',
+  label: tl('Loaded sample data'),
   apply: async (db) => {
     const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
     for (const x of data.transactions) void t.objectStore('transactions').put(x);
@@ -489,7 +516,7 @@ export const removeSample = (
   marker: SampleMarker,
   removed: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
 ): Command => ({
-  label: 'Removed sample data',
+  label: tl('Removed sample data'),
   apply: async (db) => {
     const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
     for (const x of removed.transactions) void t.objectStore('transactions').delete(x.id);

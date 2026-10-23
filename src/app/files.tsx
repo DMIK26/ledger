@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { usePrivacy } from './Money';
+import { tl } from '../domain/i18n';
 
 /** Opens the share sheet with the file where supported (phones), otherwise downloads it. */
 export async function shareOrDownload(file: File): Promise<void> {
@@ -67,13 +68,13 @@ export function ExportButton({
       </button>
       {confirming && (
         <div className="preview confirm" role="alert">
-          <p>The file contains real amounts, even with privacy mode on.</p>
+          <p>{tl('The file contains real amounts, even with privacy mode on.')}</p>
           <div className="btn-row">
             <button type="button" className="btn btn-primary" onClick={() => void run()}>
-              Export anyway
+              {tl('Export anyway')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { useLedger } from '../data/store';
 import { monthKey, todayISO } from '../domain/dates';
 import { applyPins, samePin, togglePin, type Pin } from '../domain/pins';
+import { tl } from '../domain/i18n';
 
 /**
  * What the user is looking at, shared by every page: pinned entities (a filter on everything) and the
@@ -30,12 +31,14 @@ export const useView = create<ViewState>((set, get) => ({
     const on = !get().pins.some((p) => samePin(p, pin));
     set({ pins: togglePin(get().pins, pin) });
     get().announce(
-      on ? `Pinned ${pin.label}. Every page now shows only this.` : `Unpinned ${pin.label}.`,
+      on
+        ? tl('Pinned {0}. Every page now shows only this.', pin.label)
+        : tl('Unpinned {0}.', pin.label),
     );
   },
   removePin: (pin) => {
     set({ pins: get().pins.filter((p) => !samePin(p, pin)) });
-    get().announce(`Unpinned ${pin.label}.`);
+    get().announce(tl('Unpinned {0}.', pin.label));
   },
   popPin: () => {
     const last = get().pins.at(-1);
@@ -43,7 +46,7 @@ export const useView = create<ViewState>((set, get) => ({
   },
   clearPins: () => {
     set({ pins: [] });
-    get().announce('Cleared all pins.');
+    get().announce(tl('Cleared all pins.'));
   },
   setMonth: (month) => set({ month: month === monthKey(todayISO()) ? null : month }),
   // A trailing space when repeating forces screen readers to read the same text again.

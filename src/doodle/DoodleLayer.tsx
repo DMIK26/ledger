@@ -23,6 +23,7 @@ import { useScopedTransactions, useViewMonth } from '../kit/view';
 import { Doodle, STAMP_ART } from './art';
 import { useAnchorBoxes, type Box } from './anchors';
 import { useDoodle } from './state';
+import { tl } from '../domain/i18n';
 
 const FADE_MS = 3000;
 
@@ -245,7 +246,7 @@ export function DoodleLayer({ path }: { path: string }) {
     if (tool === 'note' || tool === 'stamp') {
       const anchor = anchorAt(e);
       if (!anchor) {
-        setHint('Tap a bar, slice, row, day or budget to attach it there.');
+        setHint(tl('Tap a bar, slice, row, day or budget to attach it there.'));
         return;
       }
       setHint(null);
@@ -382,7 +383,7 @@ export function DoodleLayer({ path }: { path: string }) {
           width={size.w}
           height={size.h}
           data-tool={tool}
-          aria-label="Drawing surface. Use the sketch tools at the bottom of the screen."
+          aria-label={tl('Drawing surface. Use the sketch tools at the bottom of the screen.')}
           role="img"
           onPointerDown={onDown}
           onPointerMove={onMove}
@@ -419,7 +420,7 @@ export function DoodleLayer({ path }: { path: string }) {
           }}
         >
           <label className="visually-hidden" htmlFor="note-input">
-            Note
+            {tl('Note')}
           </label>
           <textarea
             id="note-input"
@@ -428,14 +429,14 @@ export function DoodleLayer({ path }: { path: string }) {
             rows={3}
             maxLength={MAX_NOTE_LENGTH}
             autoFocus
-            placeholder="Write a note"
+            placeholder={tl('Write a note')}
           />
           <div className="btn-row">
             <button type="submit" className="btn btn-primary">
-              Save note
+              {tl('Save note')}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setEditor(null)}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </form>

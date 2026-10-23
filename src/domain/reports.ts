@@ -3,6 +3,7 @@ import { normalizeMerchantKey } from './categoriser';
 import { addDays, daysInMonth, diffDays, isoFromYMD, parseISO, weekdayOf } from './dates';
 import type { RelativeRange } from './periods';
 import type { CategoryId, ISODate, PaymentMethod, Transaction } from './types';
+import { tl } from './i18n';
 
 export const inRange = (
   list: readonly Transaction[],
@@ -104,7 +105,7 @@ export function buildReport(
   for (const t of current) {
     const key = normalizeMerchantKey(t.merchant) || '(none)';
     const r = merchantMap.get(key) ?? {
-      merchant: t.merchant || 'Untitled',
+      merchant: t.merchant || tl('Untitled'),
       count: 0,
       totalMinor: 0,
     };

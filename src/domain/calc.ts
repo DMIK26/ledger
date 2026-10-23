@@ -1,4 +1,5 @@
 import { parseAmountToMinor } from './money';
+import { tl } from './i18n';
 
 /**
  * Amount maths for quick add, the amount field and the keypad: "250+120/2", "3 x 45", "2k+500".
@@ -47,7 +48,7 @@ const roundDiv = (a: number, b: number): number => {
 /** Evaluates an amount expression. Plain numbers work too ("250" is 250). */
 export function evaluateAmount(text: string): CalcResult {
   const source = text.replace(/\s+/g, '');
-  if (!source) return { ok: false, error: 'Enter an amount' };
+  if (!source) return { ok: false, error: tl('Enter an amount') };
   const re = new RegExp(`(${CALC_NUMBER})|(${CALC_OPERATOR})`, 'giy');
   const numbers: number[] = [];
   const ops: Op[] = [];
@@ -56,21 +57,21 @@ export function evaluateAmount(text: string): CalcResult {
   while (pos < source.length) {
     re.lastIndex = pos;
     const m = re.exec(source);
-    if (!m) return { ok: false, error: 'That sum has something Ledger cannot read' };
+    if (!m) return { ok: false, error: tl('That sum has something Ledger cannot read') };
     pos = re.lastIndex;
     if (m[1] !== undefined && expectNumber) {
       const n = numberMinor(m[1]);
-      if (n === null) return { ok: false, error: 'That sum has a number Ledger cannot read' };
+      if (n === null) return { ok: false, error: tl('That sum has a number Ledger cannot read') };
       numbers.push(n);
       expectNumber = false;
     } else if (m[2] !== undefined && !expectNumber) {
       ops.push(OPS[m[2]]!);
       expectNumber = true;
     } else {
-      return { ok: false, error: 'Finish the sum, for example 250+120' };
+      return { ok: false, error: tl('Finish the sum, for example 250+120') };
     }
   }
-  if (expectNumber) return { ok: false, error: 'Finish the sum, for example 250+120' };
+  if (expectNumber) return { ok: false, error: tl('Finish the sum, for example 250+120') };
 
   // First pass: times and divide, left to right.
   const terms: number[] = [numbers[0]!];
@@ -80,10 +81,11 @@ export function evaluateAmount(text: string): CalcResult {
     const n = numbers[i + 1]!;
     if (op === '*') {
       const product = terms[terms.length - 1]! * n;
-      if (!Number.isSafeInteger(product)) return { ok: false, error: 'That amount is too large' };
+      if (!Number.isSafeInteger(product))
+        return { ok: false, error: tl('That amount is too large') };
       terms[terms.length - 1] = roundDiv(product, 100);
     } else if (op === '/') {
-      if (n === 0) return { ok: false, error: 'Cannot divide by zero' };
+      if (n === 0) return { ok: false, error: tl('Cannot divide by zero') };
       terms[terms.length - 1] = roundDiv(terms[terms.length - 1]! * 100, n);
     } else {
       terms.push(n);
@@ -93,7 +95,7 @@ export function evaluateAmount(text: string): CalcResult {
   let total = terms[0]!;
   for (let i = 0; i < addOps.length; i += 1)
     total = addOps[i] === '+' ? total + terms[i + 1]! : total - terms[i + 1]!;
-  if (!Number.isSafeInteger(total)) return { ok: false, error: 'That amount is too large' };
-  if (total <= 0) return { ok: false, error: 'That sum comes to zero or less' };
+  if (!Number.isSafeInteger(total)) return { ok: false, error: tl('That amount is too large') };
+  if (total <= 0) return { ok: false, error: tl('That sum comes to zero or less') };
   return { ok: true, minor: total };
 }

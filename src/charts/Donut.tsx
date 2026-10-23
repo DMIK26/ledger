@@ -8,6 +8,7 @@ import { useHighlight } from '../kit/entityBus';
 import { entityKey } from '../kit/entityKeys';
 import { useRoving } from '../kit/roving';
 import { fillFor, HatchDefs } from './fills';
+import { tl } from '../domain/i18n';
 
 const SIZE = 220;
 const R_OUT = 104;
@@ -58,7 +59,7 @@ export function Donut({
     .padAngle(totals.length > 1 ? 0.012 : 0)(totals);
   const shape = arc<PieArcDatum<CategoryTotal>>().cornerRadius(2);
   const activeTotal = totals.find((t) => t.categoryId === active);
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   const byId = new Map(totals.map((t) => [t.categoryId, t.totalMinor]));
   const rows = legendIds ?? totals.map((t) => t.categoryId);
 
@@ -70,7 +71,10 @@ export function Donut({
           height={SIZE}
           viewBox={`${-SIZE / 2} ${-SIZE / 2} ${SIZE} ${SIZE}`}
           role="group"
-          aria-label={`Spending by category, ${caption}. Use the arrow keys to move between slices.`}
+          aria-label={tl(
+            'Spending by category, {0}. Use the arrow keys to move between slices.',
+            caption,
+          )}
           data-roving-group=""
         >
           <HatchDefs categories={categories} />
@@ -99,7 +103,11 @@ export function Donut({
                   className="donut-slice"
                   fill={fillFor(categoryById(categories, id))}
                   role="button"
-                  aria-label={`${name(id)}, ${fmtMoney(a.data.totalMinor, { currency })}. Show breakdown`}
+                  aria-label={tl(
+                    '{0}, {1}. Show breakdown',
+                    name(id),
+                    fmtMoney(a.data.totalMinor, { currency }),
+                  )}
                   aria-pressed={selected === id}
                   data-testid={`slice-${id}`}
                   data-anchor={`category:${id}`}
@@ -130,7 +138,7 @@ export function Donut({
         </div>
       </div>
       {legend && rows.length > 0 && (
-        <ul className="legend" aria-label="Categories">
+        <ul className="legend" aria-label={tl('Categories')}>
           {rows.map((id) => {
             const c = categoryById(categories, id);
             const key = entityKey('category', id);
@@ -151,7 +159,7 @@ export function Donut({
                   {value > 0 ? (
                     <Money minor={value} currency={currency} />
                   ) : (
-                    <span className="muted" aria-label="nothing">
+                    <span className="muted" aria-label={tl('nothing')}>
                       –
                     </span>
                   )}
@@ -164,7 +172,9 @@ export function Donut({
           })}
         </ul>
       )}
-      {legend && rows.length === 0 && <p className="muted small">Nothing spent in this month.</p>}
+      {legend && rows.length === 0 && (
+        <p className="muted small">{tl('Nothing spent in this month.')}</p>
+      )}
     </div>
   );
 }

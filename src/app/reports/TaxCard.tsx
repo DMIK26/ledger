@@ -6,6 +6,8 @@ import { taxCsvRows, taxSummary } from '../../domain/tax';
 import type { Transaction } from '../../domain/types';
 import { csvFile, ExportButton } from '../files';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /**
  * Tax summary (Drop 12) for the financial year of the report's period: entries tagged with a deduction,
@@ -30,10 +32,10 @@ export function TaxCard({
   return (
     <section className="card" aria-labelledby="tax-title" data-testid="tax-summary">
       <div className="card-head">
-        <h2 id="tax-title">Tax deductions, {fy.label}</h2>
+        <h2 id="tax-title">{tl('Tax deductions, {0}', fy.label)}</h2>
         {s.rows.length > 0 && (
           <ExportButton
-            label="Export CSV"
+            label={tl('Export CSV')}
             className="btn btn-ghost"
             build={() =>
               csvFile(
@@ -46,8 +48,9 @@ export function TaxCard({
       </div>
       {s.rows.length === 0 ? (
         <p className="muted small">
-          Mark an entry with a deduction (80C, 80D and so on) in its form under “Who it was for, tax
-          and warranty”, or with a rule, and it adds up here for the financial year.
+          {tl(
+            'Mark an entry with a deduction (80C, 80D and so on) in its form under “Who it was for, tax and warranty”, or with a rule, and it adds up here for the financial year.',
+          )}
         </p>
       ) : (
         <>
@@ -55,15 +58,15 @@ export function TaxCard({
             <table className="report-table">
               <thead>
                 <tr>
-                  <th scope="col">Section</th>
+                  <th scope="col">{tl('Section')}</th>
                   <th scope="col" className="num">
-                    Total
+                    {tl('Total')}
                   </th>
                   <th scope="col" className="num">
-                    Usual limit
+                    {tl('Usual limit')}
                   </th>
                   <th scope="col" className="num">
-                    Counts
+                    {tl('Counts')}
                   </th>
                 </tr>
               </thead>
@@ -82,7 +85,7 @@ export function TaxCard({
                     </td>
                     <td className="num">
                       {r.section.limitMinor === null ? (
-                        'No fixed limit'
+                        tl('No fixed limit')
                       ) : (
                         <Money minor={r.section.limitMinor} currency={currency} />
                       )}
@@ -92,7 +95,7 @@ export function TaxCard({
                       {r.overMinor > 0 && (
                         <span className="status-over small">
                           {' '}
-                          (<Money minor={r.overMinor} currency={currency} /> over)
+                          {tr('({0} over)', <Money minor={r.overMinor} currency={currency} />)}
                         </span>
                       )}
                     </td>
@@ -102,15 +105,18 @@ export function TaxCard({
             </table>
           </div>
           <p className="small" data-testid="tax-total">
-            Counts in all: <Money minor={s.countedMinor} currency={currency} /> from{' '}
-            {s.entries === 1 ? '1 entry' : `${s.entries} entries`}.
+            {tr(
+              'Counts in all: {0} from {1}.',
+              <Money minor={s.countedMinor} currency={currency} />,
+              s.entries === 1 ? tl('1 entry') : tl('{0} entries', s.entries),
+            )}
           </p>
         </>
       )}
       <p className="muted small">
-        A guide, not tax advice. Most of these count only under the old tax regime. From April 2026
-        the Income-tax Act, 2025 renumbers them (80C is section 123, 80D section 126). Check the
-        limits with your tax adviser.
+        {tl(
+          'A guide, not tax advice. Most of these count only under the old tax regime. From April 2026 the Income-tax Act, 2025 renumbers them (80C is section 123, 80D section 126). Check the limits with your tax adviser.',
+        )}
       </p>
     </section>
   );

@@ -10,6 +10,8 @@ import type { Transaction } from '../domain/types';
 import { getPointer, subscribeHighlight, useHighlight } from './entityBus';
 import { createSpring2D } from './spring';
 import { useScopedTransactions, useViewMonth } from './view';
+import { tl } from '../domain/i18n';
+import { tr } from '../app/tr';
 
 const DELAY_MS = 350;
 
@@ -52,7 +54,7 @@ function Body({ entityKey }: { entityKey: string }) {
         <strong>{title}</strong>
         <span>
           <Money minor={sum(list)} currency={currency} />,{' '}
-          {list.length === 1 ? '1 entry' : `${list.length} entries`}
+          {list.length === 1 ? tl('1 entry') : tl('{0} entries', list.length)}
         </span>
         {kind === 'day' &&
           list.slice(0, 3).map((t) => (
@@ -69,7 +71,7 @@ function Body({ entityKey }: { entityKey: string }) {
   const before = inMonth(list, previousMonth(month));
   const title =
     kind === 'category'
-      ? (categoryById(categories, id)?.name ?? 'Other')
+      ? (categoryById(categories, id)?.name ?? tl('Other'))
       : kind === 'tag'
         ? `#${id}`
         : kind === 'method'
@@ -82,31 +84,37 @@ function Body({ entityKey }: { entityKey: string }) {
     <>
       <strong>{title}</strong>
       <span>
-        <Money minor={sum(now)} currency={currency} /> in {monthLabel(month)},{' '}
-        {now.length === 1 ? '1 entry' : `${now.length} entries`}
+        {tr(
+          '{0} in {1}, {2}',
+          <Money minor={sum(now)} currency={currency} />,
+          monthLabel(month),
+          now.length === 1 ? tl('1 entry') : tl('{0} entries', now.length),
+        )}
       </span>
       <span className="muted">
-        <Money minor={sum(before)} currency={currency} /> the month before
+        {tr('{0} the month before', <Money minor={sum(before)} currency={currency} />)}
       </span>
       {status && (
         <span className={status.kind === 'over' ? 'status-over' : undefined}>
           {status.kind === 'over' ? (
-            <>
-              Over budget by <Money minor={status.overMinor} currency={currency} />
-            </>
+            <>{tr('Over budget by {0}', <Money minor={status.overMinor} currency={currency} />)}</>
           ) : (
             <>
-              <Money minor={status.leftMinor} currency={currency} /> of the budget left
+              {tr('{0} of the budget left', <Money minor={status.leftMinor} currency={currency} />)}
             </>
           )}
         </span>
       )}
       {kind === 'merchant' && last && (
         <span className="muted">
-          Last on {fmtDate(last.date)}, {list.length === 1 ? 'once' : `${list.length} times`} in all
+          {tl(
+            'Last on {0}, {1} in all',
+            fmtDate(last.date),
+            list.length === 1 ? tl('once') : tl('{0} times', list.length),
+          )}
         </span>
       )}
-      <span className="muted small">Click to pin or open</span>
+      <span className="muted small">{tl('Click to pin or open')}</span>
     </>
   );
 }

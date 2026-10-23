@@ -12,6 +12,7 @@ import { replaceNumberWords } from './numberWords';
 import { firstRule, type CustomRule } from './rules';
 import { subcategoryInText } from './subcategories';
 import type { Category, CategoryId, ISODate, PaymentMethod } from './types';
+import { tl } from './i18n';
 
 export type TokenKind = 'amount' | 'date' | 'method' | 'income';
 export interface Token {
@@ -99,12 +100,12 @@ function resolveDayMonth(
   year: number | undefined,
   today: ISODate,
 ): Resolved {
-  if (month < 1 || month > 12) return { date: null, error: 'Month must be between 1 and 12' };
+  if (month < 1 || month > 12) return { date: null, error: tl('Month must be between 1 and 12') };
   const t = parseISO(today);
-  if (!t) return { date: null, error: 'Today is not a valid date' };
+  if (!t) return { date: null, error: tl('Today is not a valid date') };
   let y = year ?? t.y;
   if (day < 1 || day > daysInMonth(y, month)) {
-    return { date: null, error: `${MONTHS[month - 1]} has ${daysInMonth(y, month)} days` };
+    return { date: null, error: tl('{0} has {1} days', MONTHS[month - 1], daysInMonth(y, month)) };
   }
   let date = isoFromYMD(y, month, day);
   if (year === undefined && diffDays(date, today) > 7) {
@@ -116,7 +117,7 @@ function resolveDayMonth(
 
 function resolveDayInMonthOffset(day: number, offset: number, today: ISODate): Resolved {
   const t = parseISO(today);
-  if (!t) return { date: null, error: 'Today is not a valid date' };
+  if (!t) return { date: null, error: tl('Today is not a valid date') };
   const target = shiftMonth(t.y, t.m, offset);
   return resolveDayMonth(day, target.m, target.y, today);
 }
@@ -427,7 +428,7 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
     if (r.date) {
       date = r.date;
       upcoming = Boolean(r.upcoming);
-    } else errors.push(r.error ?? 'That date is not valid');
+    } else errors.push(r.error ?? tl('That date is not valid'));
   };
 
   const dateHit = detectDate(text);

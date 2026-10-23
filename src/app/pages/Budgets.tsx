@@ -3,7 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { AllocationBar } from '../../charts/AllocationBar';
 import { PaceChart } from '../../charts/PaceChart';
 import { fillFor } from '../../charts/fills';
-import { useLedger } from '../../data/store';
+import { useLedger, viewOf } from '../../data/store';
 import { categoryTotals, previousMonth } from '../../domain/aggregates';
 import {
   budgetsForMonth,
@@ -29,6 +29,7 @@ import {
 } from '../../domain/plan';
 import { usePins, useScopedTransactions, useViewMonth } from '../../kit/view';
 import { TripsView } from '../plan/Trips';
+import { PickASpace } from '../spaces/SpaceSwitcher';
 import type { BudgetKind, Category } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { Money, usePrivacy } from '../Money';
@@ -36,6 +37,8 @@ import { navigate } from '../router';
 import { RiskText, useRisks } from '../plan/AtRisk';
 import { GoalsView } from '../plan/Goals';
 import { WishlistView } from '../plan/Wishlist';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 function Status({
   spent,
@@ -46,17 +49,17 @@ function Status({
   budget: number | null;
   currency: string;
 }) {
-  if (budget === null) return <span className="muted">No budget</span>;
+  if (budget === null) return <span className="muted">{tl('No budget')}</span>;
   const s = budgetStatus(spent, budget);
   if (s.kind === 'over')
     return (
       <span className="status-over">
-        Over by <Money minor={s.overMinor} currency={currency} />
+        {tr('Over by {0}', <Money minor={s.overMinor} currency={currency} />)}
       </span>
     );
   return (
     <span className={s.kind === 'near' ? 'status-near' : undefined}>
-      <Money minor={s.leftMinor} currency={currency} /> left
+      {tr('{0} left', <Money minor={s.leftMinor} currency={currency} />)}
     </span>
   );
 }
@@ -172,47 +175,83 @@ function PaceCard({
   const actual = last.actualMinor!;
   const gap = actual - last.idealMinor;
   const money = (m: number) => fmtMoney(m, { currency });
-  const label = `${money(actual)} spent by day ${last.day}; the straight line to ${money(planMinor)} is at ${money(last.idealMinor)}.`;
+  const label = tl(
+    '{0} spent by day {1}; the straight line to {2} is at {3}.',
+    money(actual),
+    last.day,
+    money(planMinor),
+    money(last.idealMinor),
+  );
   return (
     <section className="card" aria-labelledby="pace-title">
       <div className="card-head">
-        <h2 id="pace-title">Pace</h2>
-        <span className="muted small">
-          Day {last.day} of {points.length}
-        </span>
+        <h2 id="pace-title">{tl('Pace')}</h2>
+        <span className="muted small">{tl('Day {0} of {1}', last.day, points.length)}</span>
       </div>
       <PaceChart points={points} label={label} />
       <p className="small" data-testid="pace-text">
-        <Money minor={actual} currency={currency} /> spent by day {last.day}.{' '}
-        {gap > 0 ? (
-          <span className="status-over">
-            <Money minor={gap} currency={currency} /> above the straight line to{' '}
-            <Money minor={planMinor} currency={currency} />.
-          </span>
-        ) : (
-          <>
-            <Money minor={-gap} currency={currency} /> below the straight line to{' '}
-            <Money minor={planMinor} currency={currency} />.
-          </>
+        {tr(
+          '{0} spent by day {1}. {2}',
+          <Money minor={actual} currency={currency} />,
+          last.day,
+          gap > 0 ? (
+            <span className="status-over">
+              {tr(
+                '{0} above the straight line to {1}.',
+                <Money minor={gap} currency={currency} />,
+                <Money minor={planMinor} currency={currency} />,
+              )}
+            </span>
+          ) : (
+            <>
+              {tr(
+                '{0} below the straight line to {1}.',
+                <Money minor={-gap} currency={currency} />,
+                <Money minor={planMinor} currency={currency} />,
+              )}
+            </>
+          ),
         )}
       </p>
       <p className="muted small pace-key">
-        <span
-          className={gap > 0 ? 'pace-swatch pace-swatch-over' : 'pace-swatch'}
-          aria-hidden="true"
-        />{' '}
-        Spent so far
-        <span className="pace-swatch pace-swatch-ideal" aria-hidden="true" /> Even pace
+        {tr(
+          '{0} Spent so far{1} Even pace',
+          <span
+            className={gap > 0 ? 'pace-swatch pace-swatch-over' : 'pace-swatch'}
+            aria-hidden="true"
+          />,
+          <span className="pace-swatch pace-swatch-ideal" aria-hidden="true" />,
+        )}
       </p>
     </section>
   );
 }
 
 const VIEWS = [
-  { id: 'budgets', label: 'Budgets' },
-  { id: 'goals', label: 'Goals' },
-  { id: 'wishlist', label: 'Wishlist' },
-  { id: 'trips', label: 'Trips' },
+  {
+    id: 'budgets',
+    get label() {
+      return tl('Budgets');
+    },
+  },
+  {
+    id: 'goals',
+    get label() {
+      return tl('Goals');
+    },
+  },
+  {
+    id: 'wishlist',
+    get label() {
+      return tl('Wishlist');
+    },
+  },
+  {
+    id: 'trips',
+    get label() {
+      return tl('Trips');
+    },
+  },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
@@ -220,9 +259,11 @@ type View = (typeof VIEWS)[number]['id'];
 export function Budgets({ view }: { view?: string | null }) {
   const current: View =
     view === 'goals' || view === 'wishlist' || view === 'trips' ? view : 'budgets';
+  // Plans belong to one ledger (Drop 13); Both is for reading.
+  const both = useLedger((s) => viewOf(s.settings) === 'both');
   return (
     <>
-      <div className="segmented page-views" role="group" aria-label="Show">
+      <div className="segmented page-views" role="group" aria-label={tl('Show')}>
         {VIEWS.map((v) => (
           <button
             key={v.id}
@@ -234,10 +275,15 @@ export function Budgets({ view }: { view?: string | null }) {
           </button>
         ))}
       </div>
-      {current === 'budgets' && <BudgetPlan />}
-      {current === 'goals' && <GoalsView />}
-      {current === 'wishlist' && <WishlistView />}
-      {current === 'trips' && <TripsView />}
+      {both && (
+        <PickASpace
+          what={current === 'budgets' ? tl('budgets') : current === 'trips' ? tl('trips') : current}
+        />
+      )}
+      {!both && current === 'budgets' && <BudgetPlan />}
+      {!both && current === 'goals' && <GoalsView />}
+      {!both && current === 'wishlist' && <WishlistView />}
+      {!both && current === 'trips' && <TripsView />}
     </>
   );
 }
@@ -246,8 +292,11 @@ function CarryText({ effective, currency }: { effective: EffectiveBudget; curren
   if (effective.carryMinor === 0) return null;
   return (
     <span className="muted small budget-carry" data-testid="budget-carry">
-      {effective.carryMinor > 0 ? 'plus ' : 'less '}
-      <Money minor={Math.abs(effective.carryMinor)} currency={currency} /> carried
+      {tr(
+        '{0}{1} carried',
+        effective.carryMinor > 0 ? tl('plus') + ' ' : tl('less') + ' ',
+        <Money minor={Math.abs(effective.carryMinor)} currency={currency} />,
+      )}
     </span>
   );
 }
@@ -311,16 +360,16 @@ function BudgetPlan() {
       <section className="card" aria-labelledby="overall-title">
         <div className="card-head">
           <h2 id="overall-title">
-            <label htmlFor="budget-overall">Monthly budget</label>
+            <label htmlFor="budget-overall">{tl('Monthly budget')}</label>
           </h2>
           <span className="muted small">{monthLabel(month)}</span>
         </div>
         <div className="budget-overall">
           <BudgetField
             id="budget-overall"
-            label="Monthly budget"
+            label={tl('Monthly budget')}
             value={mine.overall}
-            onSave={(v) => save({ ...mine, overall: v || null }, 'Changed the monthly budget')}
+            onSave={(v) => save({ ...mine, overall: v || null }, tl('Changed the monthly budget'))}
           />
           <p data-testid="overall-status">
             <Status spent={spent} budget={mine.overall} currency={currency} />
@@ -328,12 +377,14 @@ function BudgetPlan() {
         </div>
         <Meter spent={spent} budget={mine.overall} anchor="budget:overall" />
         <p className="muted small">
-          <Money minor={spent} currency={currency} /> spent so far this month.
+          {tr('{0} spent so far this month.', <Money minor={spent} currency={currency} />)}
         </p>
         {mine.overall !== null && catSum > mine.overall && (
           <p className="warning">
-            Category budgets add up to <Money minor={catSum} currency={currency} />, more than the
-            monthly budget.
+            {tr(
+              'Category budgets add up to {0}, more than the monthly budget.',
+              <Money minor={catSum} currency={currency} />,
+            )}
           </p>
         )}
       </section>
@@ -346,7 +397,7 @@ function BudgetPlan() {
             setProposal({ kind: 'suggest', budgets: suggestBudgets(transactions, today) })
           }
         >
-          Suggest budgets
+          {tl('Suggest budgets')}
         </button>
         <button
           type="button"
@@ -356,7 +407,7 @@ function BudgetPlan() {
             setProposal({ kind: 'copy', budgets: copyFromPreviousMonth(budgets, month) })
           }
         >
-          Copy last month
+          {tl('Copy last month')}
         </button>
         <button
           type="button"
@@ -367,7 +418,7 @@ function BudgetPlan() {
             setProposal({ kind: 'suggest', budgets: suggestBudgets(transactions, today) });
           }}
         >
-          Reset plan
+          {tl('Reset plan')}
         </button>
       </div>
 
@@ -375,20 +426,20 @@ function BudgetPlan() {
         <section className="card ghost" aria-labelledby="proposal-title" data-testid="proposal">
           <h2 id="proposal-title">
             {proposal.kind === 'suggest'
-              ? 'Suggested from your last three months'
-              : `Budgets from ${monthLabel(previousMonth(month))}`}
+              ? tl('Suggested from your last three months')
+              : tl('Budgets from {0}', monthLabel(previousMonth(month)))}
           </h2>
           {hasBudgets(proposal.budgets) ? (
             <>
               <p className="muted small">
-                Monthly budget{' '}
-                {proposal.budgets.overall !== null ? (
-                  <Money minor={proposal.budgets.overall} currency={currency} />
-                ) : (
-                  'none'
+                {tr(
+                  'Monthly budget {0}. The dashed rows below show each category. Accept replaces this month’s budgets; you can undo it.',
+                  proposal.budgets.overall !== null ? (
+                    <Money minor={proposal.budgets.overall} currency={currency} />
+                  ) : (
+                    tl('none')
+                  ),
                 )}
-                . The dashed rows below show each category. Accept replaces this month&rsquo;s
-                budgets; you can undo it.
               </p>
               <GhostBar proposal={proposal.budgets} categories={categories} />
               <div className="btn-row">
@@ -399,16 +450,16 @@ function BudgetPlan() {
                     save(
                       proposal.budgets,
                       proposal.kind === 'suggest'
-                        ? 'Accepted suggested budgets'
-                        : "Copied last month's budgets",
+                        ? tl('Accepted suggested budgets')
+                        : tl("Copied last month's budgets"),
                     );
                     setProposal(null);
                   }}
                 >
-                  Accept
+                  {tl('Accept')}
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => setProposal(null)}>
-                  Reject
+                  {tl('Reject')}
                 </button>
               </div>
             </>
@@ -416,11 +467,13 @@ function BudgetPlan() {
             <>
               <p className="muted small">
                 {proposal.kind === 'suggest'
-                  ? 'There is not enough spending in the last three months to suggest anything yet.'
-                  : 'Last month had no budgets.'}
+                  ? tl(
+                      'There is not enough spending in the last three months to suggest anything yet.',
+                    )
+                  : tl('Last month had no budgets.')}
               </p>
               <button type="button" className="btn btn-ghost" onClick={() => setProposal(null)}>
-                Close
+                {tl('Close')}
               </button>
             </>
           )}
@@ -432,16 +485,17 @@ function BudgetPlan() {
       )}
 
       <section className="card" aria-labelledby="split-title">
-        <h2 id="split-title">Split by category</h2>
+        <h2 id="split-title">{tl('Split by category')}</h2>
         {segments.length === 0 ? (
           <p className="muted small">
-            Give categories a budget below to see how the month is split.
+            {tl('Give categories a budget below to see how the month is split.')}
           </p>
         ) : (
           <>
             <p className="muted small">
-              Drag a divider, or focus it and use the arrow keys, to move budget between neighbours
-              in steps of 500. The total stays the same.
+              {tl(
+                'Drag a divider, or focus it and use the arrow keys, to move budget between neighbours in steps of 500. The total stays the same.',
+              )}
             </p>
             <AllocationBar
               segments={segments}
@@ -457,7 +511,7 @@ function BudgetPlan() {
                       ...Object.fromEntries(next.map((s) => [s.id, s.amountMinor])),
                     },
                   },
-                  'Moved budget between categories',
+                  tl('Moved budget between categories'),
                 )
               }
             />
@@ -466,11 +520,11 @@ function BudgetPlan() {
       </section>
 
       <section className="card" aria-labelledby="cats-title">
-        <h2 id="cats-title">Categories</h2>
+        <h2 id="cats-title">{tl('Categories')}</h2>
         <p className="muted small">
-          Fixed costs stay about the same each month, flexible spending changes day to day, and
-          non-monthly costs come now and then. The forecast only stretches flexible spending over
-          the month.
+          {tl(
+            'Fixed costs stay about the same each month, flexible spending changes day to day, and non-monthly costs come now and then. The forecast only stretches flexible spending over the month.',
+          )}
         </p>
         {BUDGET_KINDS.map((kind) => {
           const group = categories.filter((c) => budgetKindOf(c.id, allCategories) === kind);
@@ -482,8 +536,11 @@ function BudgetPlan() {
               <div className="budget-group-head">
                 <h3>{BUDGET_KIND_LABEL[kind]}</h3>
                 <span className="muted small" data-testid={`budget-subtotal-${kind}`}>
-                  <Money minor={groupSpent} currency={currency} /> of{' '}
-                  <Money minor={groupBudget} currency={currency} />
+                  {tr(
+                    '{0} of {1}',
+                    <Money minor={groupSpent} currency={currency} />,
+                    <Money minor={groupBudget} currency={currency} />,
+                  )}
                 </span>
               </div>
               <p className="muted small budget-group-hint">{BUDGET_KIND_HINT[kind]}</p>
@@ -502,7 +559,7 @@ function BudgetPlan() {
                     onSave={(v) =>
                       save(
                         { ...mine, categories: { ...mine.categories, [c.id]: v } },
-                        `Changed the ${c.name} budget`,
+                        tl('Changed the {0} budget', c.name),
                       )
                     }
                     onKind={(k) => void setCategoryPlan(c.id, { budgetKind: k })}
@@ -553,14 +610,14 @@ function BudgetRow({
         {c.name}
       </span>
       <span className="budget-spent">
-        <Money minor={used} currency={currency} /> spent
+        {tr('{0} spent', <Money minor={used} currency={currency} />)}
       </span>
       <span className="budget-status">
         <Status spent={used} budget={total} currency={currency} />
       </span>
       <BudgetField
         id={`budget-${c.id}`}
-        label={`Budget for ${c.name}`}
+        label={tl('Budget for {0}', c.name)}
         value={budget}
         onSave={onSave}
       />
@@ -568,7 +625,7 @@ function BudgetRow({
       <div className="budget-extra">
         <select
           className="input input-small"
-          aria-label={`Type of ${c.name}`}
+          aria-label={tl('Type of {0}', c.name)}
           value={kind}
           onChange={(e) => onKind(e.target.value as BudgetKind)}
         >
@@ -584,7 +641,7 @@ function BudgetRow({
             checked={!!c.rollover}
             onChange={(e) => onRollover(e.target.checked)}
           />
-          Roll over
+          {tl('Roll over')}
         </label>
         {effective && <CarryText effective={effective} currency={currency} />}
         {risk?.kind === 'at-risk' && (
@@ -595,7 +652,7 @@ function BudgetRow({
       </div>
       {proposal && proposed !== undefined && (
         <span className="ghost-chip">
-          {proposal.kind === 'suggest' ? 'Suggested' : 'Last month'}{' '}
+          {proposal.kind === 'suggest' ? tl('Suggested') : tl('Last month')}{' '}
           <Money minor={proposed} currency={currency} />
         </span>
       )}

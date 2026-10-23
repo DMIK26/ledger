@@ -1,4 +1,5 @@
 import type { LockConfig } from './types';
+import { tl } from './i18n';
 
 export const PIN_ITERATIONS = 210_000;
 
@@ -61,8 +62,8 @@ export const resetDue = (requestedAt: number, now: number): boolean =>
 /** Plain wording for the time left: "about 23 hours", "about 40 minutes", "less than a minute". */
 export function fmtWait(ms: number): string {
   const minutes = Math.ceil(ms / 60_000);
-  if (minutes <= 1) return ms <= 0 ? 'no time' : 'less than a minute';
-  if (minutes < 60) return `about ${minutes} minutes`;
+  if (minutes <= 1) return ms <= 0 ? tl('no time') : tl('less than a minute');
+  if (minutes < 60) return tl('about {0} minutes', minutes);
   const hours = Math.round(minutes / 60);
-  return hours === 1 ? 'about 1 hour' : `about ${hours} hours`;
+  return hours === 1 ? tl('about 1 hour') : tl('about {0} hours', hours);
 }

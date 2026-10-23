@@ -3,6 +3,7 @@ import { useLedger } from '../../data/store';
 import { spentFor } from '../../domain/forWhom';
 import type { Transaction } from '../../domain/types';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
 
 /** Spent for whom (Drop 12): the period's spending per person it was for; shown once anyone is named. */
 export function ForWhom({
@@ -20,14 +21,14 @@ export function ForWhom({
   const max = Math.max(1, ...rows.map((r) => r.totalMinor));
   return (
     <section className="card" aria-labelledby="for-whom-title" data-testid="for-whom">
-      <h2 id="for-whom-title">Spent for whom</h2>
+      <h2 id="for-whom-title">{tl('Spent for whom')}</h2>
       <ul className="hbars">
         {rows.map((r) => (
           <li key={r.name || 'you'} className="hbar">
-            <span className="hbar-label">{r.name || 'You'}</span>
+            <span className="hbar-label">{r.name || tl('You')}</span>
             <Money minor={r.totalMinor} currency={currency} />
             <span className="muted small hbar-note">
-              {r.count === 1 ? '1 entry' : `${r.count} entries`}
+              {r.count === 1 ? tl('1 entry') : tl('{0} entries', r.count)}
             </span>
             <span className="hbar-track" aria-hidden="true">
               <span className="hbar-fill" style={{ width: `${(r.totalMinor / max) * 100}%` }} />

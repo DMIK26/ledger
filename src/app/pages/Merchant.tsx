@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { EmptyDoodle } from '../../doodle/Studio';
+import { EmptyDoodle } from '../../doodle/bits';
 import { useLedger } from '../../data/store';
 import { categorise } from '../../domain/categoriser';
 import { categoryById } from '../../domain/categories';
-import { fmtDate, monthLabel, todayISO } from '../../domain/dates';
+import { fmtDate, monthLabel, monthShortLabel, todayISO } from '../../domain/dates';
 import { merchantStats } from '../../domain/merchant';
 import { firstRule } from '../../domain/rules';
 import { useView } from '../../kit/view';
@@ -11,6 +11,8 @@ import { Money } from '../Money';
 import { ReceiptViewer } from '../ReceiptViewer';
 import { href } from '../router';
 import { TxList } from '../TxList';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const PAGE = 30;
 
@@ -24,7 +26,7 @@ function MonthColumns({
 }) {
   const max = Math.max(1, ...months.map((m) => m.totalMinor));
   return (
-    <ol className="month-cols" aria-label="Spent each month">
+    <ol className="month-cols" aria-label={tl('Spent each month')}>
       {months.map((m) => (
         <li key={m.month} className="month-col">
           <span className="month-col-track" aria-hidden="true">
@@ -36,7 +38,7 @@ function MonthColumns({
             />
           </span>
           <span className="month-col-label" aria-hidden="true">
-            {monthLabel(m.month).slice(0, 3)}
+            {monthShortLabel(m.month)}
           </span>
           <span className="visually-hidden">
             {monthLabel(m.month)}: <Money minor={m.totalMinor} currency={currency} />
@@ -73,15 +75,18 @@ export function MerchantPage({ merchantKey }: { merchantKey: string }) {
     return (
       <section className="card empty">
         <EmptyDoodle art="receipt" />
-        <h2>No entries for this merchant</h2>
+        <h2>{tl('No entries for this merchant')}</h2>
         <p className="muted">
-          It may have been renamed or deleted. <a href={href('/transactions')}>See all entries</a>.
+          {tr(
+            'It may have been renamed or deleted. {0}.',
+            <a href={href('/transactions')}>{tl('See all entries')}</a>,
+          )}
         </p>
       </section>
     );
   }
 
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
   const rule = firstRule(customRules, {
     merchant: stats.name,
     amountMinor: stats.averageMinor,
@@ -90,19 +95,19 @@ export function MerchantPage({ merchantKey }: { merchantKey: string }) {
   const learned = rules[merchantKey];
   const guess = categorise(stats.name, rules);
   const filedAs = rule?.set.categoryId
-    ? `Your rule for “${rule.text}” files it under ${name(rule.set.categoryId)}.`
+    ? tl('Your rule for “{0}” files it under {1}.', rule.text, name(rule.set.categoryId))
     : learned
-      ? `Ledger files it under ${name(learned)}, learned from your choices.`
+      ? tl('Ledger files it under {0}, learned from your choices.', name(learned))
       : guess.confidence !== 'none'
-        ? `Ledger files it under ${name(guess.categoryId)} from its name.`
-        : 'Ledger does not know where it goes yet; it is marked unsure.';
+        ? tl('Ledger files it under {0} from its name.', name(guess.categoryId))
+        : tl('Ledger does not know where it goes yet; it is marked unsure.');
   const pinned = pins.some((p) => p.kind === 'merchant' && p.id === merchantKey);
   const since =
     stats.daysSinceLast === 0
-      ? 'today'
+      ? tl('today')
       : stats.daysSinceLast === 1
-        ? 'yesterday'
-        : `${stats.daysSinceLast} days ago`;
+        ? tl('yesterday')
+        : tl('{0} days ago', stats.daysSinceLast);
 
   return (
     <>
@@ -110,47 +115,49 @@ export function MerchantPage({ merchantKey }: { merchantKey: string }) {
         <div className="card-head">
           <h2 id="merchant-title">{stats.name}</h2>
           <span className="muted small">
-            Usually {name(stats.usualCategoryId)}, {stats.usualMethod}
+            {tl('Usually {0}, {1}', name(stats.usualCategoryId), stats.usualMethod)}
           </span>
         </div>
         <dl className="facts">
           <div>
-            <dt>All time</dt>
+            <dt>{tl('All time')}</dt>
             <dd data-testid="merchant-total">
               <Money minor={stats.totalMinor} currency={currency} />
             </dd>
           </div>
           <div>
-            <dt>This month</dt>
+            <dt>{tl('This month')}</dt>
             <dd>
               <Money minor={stats.thisMonthMinor} currency={currency} />
             </dd>
           </div>
           <div>
-            <dt>Entries</dt>
+            <dt>{tl('Entries')}</dt>
             <dd>{stats.count}</dd>
           </div>
           <div>
-            <dt>Average per entry</dt>
+            <dt>{tl('Average per entry')}</dt>
             <dd>
               <Money minor={stats.averageMinor} currency={currency} />
             </dd>
           </div>
           <div>
-            <dt>Last visit</dt>
+            <dt>{tl('Last visit')}</dt>
             <dd>
               {fmtDate(stats.last)}, {since}
             </dd>
           </div>
           <div>
-            <dt>First visit</dt>
+            <dt>{tl('First visit')}</dt>
             <dd>{fmtDate(stats.first)}</dd>
           </div>
           {stats.everyDays !== null && (
             <div>
-              <dt>How often</dt>
+              <dt>{tl('How often')}</dt>
               <dd>
-                {stats.everyDays <= 1 ? 'About every day' : `About every ${stats.everyDays} days`}
+                {stats.everyDays <= 1
+                  ? tl('About every day')
+                  : tl('About every {0} days', stats.everyDays)}
               </dd>
             </div>
           )}
@@ -163,31 +170,31 @@ export function MerchantPage({ merchantKey }: { merchantKey: string }) {
             aria-pressed={pinned}
             onClick={() => togglePin({ kind: 'merchant', id: merchantKey, label: stats.name })}
           >
-            {pinned ? 'Pinned to every page' : 'Pin to every page'}
+            {pinned ? tl('Pinned to every page') : tl('Pin to every page')}
           </button>
           <a
             className="btn btn-ghost"
             href={href(`/settings?view=rules&merchant=${encodeURIComponent(stats.name)}`)}
           >
-            Make a rule
+            {tl('Make a rule')}
           </a>
         </div>
       </section>
 
       <section className="card" aria-labelledby="merchant-months-title">
-        <h2 id="merchant-months-title">Last 12 months</h2>
+        <h2 id="merchant-months-title">{tl('Last 12 months')}</h2>
         <MonthColumns months={stats.months} currency={currency} />
       </section>
 
       <section className="card" aria-labelledby="merchant-history-title">
         <div className="card-head">
-          <h2 id="merchant-history-title">History</h2>
+          <h2 id="merchant-history-title">{tl('History')}</h2>
           <span className="muted small">
-            {stats.count === 1 ? '1 entry' : `${stats.count} entries`}
+            {stats.count === 1 ? tl('1 entry') : tl('{0} entries', stats.count)}
           </span>
         </div>
         <TxList
-          label={`Entries from ${stats.name}`}
+          label={tl('Entries from {0}', stats.name)}
           transactions={stats.entries.slice(0, shown)}
           onDelete={(id) => void removeTransaction(id)}
           onEdit={setEditingId}
@@ -196,7 +203,7 @@ export function MerchantPage({ merchantKey }: { merchantKey: string }) {
         />
         {stats.entries.length > shown && (
           <button type="button" className="btn btn-ghost" onClick={() => setShown((s) => s + PAGE)}>
-            Show more
+            {tl('Show more')}
           </button>
         )}
       </section>

@@ -1,5 +1,6 @@
 import { mergeTranscripts } from '../domain/transcript';
 import { isIOS } from '../domain/platform';
+import { tl } from '../domain/i18n';
 
 /** Voice quick add with the browser's speech recognition (Chrome, Edge and Safari), in Indian English. */
 interface Recognition {
@@ -49,24 +50,27 @@ export function voiceMode(): VoiceMode {
   return ctor() ? 'listen' : 'none';
 }
 
-const KEYBOARD_TIP = 'Tap the mic on your keyboard and say something like “chai twenty cash”.';
+const keyboardTip = (): string =>
+  tl('Tap the mic on your keyboard and say something like “chai twenty cash”.');
 
 function message(error: string): string | null {
   switch (error) {
     case 'not-allowed':
-      return 'Microphone permission is off. Allow it for this site in the browser settings, or use the mic on your keyboard.';
+      return tl(
+        'Microphone permission is off. Allow it for this site in the browser settings, or use the mic on your keyboard.',
+      );
     case 'service-not-allowed':
-      return `Voice input is not available here. ${KEYBOARD_TIP}`;
+      return tl('Voice input is not available here. {0}', keyboardTip());
     case 'audio-capture':
-      return 'No microphone was found.';
+      return tl('No microphone was found.');
     case 'no-speech':
-      return 'Did not catch that. Try again, a little closer to the phone.';
+      return tl('Did not catch that. Try again, a little closer to the phone.');
     case 'network':
-      return 'Voice input needs a connection in this browser.';
+      return tl('Voice input needs a connection in this browser.');
     case 'aborted':
       return null;
     default:
-      return `Voice input stopped. ${KEYBOARD_TIP}`;
+      return tl('Voice input stopped. {0}', keyboardTip());
   }
 }
 
@@ -87,7 +91,7 @@ export function listen(
 ): () => void {
   const C = ctor();
   if (!C) {
-    onEnd(`Voice input is not available in this browser. ${KEYBOARD_TIP}`);
+    onEnd(tl('Voice input is not available in this browser. {0}', keyboardTip()));
     return () => undefined;
   }
   const rec = new C();
@@ -153,7 +157,7 @@ export function listen(
   try {
     rec.start();
   } catch {
-    error = `Voice input could not start. ${KEYBOARD_TIP}`;
+    error = tl('Voice input could not start. {0}', keyboardTip());
     finish();
   }
   return stop;

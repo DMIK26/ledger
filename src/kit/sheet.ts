@@ -1,4 +1,5 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { tl } from '../domain/i18n';
 
 export type Snap = 'half' | 'full';
 
@@ -44,7 +45,7 @@ export function useSheetSnap(open: boolean, onClose: () => void) {
   const handleProps = {
     role: 'button' as const,
     tabIndex: 0,
-    'aria-label': snap === 'full' ? 'Make the sheet smaller' : 'Make the sheet full height',
+    'aria-label': snap === 'full' ? tl('Make the sheet smaller') : tl('Make the sheet full height'),
     className: 'sheet-handle',
     onPointerDown: (e: PointerEvent<HTMLElement>) => {
       start.current = e.clientY;

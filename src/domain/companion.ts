@@ -6,6 +6,7 @@ import type { Insight } from './insights';
 import { fmtMoney } from './money';
 import { nextOccurrence, type RecurringItem } from './recurring';
 import type { Category, ISODate, Transaction } from './types';
+import { tl } from './i18n';
 
 /** The pencil's mood: from the month's budget, or asleep when nobody has touched anything for a while. */
 export type Mood = 'relaxed' | 'worried' | 'dizzy' | 'asleep';
@@ -23,7 +24,9 @@ export function companionMood(spentMinor: number, budgetMinor: number | null, id
 
 export const MOOD_LABEL: Record<Mood, string> = {
   relaxed: 'relaxed',
-  worried: 'a little worried',
+  get worried() {
+    return tl('a little worried');
+  },
   dizzy: 'dizzy',
   asleep: 'asleep',
 };
@@ -43,12 +46,24 @@ export const PAGE_PROP: Record<string, Prop> = {
 export type Question = 'where' | 'biggest' | 'budget' | 'busiest' | 'trend' | 'next';
 
 export const QUESTION_LABEL: Record<Question, string> = {
-  where: 'Where did most of it go?',
-  biggest: 'What was the biggest one?',
-  budget: 'Am I on budget?',
-  busiest: 'Which day was busiest?',
-  trend: 'How does this month compare?',
-  next: 'What is due next?',
+  get where() {
+    return tl('Where did most of it go?');
+  },
+  get biggest() {
+    return tl('What was the biggest one?');
+  },
+  get budget() {
+    return tl('Am I on budget?');
+  },
+  get busiest() {
+    return tl('Which day was busiest?');
+  },
+  get trend() {
+    return tl('How does this month compare?');
+  },
+  get next() {
+    return tl('What is due next?');
+  },
 };
 
 /** The questions that make sense on each page, most useful first. */
@@ -87,32 +102,35 @@ function monthEntries(ctx: AskContext): Transaction[] {
 export function answer(q: Question, ctx: AskContext): Answer {
   const money = (m: number) => fmtMoney(m, { currency: ctx.currency });
   const list = monthEntries(ctx);
-  const name = (id: string) => categoryById(ctx.categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(ctx.categories, id)?.name ?? tl('Other');
   switch (q) {
     case 'where': {
       const top = categoryTotals(list, ctx.month)[0];
-      if (!top) return { text: 'Nothing spent this month yet, so nowhere.', anchor: null };
+      if (!top) return { text: tl('Nothing spent this month yet, so nowhere.'), anchor: null };
       return {
-        text: `Most of it went on ${name(top.categoryId)}: ${money(top.totalMinor)}.`,
+        text: tl('Most of it went on {0}: {1}.', name(top.categoryId), money(top.totalMinor)),
         anchor: `category:${top.categoryId}`,
       };
     }
     case 'biggest': {
       const big = [...list].sort((a, b) => b.amountMinor - a.amountMinor)[0];
-      if (!big) return { text: 'No entries this month yet.', anchor: null };
+      if (!big) return { text: tl('No entries this month yet.'), anchor: null };
       return {
-        text: `${big.merchant}, ${money(big.amountMinor)} on ${fmtDate(big.date)}.`,
+        text: tl('{0}, {1} on {2}.', big.merchant, money(big.amountMinor), fmtDate(big.date)),
         anchor: `tx:${big.id}`,
       };
     }
     case 'budget': {
       if (ctx.overallBudgetMinor === null)
-        return { text: 'There is no budget for this month yet. Set one on Budgets.', anchor: null };
+        return {
+          text: tl('There is no budget for this month yet. Set one on Budgets.'),
+          anchor: null,
+        };
       const spent = list.reduce((s, t) => s + t.amountMinor, 0);
       const now = budgetStatus(spent, ctx.overallBudgetMinor);
       if (now.kind === 'over')
         return {
-          text: `Over by ${money(now.overMinor)} already. Slower days from here.`,
+          text: tl('Over by {0} already. Slower days from here.', money(now.overMinor)),
           anchor: 'budget:overall',
         };
       const current = monthKey(ctx.today) === ctx.month;
@@ -122,18 +140,25 @@ export function answer(q: Question, ctx: AskContext): Answer {
         return {
           text:
             end.kind === 'over'
-              ? `${money(now.leftMinor)} left, but this pace ends ${money(end.overMinor)} over.`
-              : `Yes. ${money(now.leftMinor)} left and the pace looks fine.`,
+              ? tl(
+                  '{0} left, but this pace ends {1} over.',
+                  money(now.leftMinor),
+                  money(end.overMinor),
+                )
+              : tl('Yes. {0} left and the pace looks fine.', money(now.leftMinor)),
           anchor: 'budget:overall',
         };
       }
-      return { text: `Yes, with ${money(now.leftMinor)} to spare.`, anchor: 'budget:overall' };
+      return {
+        text: tl('Yes, with {0} to spare.', money(now.leftMinor)),
+        anchor: 'budget:overall',
+      };
     }
     case 'busiest': {
       const byDay = new Map<string, number>();
       for (const t of list) byDay.set(t.date, (byDay.get(t.date) ?? 0) + t.amountMinor);
       const top = [...byDay.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
-      if (!top) return { text: 'No entries this month yet.', anchor: null };
+      if (!top) return { text: tl('No entries this month yet.'), anchor: null };
       return { text: `${fmtDate(top[0])}: ${money(top[1])}.`, anchor: `day:${top[0]}` };
     }
     case 'trend': {
@@ -143,19 +168,28 @@ export function answer(q: Question, ctx: AskContext): Answer {
       );
       const text =
         k.changePct === null
-          ? 'Last month had nothing to compare with.'
+          ? tl('Last month had nothing to compare with.')
           : k.changePct === 0
-            ? 'About the same as last month by this day.'
-            : `${Math.abs(k.changePct)}% ${k.changePct > 0 ? 'more' : 'less'} than last month by this day.`;
+            ? tl('About the same as last month by this day.')
+            : tl(
+                '{0}% {1} than last month by this day.',
+                Math.abs(k.changePct),
+                k.changePct > 0 ? tl('more') : tl('less'),
+              );
       return { text, anchor: `month:${ctx.month}` };
     }
     case 'next': {
       const next = ctx.recurring
         .map((r) => ({ r, date: nextOccurrence(r, ctx.today) }))
         .sort((a, b) => a.date.localeCompare(b.date))[0];
-      if (!next) return { text: 'Nothing recurring yet.', anchor: null };
+      if (!next) return { text: tl('Nothing recurring yet.'), anchor: null };
       return {
-        text: `${next.r.merchant}, ${money(next.r.amountMinor)} on ${fmtDate(next.date)}.`,
+        text: tl(
+          '{0}, {1} on {2}.',
+          next.r.merchant,
+          money(next.r.amountMinor),
+          fmtDate(next.date),
+        ),
         anchor: `recurring:${next.r.id}`,
       };
     }
@@ -175,12 +209,14 @@ export function autoAnnotation(
   switch (page) {
     case '/': {
       const top = categoryTotals(list, ctx.month)[0];
-      return top ? { text: 'most of it went here', anchor: `category:${top.categoryId}` } : null;
+      return top
+        ? { text: tl('most of it went here'), anchor: `category:${top.categoryId}` }
+        : null;
     }
     case '/transactions': {
       const big = [...list].sort((a, b) => b.amountMinor - a.amountMinor)[0];
       return big
-        ? { text: `the big one, ${money(big.amountMinor)}`, anchor: `tx:${big.id}` }
+        ? { text: tl('the big one, {0}', money(big.amountMinor)), anchor: `tx:${big.id}` }
         : null;
     }
     case '/budgets': {
@@ -195,17 +231,17 @@ export function autoAnnotation(
       }
       if (!pick) return null;
       return {
-        text: pick.ratio > 1 ? 'this one ran over' : 'closest to its limit',
+        text: pick.ratio > 1 ? tl('this one ran over') : tl('closest to its limit'),
         anchor: `budget:${pick.id}`,
       };
     }
     case '/reports': {
       const a = answer('busiest', ctx);
-      return a.anchor ? { text: 'busiest day', anchor: a.anchor } : null;
+      return a.anchor ? { text: tl('busiest day'), anchor: a.anchor } : null;
     }
     case '/recurring': {
       const a = answer('next', ctx);
-      return a.anchor ? { text: 'next up', anchor: a.anchor } : null;
+      return a.anchor ? { text: tl('next up'), anchor: a.anchor } : null;
     }
     default:
       return null;
@@ -219,22 +255,30 @@ export function insightSentence(
   currency: string,
 ): string {
   const money = (m: number) => fmtMoney(m, { currency });
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
-  if (!insight) return 'All quiet. Add an entry and I will keep an eye on it.';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
+  if (!insight) return tl('All quiet. Add an entry and I will keep an eye on it.');
   switch (insight.kind) {
     case 'pace-over':
-      return `At this pace the month ends ${money(insight.overMinor)} over budget.`;
+      return tl('At this pace the month ends {0} over budget.', money(insight.overMinor));
     case 'pace-under':
-      return `On track: about ${money(insight.leftMinor)} of the budget should be left.`;
+      return tl('On track: about {0} of the budget should be left.', money(insight.leftMinor));
     case 'category-up':
-      return `${name(insight.categoryId)} is up ${insight.pct}% on this point last month.`;
+      return tl('{0} is up {1}% on this point last month.', name(insight.categoryId), insight.pct);
     case 'category-down':
-      return `${name(insight.categoryId)} is down ${insight.pct}% on this point last month.`;
+      return tl(
+        '{0} is down {1}% on this point last month.',
+        name(insight.categoryId),
+        insight.pct,
+      );
     case 'largest':
-      return `Biggest this month: ${insight.tx.merchant}, ${money(insight.tx.amountMinor)}.`;
+      return tl(
+        'Biggest this month: {0}, {1}.',
+        insight.tx.merchant,
+        money(insight.tx.amountMinor),
+      );
     case 'upcoming':
-      return `${insight.merchant} is due ${fmtDate(insight.date)}.`;
+      return tl('{0} is due {1}.', insight.merchant, fmtDate(insight.date));
     case 'quiet-days':
-      return `${insight.days} days this month with nothing spent.`;
+      return tl('{0} days this month with nothing spent.', insight.days);
   }
 }

@@ -1,6 +1,7 @@
 import { normalizeMerchantKey } from './categoriser';
 import { diffDays, monthBounds, monthKey, shiftMonthKey } from './dates';
 import type { CategoryId, ISODate, PaymentMethod, Transaction } from './types';
+import { tl } from './i18n';
 
 /** A merchant's page (Drop 12): its whole history with a few plain facts, after Apple Card. */
 
@@ -61,7 +62,7 @@ export function merchantStats(
   });
   return {
     key,
-    name: entries[0]!.merchant || 'Untitled',
+    name: entries[0]!.merchant || tl('Untitled'),
     count: entries.length,
     totalMinor,
     averageMinor: Math.round(totalMinor / entries.length),

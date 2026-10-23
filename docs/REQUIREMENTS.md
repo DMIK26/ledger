@@ -390,10 +390,40 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   on first use, like Drop 11's screens. Schema v4 adds a `projects` store; rules, saved reports and
   dismissed nudges are lists in settings; backups carry all of it.
 
-### Later drops (scope agreed, details written when each starts)
+### Drop 13: reach and polish, v1.1.0 (scope approved 22 Oct 2026; details written 23 Oct 2026)
 
-- **Drop 13, reach and polish (v1.1.0)**: Personal and Shop spaces with a simple profit and loss; passkey
-  unlock if it works in an iPhone home-screen app; one-tap backup to Files on iPhone and a weekly file
-  backup on Chrome; password-protected backup files (encrypted on the device); app badge for bills due; Telugu and Hindi interface; accessibility and performance pass.
+- **Spaces** (Settings > Spaces, off by default): "Keep a Shop ledger as well", with the shop's name.
+  When on, a switcher on every page chooses Personal, the shop or Both, and is remembered on this device.
+  Each space is its own ledger: entries, money in, transfers and fees, accounts, budgets, recurring
+  payments, udhaar and people, loans, goals, the wishlist, assets and trips belong to the space they were
+  made in. Categories, rules, tags, favourites, settings and the lock are shared. Both shows the two
+  together for reading; what you add there goes to Personal, and budgets and goals ask you to pick a
+  space. Transactions can move selected entries to the other space (one undo). Backups carry every space.
+- **Profit and loss** (Reports, in the Shop or Both): for the period, sales (money in to the shop),
+  spending by category, fees, profit and margin, a row per month when the period is longer than a month,
+  and CSV export. In Both, Personal and the shop side by side.
+- **Password-protected backups** (Settings > Backup): an optional password encrypts the file on the device
+  (AES-GCM, key from PBKDF2-SHA-256 with 600,000 rounds, random salt and IV). Restoring asks for it. The
+  password is never stored; without it the file cannot be opened, and Ledger says so plainly.
+- **One-tap backup**: the weekly reminder's "Back up now" saves the backup at once (share sheet on
+  phones, so "Save to Files" on an iPhone; a download elsewhere).
+- **Folder backup every week** (Chrome on a computer or Android, where the browser can write to a folder):
+  choose a folder once; when a week has passed, opening Ledger writes `ledger-backup-YYYY-MM-DD.json`
+  there by itself, or asks with one tap when the browser wants permission again. Turn it off any time.
+- **App badge** (Settings > Experience, where the device supports it): the number of bills due in the next
+  seven days (recurring payments and card payments) on the app icon, updated whenever Ledger is open. On
+  an iPhone the number only shows if notifications are allowed; Ledger asks and never sends any.
+- **Face ID or fingerprint** (Settings > Screen lock, with a PIN set, where the device offers it): unlock
+  with a passkey made on this device. The PIN always still works. Not yet tried on a real iPhone
+  home-screen app, which Ledger says next to the switch.
+- **Telugu and Hindi interface** (Settings > Appearance > Language: English, తెలుగు, हिन्दी): every
+  screen, message, chart label and date follows; amounts keep Western digits and the rupee sign. Words
+  without a translation show in English. The page's language attribute follows. Translations load on
+  first use and stay available offline.
+- **Polish**: start-up JavaScript back under 160 KB; precache budget for the two languages; axe, phone-size
+  and privacy sweeps run on the new screens and in Telugu and Hindi; version 1.1.0 and a v1.1.0 tag.
+
+### Later (not scheduled)
+
 - Not doing: automatic capture, bank linking, AI chat, maps, push or email alerts, widgets, ads, analytics,
   cloud sync.

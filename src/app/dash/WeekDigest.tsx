@@ -6,6 +6,8 @@ import { addDays, diffDays, fmtDate } from '../../domain/dates';
 import { buildRecap, type RecapPeriod } from '../../domain/recap';
 import { occurrencesBetween } from '../../domain/recurring';
 import { Money } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /**
  * The weekly digest (Drop 12, after Monarch's weekly recap): last week at a glance on the Dashboard,
@@ -40,43 +42,58 @@ export function WeekDigest({
   return (
     <section className="card recap-offer" aria-labelledby="digest-title" data-testid="week-digest">
       <h2 id="digest-title">
-        Last week, {fmtDate(period.start)} to {fmtDate(period.end)}
+        {tl('Last week, {0} to {1}', fmtDate(period.start), fmtDate(period.end))}
       </h2>
       <ul className="digest">
         <li>
-          Spent {m(r.totalMinor)}
-          {r.changePct === null
-            ? '.'
-            : r.changePct === 0
-              ? ', the same as the week before.'
-              : `, ${Math.abs(r.changePct)}% ${r.changePct > 0 ? 'more' : 'less'} than the week before.`}
+          {tr(
+            'Spent {0}{1}',
+            m(r.totalMinor),
+            r.changePct === null
+              ? '.'
+              : r.changePct === 0
+                ? tl(', the same as the week before.')
+                : tl(
+                    ', {0}% {1} than the week before.',
+                    Math.abs(r.changePct),
+                    r.changePct > 0 ? tl('more') : tl('less'),
+                  ),
+          )}
         </li>
         {r.topCategory && (
           <li>
-            Most on {categoryById(categories, r.topCategory.categoryId)?.name ?? 'Other'}:{' '}
-            {m(r.topCategory.totalMinor)}.
+            {tr(
+              'Most on {0}: {1}.',
+              categoryById(categories, r.topCategory.categoryId)?.name ?? tl('Other'),
+              m(r.topCategory.totalMinor),
+            )}
           </li>
         )}
         {r.biggest && (
           <li>
-            Biggest: {r.biggest.merchant}, {m(r.biggest.amountMinor)} on {fmtDate(r.biggest.date)}.
+            {tr(
+              'Biggest: {0}, {1} on {2}.',
+              r.biggest.merchant,
+              m(r.biggest.amountMinor),
+              fmtDate(r.biggest.date),
+            )}
           </li>
         )}
         <li>
           {r.quietDays === 0
-            ? 'Something spent every day.'
+            ? tl('Something spent every day.')
             : r.quietDays === 1
-              ? '1 day with nothing spent.'
-              : `${r.quietDays} days with nothing spent.`}
+              ? tl('1 day with nothing spent.')
+              : tl('{0} days with nothing spent.', r.quietDays)}
         </li>
         <li>
           {bills.length === 0 ? (
-            'No bills due the rest of this week.'
+            tl('No bills due the rest of this week.')
           ) : (
             <>
               {bills.length === 1
-                ? `${bills[0]!.item.merchant} is due by Sunday`
-                : `${bills.length} bills due by Sunday`}
+                ? tl('{0} is due by Sunday', bills[0]!.item.merchant)
+                : tl('{0} bills due by Sunday', bills.length)}
               : {m(billsMinor)}.
             </>
           )}
@@ -84,10 +101,10 @@ export function WeekDigest({
       </ul>
       <div className="btn-row">
         <button type="button" className="btn btn-primary" onClick={onOpen}>
-          Open the recap
+          {tl('Open the recap')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Got it
+          {tl('Got it')}
         </button>
       </div>
     </section>

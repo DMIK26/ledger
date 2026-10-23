@@ -4,13 +4,14 @@ import { Money, usePrivacy } from '../app/Money';
 import { useLedger } from '../data/store';
 import { lastMonths, monthSeries } from '../domain/aggregates';
 import { budgetsForMonth, budgetStatus } from '../domain/budgets';
-import { fmtDate, monthKey, monthLabel, monthRangeLabel, shiftMonthKey, todayISO } from '../domain/dates';
+import { fmtDate, monthKey, monthLabel, monthRangeLabel, monthShortLabel, shiftMonthKey, todayISO } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { navSummary } from '../domain/navSummary';
 import { cardsDueSoon, cashFlow } from '../domain/accounts';
 import { PIN_KIND_LABEL } from '../domain/pins';
 import { useRoving } from './roving';
 import { useScopedTransactions, useView, useViewMonth } from './view';
+import { tl } from '../domain/i18n';
 
 /** Closes a popover on Escape or a click outside it. */
 function useDismiss(open: boolean, close: () => void, root: React.RefObject<HTMLElement | null>) {
@@ -61,7 +62,7 @@ export function MonthSwitcher() {
   const go = (m: string) => {
     setMonth(m);
     setOpen(false);
-    announce(`Showing ${monthLabel(m)}.`);
+    announce(tl('Showing {0}.', monthLabel(m)));
   };
 
   return (
@@ -69,7 +70,7 @@ export function MonthSwitcher() {
       <button
         type="button"
         className="btn btn-ghost btn-icon"
-        aria-label="Previous month"
+        aria-label={tl('Previous month')}
         disabled={month <= months[0]!}
         onClick={() => go(shift(month, -1))}
       >
@@ -91,23 +92,23 @@ export function MonthSwitcher() {
       <button
         type="button"
         className="btn btn-ghost btn-icon"
-        aria-label="Next month"
+        aria-label={tl('Next month')}
         disabled={month >= thisMonth}
         onClick={() => go(shift(month, 1))}
       >
         <span aria-hidden="true">›</span>
       </button>
       {open && (
-        <div className="popover month-pop" role="group" aria-label="Choose a month">
+        <div className="popover month-pop" role="group" aria-label={tl('Choose a month')}>
           <ul className="month-list" data-roving-group="">
             {series.map((p, i) => {
               const b = budgetsForMonth(budgets, p.month).overall;
               const mood = b === null ? 'none' : budgetStatus(p.totalMinor, b).kind;
               const moodText = {
-                none: 'no budget',
-                under: 'within budget',
-                near: 'close to budget',
-                over: 'over budget',
+                none: tl('no budget'),
+                under: tl('within budget'),
+                near: tl('close to budget'),
+                over: tl('over budget'),
               }[mood];
               const rv = roving.props(i);
               return (
@@ -120,7 +121,7 @@ export function MonthSwitcher() {
                     {...rv}
                     onClick={() => go(p.month)}
                   >
-                    <span className="month-name">{monthLabel(p.month).slice(0, 3)}</span>
+                    <span className="month-name">{monthShortLabel(p.month)}</span>
                     <span className="mini-bar" aria-hidden="true">
                       <span style={{ width: `${(p.totalMinor / max) * 100}%` }} />
                     </span>
@@ -132,8 +133,7 @@ export function MonthSwitcher() {
           </ul>
           {month !== thisMonth && (
             <button type="button" className="btn btn-ghost" onClick={() => go(thisMonth)}>
-              Back to this month
-            </button>
+              {tl('Back to this month')}</button>
           )}
         </div>
       )}
@@ -151,15 +151,15 @@ export function PinBar() {
   if (pins.length === 0) return null;
   const total = shown.reduce((s, t) => s + t.amountMinor, 0);
   return (
-    <div className="pin-bar" role="region" aria-label="Pinned" data-testid="pin-bar">
-      <span className="small muted">Showing only</span>
+    <div className="pin-bar" role="region" aria-label={tl('Pinned')} data-testid="pin-bar">
+      <span className="small muted">{tl('Showing only')}</span>
       <ul className="chips">
         {pins.map((p) => (
           <li key={`${p.kind}:${p.id}`}>
             <button
               type="button"
               className="chip pin-chip"
-              aria-label={`Unpin ${PIN_KIND_LABEL[p.kind].toLowerCase()} ${p.label}`}
+              aria-label={tl('Unpin {0} {1}', PIN_KIND_LABEL[p.kind].toLowerCase(), p.label)}
               onClick={() => removePin(p)}
             >
               {p.label}
@@ -169,12 +169,11 @@ export function PinBar() {
         ))}
       </ul>
       <span className="small muted pin-total">
-        {shown.length === 1 ? '1 entry' : `${shown.length} entries`},{' '}
+        {shown.length === 1 ? tl('1 entry') : tl('{0} entries', shown.length)},{' '}
         <Money minor={total} currency={currency} />
       </span>
       <button type="button" className="btn btn-ghost" onClick={clearPins}>
-        Clear
-      </button>
+        {tl('Clear')}</button>
     </div>
   );
 }
@@ -210,17 +209,17 @@ export function UndoControls() {
         className="btn btn-ghost"
         disabled={!canUndo}
         onClick={() => void undo()}
-        title={undoLabel ? `Undo: ${undoLabel}` : 'Undo'}
+        title={undoLabel ? tl('Undo: {0}', undoLabel) : tl('Undo')}
       >
         <Icon name="undo" />
-        <span className="undo-text">Undo</span>
+        <span className="undo-text">{tl('Undo')}</span>
       </button>
       {canRedo && (
         <button
           type="button"
           className="btn btn-ghost btn-icon"
-          aria-label={redoLabel ? `Redo: ${redoLabel}` : 'Redo'}
-          title={redoLabel ? `Redo: ${redoLabel}` : 'Redo'}
+          aria-label={redoLabel ? tl('Redo: {0}', redoLabel) : tl('Redo')}
+          title={redoLabel ? tl('Redo: {0}', redoLabel) : tl('Redo')}
           onClick={() => void redo()}
         >
           <Icon name="redo" />
@@ -237,12 +236,12 @@ export function UndoControls() {
           <span className="history-icon" aria-hidden="true">
             <Icon name="history" />
           </span>
-          <span className="history-text">History</span>
+          <span className="history-text">{tl('History')}</span>
         </button>
       )}
       {open && (
-        <div className="popover history-pop" role="group" aria-label="Recent changes">
-          <p className="small muted">Undo back to before:</p>
+        <div className="popover history-pop" role="group" aria-label={tl('Recent changes')}>
+          <p className="small muted">{tl('Undo back to before:')}</p>
           <ul className="chips history-chips">
             {history.map((label, i) => (
               <li key={`${i}-${label}`}>
@@ -291,37 +290,35 @@ export function useNavInfo() {
   const label = monthLabel(monthKey(today));
   return {
     badges: {
-      '/transactions': s.unsure > 0 ? { count: s.unsure, text: `${s.unsure} unsure` } : null,
+      '/transactions': s.unsure > 0 ? { count: s.unsure, text: tl('{0} unsure', s.unsure) } : null,
       '/budgets':
         s.overCategories > 0
-          ? { count: s.overCategories, text: `${s.overCategories} over budget` }
+          ? { count: s.overCategories, text: tl('{0} over budget', s.overCategories) }
           : null,
-      '/recurring': s.dueSoon > 0 ? { count: s.dueSoon, text: `${s.dueSoon} due this week` } : null,
+      '/recurring': s.dueSoon > 0 ? { count: s.dueSoon, text: tl('{0} due this week', s.dueSoon) } : null,
       '/money':
         cardsDue > 0
-          ? { count: cardsDue, text: `${cardsDue} card ${cardsDue === 1 ? 'payment' : 'payments'} due` }
+          ? { count: cardsDue, text: tl('{0} card {1} due', cardsDue, cardsDue === 1 ? 'payment' : 'payments') }
           : null,
     } as Record<string, { count: number; text: string } | null>,
     peeks: {
-      '/': `${money(s.monthMinor)} spent in ${label} so far`,
-      '/transactions': `${s.entries === 1 ? '1 entry' : `${s.entries} entries`} in ${label}${
-        s.unsure > 0 ? `, ${s.unsure} with a guessed category` : ''
-      }`,
+      '/': tl('{0} spent in {1} so far', money(s.monthMinor), label),
+      '/transactions': tl('{0} in {1}{2}', s.entries === 1 ? tl('1 entry') : tl('{0} entries', s.entries), label, s.unsure > 0 ? tl(', {0} with a guessed category', s.unsure) : ''),
       '/budgets':
         s.budgetLeftMinor === null
-          ? `No budget for ${label}`
+          ? tl('No budget for {0}', label)
           : s.budgetLeftMinor >= 0
-            ? `${money(s.budgetLeftMinor)} left of this month's budget`
-            : `Over this month's budget by ${money(-s.budgetLeftMinor)}`,
-      '/reports': `${label} so far: ${money(s.monthMinor)}`,
-      '/money': `${money(flow.inMinor)} in, ${money(flow.outMinor)} out in ${label}`,
+            ? tl('{0} left of this month\'s budget', money(s.budgetLeftMinor))
+            : tl('Over this month\'s budget by {0}', money(-s.budgetLeftMinor)),
+      '/reports': tl('{0} so far: {1}', label, money(s.monthMinor)),
+      '/money': tl('{0} in, {1} out in {2}', money(flow.inMinor), money(flow.outMinor), label),
       '/recurring': s.next
-        ? `Next: ${s.next.merchant}, ${money(s.next.amountMinor)} on ${fmtDate(s.next.date)}`
-        : 'Nothing due in the next week',
+        ? tl('Next: {0}, {1} on {2}', s.next.merchant, money(s.next.amountMinor), fmtDate(s.next.date))
+        : tl('Nothing due in the next week'),
       '/settings':
         lastBackupAt > 0
-          ? `Last backup ${fmtDate(todayISO(new Date(lastBackupAt)))}`
-          : 'No backup yet',
+          ? tl('Last backup {0}', fmtDate(todayISO(new Date(lastBackupAt))))
+          : tl('No backup yet'),
     } as Record<string, string>,
   };
 }

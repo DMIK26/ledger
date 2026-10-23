@@ -3,6 +3,7 @@ import { useLedger } from '../../data/store';
 import { calendarWeeks, type CalendarDay } from '../../domain/calendar';
 import {
   addDays,
+  dayShort,
   fmtDate,
   monthBounds,
   monthKey,
@@ -16,23 +17,26 @@ import { Icon } from '../icons';
 import { Money, usePrivacy } from '../Money';
 import { addPath, navigate } from '../router';
 import { TxList } from '../TxList';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** Monday first. */
+const WEEK = [1, 2, 3, 4, 5, 6, 0];
 
 /** What a day holds, in words, for its button's accessible name. */
 function dayLabel(d: CalendarDay, currency: string): string {
   const parts = [fmtDate(d.date)];
   parts.push(
     d.entries > 0
-      ? `${fmtMoney(d.spentMinor, { currency })} spent`
+      ? tl('{0} spent', fmtMoney(d.spentMinor, { currency }))
       : d.noSpend
-        ? 'no spend'
-        : 'nothing logged',
+        ? tl('no spend')
+        : tl('nothing logged'),
   );
   if (d.bills.length)
-    parts.push(d.bills.length === 1 ? '1 bill due' : `${d.bills.length} bills due`);
-  if (d.income.length) parts.push('money in');
-  if (d.cardsDue.length) parts.push('card due');
+    parts.push(d.bills.length === 1 ? tl('1 bill due') : tl('{0} bills due', d.bills.length));
+  if (d.income.length) parts.push(tl('money in'));
+  if (d.cardsDue.length) parts.push(tl('card due'));
   return parts.join(', ');
 }
 
@@ -111,12 +115,12 @@ export function CalendarView() {
             className="btn btn-ghost"
             onClick={() => setMonth(shiftMonthKey(month, -1))}
           >
-            Previous
+            {tl('Previous')}
           </button>
           <div>
             <h2 id="cal-title">{monthLabel(month)}</h2>
             <p className="muted small">
-              <Money minor={monthTotal} currency={currency} /> spent
+              {tr('{0} spent', <Money minor={monthTotal} currency={currency} />)}
             </p>
           </div>
           <button
@@ -124,14 +128,14 @@ export function CalendarView() {
             className="btn btn-ghost"
             onClick={() => setMonth(shiftMonthKey(month, 1))}
           >
-            Next
+            {tl('Next')}
           </button>
         </div>
         <div className="calendar" role="grid" aria-labelledby="cal-title" ref={grid}>
           <div className="cal-row" role="row">
-            {WEEKDAYS.map((w) => (
-              <span key={w} role="columnheader" className="cal-weekday">
-                {w}
+            {WEEK.map((d) => (
+              <span key={d} role="columnheader" className="cal-weekday">
+                {dayShort(d)}
               </span>
             ))}
           </div>
@@ -176,10 +180,13 @@ export function CalendarView() {
           ))}
         </div>
         <p className="muted small cal-key">
-          <span className="cal-mark cal-bill" aria-hidden="true" /> Bill due
-          <span className="cal-mark cal-in" aria-hidden="true" /> Money in
-          <span className="cal-mark cal-card" aria-hidden="true" /> Card due
-          <span className="cal-mark cal-rest" aria-hidden="true" /> No spend
+          {tr(
+            '{0} Bill due{1} Money in{2} Card due{3} No spend',
+            <span className="cal-mark cal-bill" aria-hidden="true" />,
+            <span className="cal-mark cal-in" aria-hidden="true" />,
+            <span className="cal-mark cal-card" aria-hidden="true" />,
+            <span className="cal-mark cal-rest" aria-hidden="true" />,
+          )}
         </p>
       </section>
 
@@ -188,18 +195,20 @@ export function CalendarView() {
           <h2 id="cal-day-title">{fmtDate(selected)}</h2>
           <button type="button" className="btn" onClick={() => navigate(addPath(selected))}>
             <Icon name="plus" />
-            Add for this day
+            {tl('Add for this day')}
           </button>
         </div>
         {entries.length > 0 ? (
           <TxList
-            label={`Entries on ${fmtDate(selected)}`}
+            label={tl('Entries on {0}', fmtDate(selected))}
             transactions={entries}
             onDelete={(id) => void removeTransaction(id)}
           />
         ) : (
           <p className="muted small">
-            {day.noSpend ? 'Marked as a day with no spending.' : 'Nothing logged on this day.'}
+            {day.noSpend
+              ? tl('Marked as a day with no spending.')
+              : tl('Nothing logged on this day.')}
           </p>
         )}
         {(day.bills.length > 0 || day.income.length > 0 || day.cardsDue.length > 0) && (
@@ -208,7 +217,7 @@ export function CalendarView() {
               <li key={`b-${b.id}`} className="money-row">
                 <span className="money-main">
                   <span>{b.merchant}</span>
-                  <span className="muted small">Bill due</span>
+                  <span className="muted small">{tl('Bill due')}</span>
                 </span>
                 <Money minor={b.amountMinor} currency={currency} />
                 <span />
@@ -218,7 +227,7 @@ export function CalendarView() {
               <li key={`i-${f.id}`} className="money-row">
                 <span className="money-main">
                   <span>{f.label}</span>
-                  <span className="muted small">Money in</span>
+                  <span className="muted small">{tl('Money in')}</span>
                 </span>
                 <Money minor={f.amountMinor} currency={currency} />
                 <span />
@@ -228,7 +237,7 @@ export function CalendarView() {
               <li key={`c-${c.id}`} className="money-row">
                 <span className="money-main">
                   <span>{c.name}</span>
-                  <span className="muted small">Card payment due</span>
+                  <span className="muted small">{tl('Card payment due')}</span>
                 </span>
                 <span />
                 <span />

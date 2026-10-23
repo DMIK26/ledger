@@ -1,5 +1,6 @@
 import { normalizeMerchantKey } from './categoriser';
 import type { Category, CategoryId, Subcategory, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Subcategories (Drop 12): one level inside a category. An entry keeps its category and may also name
@@ -50,14 +51,15 @@ export function subcategoryNameProblem(
   ignoreId?: string,
 ): string | null {
   const n = name.trim();
-  if (!n) return 'Give the subcategory a name';
-  if (n.length > MAX_SUBCATEGORY_NAME) return `Keep it under ${MAX_SUBCATEGORY_NAME} characters`;
+  if (!n) return tl('Give the subcategory a name');
+  if (n.length > MAX_SUBCATEGORY_NAME)
+    return tl('Keep it under {0} characters', MAX_SUBCATEGORY_NAME);
   if (
     (category.subcategories ?? []).some(
       (s) => s.id !== ignoreId && s.name.toLowerCase() === n.toLowerCase(),
     )
   )
-    return 'That subcategory is already there';
+    return tl('That subcategory is already there');
   return null;
 }
 
@@ -125,7 +127,7 @@ export function subcategoryBreakdown(
     const id = sub ? sub.id : null;
     const row = rows.get(id) ?? {
       id,
-      name: sub ? sub.name : 'No subcategory',
+      name: sub ? sub.name : tl('No subcategory'),
       totalMinor: 0,
       count: 0,
     };

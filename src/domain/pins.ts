@@ -1,5 +1,6 @@
 import { normalizeMerchantKey } from './categoriser';
 import type { Transaction } from './types';
+import { tl } from './i18n';
 
 export type PinKind = 'category' | 'merchant' | 'method' | 'tag' | 'day';
 
@@ -12,11 +13,21 @@ export interface Pin {
 }
 
 export const PIN_KIND_LABEL: Record<PinKind, string> = {
-  category: 'Category',
-  merchant: 'Merchant',
-  method: 'Paid by',
-  tag: 'Tag',
-  day: 'Day',
+  get category() {
+    return tl('Category');
+  },
+  get merchant() {
+    return tl('Merchant');
+  },
+  get method() {
+    return tl('Paid by');
+  },
+  get tag() {
+    return tl('Tag');
+  },
+  get day() {
+    return tl('Day');
+  },
 };
 
 export const samePin = (a: Pick<Pin, 'kind' | 'id'>, b: Pick<Pin, 'kind' | 'id'>): boolean =>

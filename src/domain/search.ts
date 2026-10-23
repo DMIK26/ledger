@@ -10,6 +10,7 @@ import {
   monthBounds,
   monthKey,
   MONTHS,
+  monthName,
   parseISO,
   shiftMonthKey,
 } from './dates';
@@ -18,6 +19,7 @@ import { lastDays, lastMonthsRange } from './periods';
 import { normalizeTag } from './tags';
 import { taxSectionFromWord } from './tax';
 import type { Category, ISODate, PaymentMethod, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Plain-words search (Drop 12): "food last month over 500 upi". Periods, amounts, methods, categories,
@@ -242,13 +244,13 @@ export function parseSearch(text: string, ctx: SearchContext): SearchQuery {
 
     // Periods.
     if (t === 'today') {
-      setPeriod(today, today, 'Today');
+      setPeriod(today, today, tl('Today'));
       i += 1;
       continue;
     }
     if (t === 'yesterday') {
       const d = addDays(today, -1);
-      setPeriod(d, d, 'Yesterday');
+      setPeriod(d, d, tl('Yesterday'));
       i += 1;
       continue;
     }
@@ -259,13 +261,13 @@ export function parseSearch(text: string, ctx: SearchContext): SearchQuery {
       if (unit === 'week' || unit === 'month' || unit === 'year' || unit === 'fy') {
         if (unit === 'week') {
           const start = addDays(weekStart(today), last ? -7 : 0);
-          setPeriod(start, addDays(start, 6), last ? 'Last week' : 'This week');
+          setPeriod(start, addDays(start, 6), last ? tl('Last week') : tl('This week'));
         } else if (unit === 'month') {
           const b = monthBounds(shiftMonthKey(monthKey(today), last ? -1 : 0));
-          setPeriod(b.start, b.end, last ? 'Last month' : 'This month');
+          setPeriod(b.start, b.end, last ? tl('Last month') : tl('This month'));
         } else if (unit === 'year') {
           const y = last ? year - 1 : year;
-          setPeriod(isoFromYMD(y, 1, 1), isoFromYMD(y, 12, 31), last ? String(y) : 'This year');
+          setPeriod(isoFromYMD(y, 1, 1), isoFromYMD(y, 12, 31), last ? String(y) : tl('This year'));
         } else {
           const now = fyOf(today, ctx.fyStart);
           const fy = last ? fyOf(addDays(now.start, -1), ctx.fyStart) : now;
@@ -283,7 +285,7 @@ export function parseSearch(text: string, ctx: SearchContext): SearchQuery {
           unit === 'month'
             ? lastMonthsRange(n, today)
             : lastDays(unit === 'week' ? 7 * n : n, today);
-        setPeriod(r.start, r.end, `Last ${n} ${n === 1 ? unit : `${unit}s`}`);
+        setPeriod(r.start, r.end, tl('Last {0} {1}', n, n === 1 ? unit : `${unit}s`));
         i += 3;
         continue;
       }
@@ -306,7 +308,7 @@ export function parseSearch(text: string, ctx: SearchContext): SearchQuery {
       }
       const y = isYear(n1) ? Number(n1) : m <= parseISO(today)!.m ? year : year - 1;
       const r = monthRange(y, m);
-      setPeriod(r.start, r.end, `${MONTHS[m - 1]} ${y}`);
+      setPeriod(r.start, r.end, `${monthName(m)} ${y}`);
       i += isYear(n1) ? 2 : 1;
       continue;
     }

@@ -1,15 +1,24 @@
 import type { Category } from './types';
 import { fmtDate, monthLabel } from './dates';
 import { isPrivacyOn } from './money';
+import { tl } from './i18n';
 
 export const STAMPS = ['star', 'check', 'question', 'heart'] as const;
 export type StampKind = (typeof STAMPS)[number];
 
 export const STAMP_LABEL: Record<StampKind, string> = {
-  star: 'Star',
-  check: 'Tick',
-  question: 'Question mark',
-  heart: 'Heart',
+  get star() {
+    return tl('Star');
+  },
+  get check() {
+    return tl('Tick');
+  },
+  get question() {
+    return tl('Question mark');
+  },
+  get heart() {
+    return tl('Heart');
+  },
 };
 
 /**
@@ -47,11 +56,11 @@ export function anchorLabel(
   merchantOf: (txId: string) => string | undefined = () => undefined,
 ): string {
   const a = parseAnchor(anchor);
-  if (!a) return 'Something that is gone';
-  const cat = (id: string) => categories.find((c) => c.id === id)?.name ?? 'a deleted category';
+  if (!a) return tl('Something that is gone');
+  const cat = (id: string) => categories.find((c) => c.id === id)?.name ?? tl('a deleted category');
   switch (a.kind) {
     case 'tx':
-      return merchantOf(a.id) ?? 'A deleted entry';
+      return merchantOf(a.id) ?? tl('A deleted entry');
     case 'category':
       return cat(a.id);
     case 'month':
@@ -59,9 +68,9 @@ export function anchorLabel(
     case 'day':
       return fmtDate(a.id);
     case 'budget':
-      return a.id === 'overall' ? 'Monthly budget' : `${cat(a.id)} budget`;
+      return a.id === 'overall' ? tl('Monthly budget') : tl('{0} budget', cat(a.id));
     default:
-      return 'A recurring payment';
+      return tl('A recurring payment');
   }
 }
 

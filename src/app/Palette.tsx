@@ -6,30 +6,31 @@ import { lastMonth, lastWeek } from '../domain/recap';
 import { useUi } from '../kit/ui';
 import { Icon } from './icons';
 import { addPath, navigate } from './router';
+import { msg, tl } from '../domain/i18n';
 
 interface Command extends PaletteItem {
   run: () => void;
 }
 
 const GO: Array<[string, string, string?]> = [
-  ['Dashboard', '/', 'home overview'],
-  ['Transactions', '/transactions', 'entries list'],
-  ['Calendar', '/transactions?view=calendar', 'month days bills'],
-  ['Review unsure entries', '/transactions?view=review', 'check categories'],
-  ['Trash', '/transactions?view=trash', 'deleted restore'],
-  ['Warranties', '/transactions?view=warranties', 'guarantee receipt repair'],
-  ['Money', '/money', 'accounts income cash flow net worth'],
-  ['Udhaar', '/money?view=udhaar', 'lent borrowed owe people splits'],
-  ['Loans', '/money?view=loans', 'emi'],
-  ['Budgets', '/budgets', 'plan limits'],
-  ['Goals and funds', '/budgets?view=goals', 'save saving sinking'],
-  ['Wishlist', '/budgets?view=wishlist', 'want wait buy'],
-  ['Trips and projects', '/budgets?view=trips', 'trip project festival holiday travel'],
-  ['Reports', '/reports', 'charts treemap flow compare'],
-  ['Recurring', '/recurring', 'bills subscriptions'],
-  ['Settings', '/settings', 'preferences backup'],
-  ['Activity', '/settings?view=activity', 'history log'],
-  ['Rules', '/settings?view=rules', 'automatic categorise merchant'],
+  [msg('Dashboard'), '/', 'home overview'],
+  [msg('Transactions'), '/transactions', 'entries list'],
+  [msg('Calendar'), '/transactions?view=calendar', 'month days bills'],
+  [msg('Review unsure entries'), '/transactions?view=review', 'check categories'],
+  [msg('Trash'), '/transactions?view=trash', 'deleted restore'],
+  [msg('Warranties'), '/transactions?view=warranties', 'guarantee receipt repair'],
+  [msg('Money'), '/money', 'accounts income cash flow net worth'],
+  [msg('Udhaar'), '/money?view=udhaar', 'lent borrowed owe people splits'],
+  [msg('Loans'), '/money?view=loans', 'emi'],
+  [msg('Budgets'), '/budgets', 'plan limits'],
+  [msg('Goals and funds'), '/budgets?view=goals', 'save saving sinking'],
+  [msg('Wishlist'), '/budgets?view=wishlist', 'want wait buy'],
+  [msg('Trips and projects'), '/budgets?view=trips', 'trip project festival holiday travel'],
+  [msg('Reports'), '/reports', 'charts treemap flow compare'],
+  [msg('Recurring'), '/recurring', 'bills subscriptions'],
+  [msg('Settings'), '/settings', 'preferences backup'],
+  [msg('Activity'), '/settings?view=activity', 'history log'],
+  [msg('Rules'), '/settings?view=rules', 'automatic categorise merchant'],
 ];
 
 /**
@@ -52,6 +53,9 @@ export function Palette() {
   const undo = useLedger((s) => s.undo);
   const redo = useLedger((s) => s.redo);
   const setSetting = useLedger((s) => s.setSetting);
+  const spacesOn = useLedger((s) => s.settings.spacesOn);
+  const space = useLedger((s) => s.settings.space);
+  const shopName = tl(useLedger((s) => s.settings.shopName) || 'Shop');
   const ref = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -74,25 +78,26 @@ export function Palette() {
 
   const commands = useMemo<Command[]>(() => {
     const today = todayISO();
+    // Keywords stay English, with the English name too, so typing in English finds things in any language.
     const list: Command[] = GO.map(([label, to, keywords]) => ({
       id: `go:${to}`,
-      label,
-      group: 'Go to',
-      keywords,
+      label: tl(label),
+      group: tl('Go to'),
+      keywords: `${label} ${keywords ?? ''}`,
       run: () => navigate(to),
     }));
     list.push(
       {
         id: 'add',
-        label: 'Add expense',
-        group: 'Do',
+        label: tl('Add expense'),
+        group: tl('Do'),
         keywords: 'new entry spend log',
         run: () => navigate(addPath()),
       },
       {
         id: 'privacy',
-        label: privacy ? 'Show amounts' : 'Hide amounts',
-        group: 'Do',
+        label: privacy ? tl('Show amounts') : tl('Hide amounts'),
+        group: tl('Do'),
         keywords: 'privacy mode mask',
         run: () => void setSetting('privacy', !privacy),
       },
@@ -101,29 +106,33 @@ export function Palette() {
         .map((t) => ({
           id: `theme:${t}`,
           label:
-            t === 'system' ? 'Match the system theme' : `${t === 'light' ? 'Light' : 'Dark'} theme`,
-          group: 'Do',
+            t === 'system'
+              ? tl('Match the system theme')
+              : t === 'light'
+                ? tl('Light theme')
+                : tl('Dark theme'),
+          group: tl('Do'),
           keywords: 'theme appearance colour',
           run: () => void setSetting('theme', t),
         })),
       {
         id: 'recap:month',
-        label: "Open last month's recap",
-        group: 'Do',
+        label: tl("Open last month's recap"),
+        group: tl('Do'),
         keywords: 'story recap wrapped summary',
         run: () => openRecap(lastMonth(today)),
       },
       {
         id: 'recap:week',
-        label: "Open last week's recap",
-        group: 'Do',
+        label: tl("Open last week's recap"),
+        group: tl('Do'),
         keywords: 'story recap summary',
         run: () => openRecap(lastWeek(today)),
       },
       {
         id: 'customise',
-        label: 'Customise the Dashboard',
-        group: 'Do',
+        label: tl('Customise the Dashboard'),
+        group: tl('Do'),
         keywords: 'layout cards reorder hide',
         run: () => {
           navigate('/');
@@ -131,19 +140,33 @@ export function Palette() {
         },
       },
     );
+    if (spacesOn)
+      for (const [id, label] of [
+        ['personal', tl('Show Personal')],
+        ['shop', tl('Show {0}', shopName)],
+        ['both', tl('Show both ledgers')],
+      ] as const)
+        if (id !== space)
+          list.push({
+            id: `space:${id}`,
+            label,
+            group: tl('Do'),
+            keywords: 'space ledger shop business personal switch',
+            run: () => void setSetting('space', id),
+          });
     if (canUndo)
       list.push({
         id: 'undo',
-        label: `Undo: ${undoLabel ?? 'last step'}`,
-        group: 'Do',
+        label: tl('Undo: {0}', undoLabel ?? tl('last step')),
+        group: tl('Do'),
         keywords: 'undo back',
         run: () => void undo(),
       });
     if (canRedo)
       list.push({
         id: 'redo',
-        label: `Redo: ${redoLabel ?? 'last step'}`,
-        group: 'Do',
+        label: tl('Redo: {0}', redoLabel ?? tl('last step')),
+        group: tl('Do'),
         keywords: 'redo again',
         run: () => void redo(),
       });
@@ -160,14 +183,17 @@ export function Palette() {
     redo,
     openRecap,
     setCustomising,
+    spacesOn,
+    space,
+    shopName,
   ]);
 
   const results = useMemo<Command[]>(() => {
     const ranked = rankItems(commands, query);
     const merchants = merchantMatches(transactions, query, 5).map((m) => ({
       id: `m:${m.key}`,
-      label: `${m.name}, ${m.count === 1 ? '1 entry' : `${m.count} entries`}`,
-      group: 'Merchant',
+      label: `${m.name}, ${m.count === 1 ? tl('1 entry') : tl('{0} entries', m.count)}`,
+      group: tl('Merchant'),
       run: () => navigate(`/merchant?key=${encodeURIComponent(m.key)}`),
     }));
     const text = query.trim();
@@ -175,8 +201,8 @@ export function Palette() {
       ? [
           {
             id: 'search',
-            label: `Search entries for “${text}”`,
-            group: 'Search',
+            label: tl('Search entries for “{0}”', text),
+            group: tl('Search'),
             run: () => navigate(`/transactions?q=${encodeURIComponent(text)}`),
           },
         ]
@@ -215,7 +241,7 @@ export function Palette() {
     <dialog
       ref={ref}
       className="palette"
-      aria-label="Go to or do"
+      aria-label={tl('Go to or do')}
       onClose={() => setPalette(false)}
       onCancel={(e) => {
         e.preventDefault();
@@ -236,8 +262,8 @@ export function Palette() {
             aria-controls="palette-list"
             aria-autocomplete="list"
             aria-activedescendant={current ? `pal-${current.id}` : undefined}
-            aria-label="Search pages, actions and merchants"
-            placeholder="Go to, do, find a merchant or search"
+            aria-label={tl('Search pages, actions and merchants')}
+            placeholder={tl('Go to, do, find a merchant or search')}
             autoComplete="off"
             spellCheck={false}
             value={query}
@@ -248,10 +274,10 @@ export function Palette() {
             onKeyDown={onKeyDown}
           />
         </div>
-        <ul id="palette-list" className="palette-list" role="listbox" aria-label="Results">
+        <ul id="palette-list" className="palette-list" role="listbox" aria-label={tl('Results')}>
           {results.length === 0 && (
             <li className="muted small palette-empty" role="presentation">
-              Nothing matches. Try a page name, “add”, “undo” or a merchant.
+              {tl('Nothing matches. Try a page name, “add”, “undo” or a merchant.')}
             </li>
           )}
           {results.map((c, i) => (
@@ -270,7 +296,7 @@ export function Palette() {
           ))}
         </ul>
         <p className="muted small palette-hint">
-          Arrow keys to move, Enter to choose, Escape to close.
+          {tl('Arrow keys to move, Enter to choose, Escape to close.')}
         </p>
       </div>
     </dialog>

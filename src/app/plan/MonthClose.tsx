@@ -7,6 +7,8 @@ import { MAX_NOTE_LENGTH } from '../../domain/notes';
 import { monthReview, monthToClose } from '../../domain/plan';
 import { Money } from '../Money';
 import { href } from '../router';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 /**
  * Close the month (Drop 10): in the first 7 days of a month, a short look back at the last one with an
@@ -37,43 +39,44 @@ export function MonthCloseCard({ today }: { today: string }) {
   return (
     <section className="card month-close" aria-labelledby="close-title" data-testid="month-close">
       <div className="card-head">
-        <h2 id="close-title">Close {label}</h2>
-        <span className="muted small">A minute to look back</span>
+        <h2 id="close-title">{tl('Close {0}', label)}</h2>
+        <span className="muted small">{tl('A minute to look back')}</span>
       </div>
       <dl className="card-facts">
         <div>
-          <dt>Spent</dt>
+          <dt>{tl('Spent')}</dt>
           <dd data-testid="close-spent">
             <Money minor={review.spentMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Against budget</dt>
+          <dt>{tl('Against budget')}</dt>
           <dd>
             {status === null ? (
-              'No budget'
+              tl('No budget')
             ) : status.kind === 'over' ? (
               <span className="status-over">
-                Over by <Money minor={status.overMinor} currency={currency} />
+                {tr('Over by {0}', <Money minor={status.overMinor} currency={currency} />)}
               </span>
             ) : (
-              <>
-                <Money minor={status.leftMinor} currency={currency} /> under
-              </>
+              <>{tr('{0} under', <Money minor={status.leftMinor} currency={currency} />)}</>
             )}
           </dd>
         </div>
         <div>
-          <dt>In and out</dt>
+          <dt>{tl('In and out')}</dt>
           <dd>
-            <Money minor={review.inMinor} currency={currency} /> in,{' '}
-            <Money minor={review.outMinor} currency={currency} /> out
+            {tr(
+              '{0} in, {1} out',
+              <Money minor={review.inMinor} currency={currency} />,
+              <Money minor={review.outMinor} currency={currency} />,
+            )}
           </dd>
         </div>
         <div>
-          <dt>Top category</dt>
+          <dt>{tl('Top category')}</dt>
           <dd>
-            {top ? top.name : 'None'}
+            {top ? top.name : tl('None')}
             {review.top && (
               <>
                 , <Money minor={review.top.totalMinor} currency={currency} />
@@ -83,28 +86,34 @@ export function MonthCloseCard({ today }: { today: string }) {
         </div>
       </dl>
       <p className="muted small">
-        {review.entries === 1 ? '1 entry' : `${review.entries} entries`}
+        {review.entries === 1 ? tl('1 entry') : tl('{0} entries', review.entries)}
         {review.changePct !== null &&
           (review.changePct === 0
-            ? ', the same as the month before'
-            : `, ${Math.abs(review.changePct)}% ${review.changePct > 0 ? 'more' : 'less'} than the month before`)}
+            ? tl(', the same as the month before')
+            : tl(
+                ', {0}% {1} than the month before',
+                Math.abs(review.changePct),
+                review.changePct > 0 ? tl('more') : tl('less'),
+              ))}
         .
         {review.carriedMinor !== 0 && (
           <>
             {' '}
-            Rollover carries <Money minor={review.carriedMinor} currency={currency} signed /> into
-            this month.
+            {tr(
+              'Rollover carries {0} into this month.',
+              <Money minor={review.carriedMinor} currency={currency} signed />,
+            )}
           </>
         )}
       </p>
       <div className="field">
-        <label htmlFor="close-note">A note for {name} (optional)</label>
+        <label htmlFor="close-note">{tr('A note for {0} (optional)', name)}</label>
         <textarea
           id="close-note"
           className="input"
           rows={2}
           maxLength={MAX_NOTE_LENGTH}
-          placeholder="What went well, what to change"
+          placeholder={tl('What went well, what to change')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
@@ -115,13 +124,13 @@ export function MonthCloseCard({ today }: { today: string }) {
           className="btn btn-primary"
           onClick={() => void closeMonth(month, note)}
         >
-          Close {name}
+          {tr('Close {0}', name)}
         </button>
         <a className="btn btn-ghost" href={href('/budgets')}>
-          Plan this month
+          {tl('Plan this month')}
         </a>
         <button type="button" className="btn btn-ghost" onClick={() => setHidden(true)}>
-          Not now
+          {tl('Not now')}
         </button>
       </div>
     </section>

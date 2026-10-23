@@ -17,8 +17,8 @@ always the source of truth.
 | 9. The whole money picture (done and published, 22 Oct 2026) | Income, accounts, transfers, cards, udhaar, loans, foreign currency | Balances reconcile; transfers never count as spending |
 | 10. Plan ahead (done and published, 22 Oct 2026) | Safe to spend, budget types, forecast, pacing and at-risk flags, rollover, plan reset, goals and funds, wishlist, net worth, close the month | Daily allowance rolls over correctly across a month; net worth adds up from its parts |
 | 11. Interactive (done and published, 22 Oct 2026) | Calendar view, command palette, review mode and learning rule, scrubbing, guess-first, treemap, money flow, compare modes, recap, splits, custom dashboard, sheet snap points, swipe rows, range select, columns, entry history, sketchbook, wry one-liners | Every gesture has a keyboard path; privacy holds in shared images |
-| 12. Insight (done, 23 Oct 2026; publish with GitHub Desktop) | Search, rules editor, nudges, merchant pages, trips, digest, subcategories, tax summary, spent for whom, warranties | Search phrases tested; subcategories roll up in every chart |
-| 13. Reach and polish (v1.1.0) | Spaces, passkey unlock, backups (also password-protected), badge, Telugu and Hindi interface, audits | Tag v1.1.0 |
+| 12. Insight (done and published, 23 Oct 2026) | Search, rules editor, nudges, merchant pages, trips, digest, subcategories, tax summary, spent for whom, warranties | Search phrases tested; subcategories roll up in every chart |
+| 13. Reach and polish (done, 23 Oct 2026; publish and tag v1.1.0 with GitHub Desktop) | Spaces with profit and loss, passkey unlock, password-protected, one-tap and weekly folder backups, app badge, Telugu and Hindi interface, audits | Every text has a Telugu and Hindi translation (test); start-up JavaScript under 160 KB; sweeps pass in all three languages; tag v1.1.0 |
 
 ## Working rules
 

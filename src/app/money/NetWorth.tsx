@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useLedger } from '../../data/store';
-import { fmtDate, monthLabel, parseISO, todayISO } from '../../domain/dates';
+import { fmtDate, monthLabel, monthShortLabel, parseISO, todayISO } from '../../domain/dates';
 import { fmtMoney } from '../../domain/money';
 import {
   ASSET_KIND_LABEL,
@@ -16,6 +16,7 @@ import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money, usePrivacy } from '../Money';
 import { useMoneyData } from './shared';
+import { tl } from '../../domain/i18n';
 
 function AssetForm({ editing, onDone }: { editing?: Asset; onDone: () => void }) {
   const saveAsset = useLedger((s) => s.saveAsset);
@@ -26,9 +27,10 @@ function AssetForm({ editing, onDone }: { editing?: Asset; onDone: () => void })
   const [error, setError] = useState<string | null>(null);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError('Give it a name, like “Gold coins” or “SBI FD”');
-    if (!editing && (value === null || value < 0)) return setError('Enter what it is worth now');
-    if (!parseISO(date)) return setError('Pick a date');
+    if (!name.trim()) return setError(tl('Give it a name, like “Gold coins” or “SBI FD”'));
+    if (!editing && (value === null || value < 0))
+      return setError(tl('Enter what it is worth now'));
+    if (!parseISO(date)) return setError(tl('Pick a date'));
     await saveAsset({ name, kind, valueMinor: value ?? 0, date }, editing?.id);
     onDone();
   };
@@ -37,19 +39,19 @@ function AssetForm({ editing, onDone }: { editing?: Asset; onDone: () => void })
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor={`${prefix}-name`}>Name</label>
+          <label htmlFor={`${prefix}-name`}>{tl('Name')}</label>
           <input
             id={`${prefix}-name`}
             className="input"
             autoComplete="off"
             maxLength={MAX_ASSET_NAME}
-            placeholder="Gold coins"
+            placeholder={tl('Gold coins')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor={`${prefix}-kind`}>Kind</label>
+          <label htmlFor={`${prefix}-kind`}>{tl('Kind')}</label>
           <select
             id={`${prefix}-kind`}
             className="input"
@@ -66,11 +68,11 @@ function AssetForm({ editing, onDone }: { editing?: Asset; onDone: () => void })
         {!editing && (
           <>
             <div className="field">
-              <label htmlFor={`${prefix}-value`}>Worth now</label>
+              <label htmlFor={`${prefix}-value`}>{tl('Worth now')}</label>
               <AmountInput id={`${prefix}-value`} initialMinor={null} onChange={setValue} />
             </div>
             <div className="field">
-              <label htmlFor={`${prefix}-date`}>As of</label>
+              <label htmlFor={`${prefix}-date`}>{tl('As of')}</label>
               <input
                 id={`${prefix}-date`}
                 className="input"
@@ -89,10 +91,10 @@ function AssetForm({ editing, onDone }: { editing?: Asset; onDone: () => void })
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {editing ? 'Save changes' : 'Add asset'}
+          {editing ? tl('Save changes') : tl('Add asset')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -106,19 +108,19 @@ function ValueForm({ asset, onDone }: { asset: Asset; onDone: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (value === null || value < 0) return setError('Enter what it is worth (0 if sold)');
-    if (!parseISO(date)) return setError('Pick a date');
+    if (value === null || value < 0) return setError(tl('Enter what it is worth (0 if sold)'));
+    if (!parseISO(date)) return setError(tl('Pick a date'));
     await setAssetValue(asset.id, value, date);
     onDone();
   };
   return (
     <form className="put-aside" onSubmit={(e) => void submit(e)} noValidate>
       <div className="field">
-        <label htmlFor={`value-${asset.id}`}>Worth now</label>
+        <label htmlFor={`value-${asset.id}`}>{tl('Worth now')}</label>
         <AmountInput id={`value-${asset.id}`} initialMinor={value} onChange={setValue} />
       </div>
       <div className="field">
-        <label htmlFor={`value-date-${asset.id}`}>As of</label>
+        <label htmlFor={`value-date-${asset.id}`}>{tl('As of')}</label>
         <input
           id={`value-date-${asset.id}`}
           className="input"
@@ -134,10 +136,10 @@ function ValueForm({ asset, onDone }: { asset: Asset; onDone: () => void }) {
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          Save value
+          {tl('Save value')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -157,7 +159,7 @@ function AssetRow({ asset }: { asset: Asset }) {
           <span>{asset.name}</span>
           <span className="muted small">
             {ASSET_KIND_LABEL[asset.kind]}
-            {latest ? `, as of ${fmtDate(latest.date)}` : ''}
+            {latest ? tl(', as of {0}', fmtDate(latest.date)) : ''}
           </span>
         </span>
         <Money minor={latest?.valueMinor ?? 0} currency={currency} />
@@ -168,17 +170,17 @@ function AssetRow({ asset }: { asset: Asset }) {
       ) : (
         <div className="btn-row">
           <button type="button" className="btn" onClick={() => setMode('value')}>
-            Update value
+            {tl('Update value')}
           </button>
           <button type="button" className="btn btn-ghost" onClick={() => setMode('edit')}>
-            Edit
+            {tl('Edit')}
           </button>
           <button
             type="button"
             className="btn btn-ghost"
             onClick={() => void deleteAsset(asset.id)}
           >
-            Delete
+            {tl('Delete')}
           </button>
         </div>
       )}
@@ -203,30 +205,30 @@ export function NetWorthCard() {
   const empty = netWorthEmpty(input);
   const max = Math.max(1, ...history.map((p) => Math.abs(p.totalMinor)));
   const parts: Array<[string, number, string]> = [
-    ['Accounts', now.accountsMinor, 'nw-accounts'],
-    ['Assets', now.assetsMinor, 'nw-assets'],
-    ['Owed to you', now.owedToYouMinor, 'nw-owed'],
-    ['Cards owed', -now.cardsMinor, 'nw-cards'],
-    ['You owe', -now.youOweMinor, 'nw-you-owe'],
-    ['Loans left', -now.loansMinor, 'nw-loans'],
+    [tl('Accounts'), now.accountsMinor, 'nw-accounts'],
+    [tl('Assets'), now.assetsMinor, 'nw-assets'],
+    [tl('Owed to you'), now.owedToYouMinor, 'nw-owed'],
+    [tl('Cards owed'), -now.cardsMinor, 'nw-cards'],
+    [tl('You owe'), -now.youOweMinor, 'nw-you-owe'],
+    [tl('Loans left'), -now.loansMinor, 'nw-loans'],
   ];
 
   return (
     <section className="card" aria-labelledby="networth-title">
       <div className="card-head">
-        <h2 id="networth-title">Net worth</h2>
+        <h2 id="networth-title">{tl('Net worth')}</h2>
         {!adding && (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Icon name="plus" />
-            Add asset
+            {tl('Add asset')}
           </button>
         )}
       </div>
       {empty && !adding ? (
         <p className="muted small">
-          Add accounts above, loans and udhaar, and assets such as gold, FDs, mutual funds, stocks,
-          PF or property, and Ledger adds up what you own less what you owe. Asset values are the
-          ones you enter; nothing is fetched online.
+          {tl(
+            'Add accounts above, loans and udhaar, and assets such as gold, FDs, mutual funds, stocks, PF or property, and Ledger adds up what you own less what you owe. Asset values are the ones you enter; nothing is fetched online.',
+          )}
         </p>
       ) : (
         <>
@@ -254,7 +256,7 @@ export function NetWorthCard() {
       {adding && <AssetForm onDone={() => setAdding(false)} />}
       {assets.length > 0 && (
         <>
-          <h3 className="networth-sub">Assets</h3>
+          <h3 className="networth-sub">{tl('Assets')}</h3>
           <ul className="money-list">
             {assets.map((a) => (
               <AssetRow key={a.id} asset={a} />
@@ -264,15 +266,15 @@ export function NetWorthCard() {
       )}
       {history.length > 1 && (
         <>
-          <h3 className="networth-sub">Month ends</h3>
-          <ul className="networth-history" aria-label="Net worth at each month end">
+          <h3 className="networth-sub">{tl('Month ends')}</h3>
+          <ul className="networth-history" aria-label={tl('Net worth at each month end')}>
             {history.map((p) => (
               <li
                 key={p.month}
                 aria-label={`${monthLabel(p.month)}: ${fmtMoney(p.totalMinor, { currency })}`}
               >
                 <span className="cashflow-month" aria-hidden="true">
-                  {monthLabel(p.month).slice(0, 3)}
+                  {monthShortLabel(p.month)}
                 </span>
                 <span className="networth-track" aria-hidden="true">
                   <span

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { useLedger } from '../data/store';
+import { isUndidNotice, useLedger } from '../data/store';
 import { applyUpdate, dismissOfflineReady, usePwaState } from '../pwa/register';
+import { tl } from '../domain/i18n';
 
 export const TOAST_MS = 6000;
 
@@ -27,30 +28,30 @@ export function Toast() {
     <div className="toast-region" role="status" aria-live="polite">
       {pwa.updateReady && (
         <div className="toast">
-          <p>Update ready</p>
+          <p>{tl('Update ready')}</p>
           <button type="button" className="btn" onClick={applyUpdate}>
-            Reload
+            {tl('Reload')}
           </button>
         </div>
       )}
       {pwa.offlineReady && (
         <div className="toast">
-          <p>Ready to work offline</p>
+          <p>{tl('Ready to work offline')}</p>
           <button type="button" className="btn" onClick={dismissOfflineReady}>
-            Close
+            {tl('Close')}
           </button>
         </div>
       )}
       {notice && (
         <div className="toast">
           <p>{notice}</p>
-          {canUndo && !notice.startsWith('Undid') && (
+          {canUndo && !isUndidNotice(notice) && (
             <button type="button" className="btn" onClick={() => void undo()}>
-              Undo
+              {tl('Undo')}
             </button>
           )}
           <button type="button" className="btn" onClick={dismiss}>
-            Close
+            {tl('Close')}
           </button>
         </div>
       )}

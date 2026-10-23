@@ -16,6 +16,8 @@ import { fmtMoney } from '../../domain/money';
 import { AmountInput } from '../AmountInput';
 import { Icon } from '../icons';
 import { Money, usePrivacy } from '../Money';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const EXTRA_STEP = 50_000; // ₹500
 
@@ -38,11 +40,11 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setError('Give the loan a name');
-    if (principal === null || principal <= 0) return setError('Enter the amount borrowed');
-    if (rateBp === null) return setError('Enter the yearly interest rate, like 10.5');
-    if (!validMonths) return setError(`Enter the number of months, 1 to ${MAX_LOAN_MONTHS}`);
-    if (!parseISO(firstDate)) return setError('Pick the date of the first EMI');
+    if (!name.trim()) return setError(tl('Give the loan a name'));
+    if (principal === null || principal <= 0) return setError(tl('Enter the amount borrowed'));
+    if (rateBp === null) return setError(tl('Enter the yearly interest rate, like 10.5'));
+    if (!validMonths) return setError(tl('Enter the number of months, 1 to {0}', MAX_LOAN_MONTHS));
+    if (!parseISO(firstDate)) return setError(tl('Pick the date of the first EMI'));
     const draft: LoanDraft = {
       name,
       lender: lender.trim(),
@@ -60,33 +62,33 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
     <form className="entry-form" onSubmit={(e) => void submit(e)} noValidate>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="loan-name">Name</label>
+          <label htmlFor="loan-name">{tl('Name')}</label>
           <input
             id="loan-name"
             className="input"
             autoComplete="off"
-            placeholder="Bike loan"
+            placeholder={tl('Bike loan')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor="loan-lender">Lender</label>
+          <label htmlFor="loan-lender">{tl('Lender')}</label>
           <input
             id="loan-lender"
             className="input"
             autoComplete="off"
-            placeholder="Bank or person"
+            placeholder={tl('Bank or person')}
             value={lender}
             onChange={(e) => setLender(e.target.value)}
           />
         </div>
         <div className="field">
-          <label htmlFor="loan-principal">Amount borrowed</label>
+          <label htmlFor="loan-principal">{tl('Amount borrowed')}</label>
           <AmountInput id="loan-principal" initialMinor={principal} onChange={setPrincipal} />
         </div>
         <div className="field">
-          <label htmlFor="loan-rate">Interest, % a year</label>
+          <label htmlFor="loan-rate">{tl('Interest, % a year')}</label>
           <input
             id="loan-rate"
             className="input"
@@ -98,7 +100,7 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
           />
         </div>
         <div className="field">
-          <label htmlFor="loan-months">Months</label>
+          <label htmlFor="loan-months">{tl('Months')}</label>
           <input
             id="loan-months"
             className="input"
@@ -110,7 +112,7 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
           />
         </div>
         <div className="field">
-          <label htmlFor="loan-first">First EMI date</label>
+          <label htmlFor="loan-first">{tl('First EMI date')}</label>
           <input
             id="loan-first"
             className="input"
@@ -120,14 +122,16 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
           />
         </div>
         <div className="field">
-          <label htmlFor="loan-emi">EMI from the bank (optional)</label>
+          <label htmlFor="loan-emi">{tl('EMI from the bank (optional)')}</label>
           <AmountInput id="loan-emi" initialMinor={emi} onChange={setEmi} />
         </div>
       </div>
       {worked !== null && (
         <p className="muted small" aria-live="polite" data-testid="loan-emi">
-          EMI works out to {fmtMoney(worked, { currency })} a month. If the bank&rsquo;s EMI
-          differs, type it above and Ledger uses that.
+          {tl(
+            'EMI works out to {0} a month. If the bank’s EMI differs, type it above and Ledger uses that.',
+            fmtMoney(worked, { currency }),
+          )}
         </p>
       )}
       {error && (
@@ -137,10 +141,10 @@ function LoanForm({ editing, onDone }: { editing?: Loan; onDone: () => void }) {
       )}
       <div className="btn-row">
         <button type="submit" className="btn btn-primary">
-          {editing ? 'Save loan' : 'Add loan'}
+          {editing ? tl('Save loan') : tl('Add loan')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Cancel
+          {tl('Cancel')}
         </button>
       </div>
     </form>
@@ -173,51 +177,55 @@ function LoanCard({ loan, today }: { loan: Loan; today: string }) {
           {loan.lender && <span className="muted small"> · {loan.lender}</span>}
         </h3>
         <span className="muted small">
-          {rateText(loan.rateBp)}% a year · {loan.months} months
+          {tl('{0}% a year · {1} months', rateText(loan.rateBp), loan.months)}
         </span>
       </div>
       {!status.repays && (
         <p className="warning" role="alert">
-          This EMI does not cover the interest, so the loan would never end. Check the EMI.
+          {tl('This EMI does not cover the interest, so the loan would never end. Check the EMI.')}
         </p>
       )}
       <dl className="card-facts">
         <div>
-          <dt>EMI</dt>
+          <dt>{tl('EMI')}</dt>
           <dd>
             <Money minor={emi} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Left to repay</dt>
+          <dt>{tl('Left to repay')}</dt>
           <dd data-testid="loan-left">
             <Money minor={status.remainingMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Interest still to pay</dt>
+          <dt>{tl('Interest still to pay')}</dt>
           <dd>
             <Money minor={status.interestLeftMinor} currency={currency} />
           </dd>
         </div>
         <div>
-          <dt>Next EMI</dt>
-          <dd>{status.nextDate ? fmtDate(status.nextDate) : 'None, all paid'}</dd>
+          <dt>{tl('Next EMI')}</dt>
+          <dd>{status.nextDate ? fmtDate(status.nextDate) : tl('None, all paid')}</dd>
         </div>
       </dl>
       <div
         className="loan-progress"
         role="img"
-        aria-label={`${status.paidCount} of ${status.totalCount} EMIs paid`}
+        aria-label={tl('{0} of {1} EMIs paid', status.paidCount, status.totalCount)}
       >
         <span style={{ width: `${pct}%` }} />
       </div>
       <p className="muted small">
-        {status.paidCount} of {status.totalCount} EMIs paid
-        {status.endDate ? `, ends ${fmtDate(status.endDate)}` : ''}.
+        {tl(
+          '{0} of {1} EMIs paid{2}.',
+          status.paidCount,
+          status.totalCount,
+          status.endDate ? tl(', ends {0}', fmtDate(status.endDate)) : '',
+        )}
       </p>
       <div className="field">
-        <label htmlFor={`extra-${loan.id}`}>Pay more each month</label>
+        <label htmlFor={`extra-${loan.id}`}>{tl('Pay more each month')}</label>
         <input
           id={`extra-${loan.id}`}
           type="range"
@@ -226,38 +234,46 @@ function LoanCard({ loan, today }: { loan: Loan; today: string }) {
           max={maxExtra}
           step={EXTRA_STEP}
           value={extra}
-          aria-valuetext={`${money(extra)} more each month`}
+          aria-valuetext={tl('{0} more each month', money(extra))}
           onChange={(e) => setExtra(Number(e.target.value))}
         />
         <p className="small" aria-live="polite" data-testid="loan-prepay">
           {extra === 0 ? (
-            'Slide to see what paying a little more each month does.'
+            tl('Slide to see what paying a little more each month does.')
           ) : (
             <>
-              <Money minor={extra} currency={currency} /> more a month ends it{' '}
-              {effect.monthsSaved === 1 ? '1 month' : `${effect.monthsSaved} months`} sooner
-              {effect.endDate ? ` (${fmtDate(effect.endDate)})` : ''} and saves{' '}
-              <Money minor={effect.interestSavedMinor} currency={currency} /> of interest.
+              {tr(
+                '{0} more a month ends it {1} sooner{2} and saves {3} of interest.',
+                <Money minor={extra} currency={currency} />,
+                effect.monthsSaved === 1 ? tl('1 month') : tl('{0} months', effect.monthsSaved),
+                effect.endDate ? ` (${fmtDate(effect.endDate)})` : '',
+                <Money minor={effect.interestSavedMinor} currency={currency} />,
+              )}
             </>
           )}
         </p>
       </div>
       <details className="loan-schedule">
-        <summary>Schedule</summary>
-        <div className="table-wrap" tabIndex={0} role="region" aria-label={`${loan.name} schedule`}>
+        <summary>{tl('Schedule')}</summary>
+        <div
+          className="table-wrap"
+          tabIndex={0}
+          role="region"
+          aria-label={tl('{0} schedule', loan.name)}
+        >
           <table className="report-table">
             <thead>
               <tr>
                 <th scope="col">#</th>
-                <th scope="col">Date</th>
+                <th scope="col">{tl('Date')}</th>
                 <th scope="col" className="num">
-                  Interest
+                  {tl('Interest')}
                 </th>
                 <th scope="col" className="num">
-                  Principal
+                  {tl('Principal')}
                 </th>
                 <th scope="col" className="num">
-                  Left
+                  {tl('Left')}
                 </th>
               </tr>
             </thead>
@@ -282,16 +298,16 @@ function LoanCard({ loan, today }: { loan: Loan; today: string }) {
         </div>
         {rows.length > 12 && (
           <button type="button" className="btn btn-ghost" onClick={() => setAll((v) => !v)}>
-            {all ? 'Show the first 12' : `Show all ${rows.length}`}
+            {all ? tl('Show the first 12') : tl('Show all {0}', rows.length)}
           </button>
         )}
       </details>
       <div className="btn-row">
         <button type="button" className="btn btn-ghost" onClick={() => setEditing(true)}>
-          Edit
+          {tl('Edit')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => void deleteLoan(loan.id)}>
-          Delete
+          {tl('Delete')}
         </button>
       </div>
     </article>
@@ -306,19 +322,20 @@ export function LoansView() {
   return (
     <section className="card" aria-labelledby="loans-title">
       <div className="card-head">
-        <h2 id="loans-title">Loans and EMIs</h2>
+        <h2 id="loans-title">{tl('Loans and EMIs')}</h2>
         {!adding && (
           <button type="button" className="btn" onClick={() => setAdding(true)}>
             <Icon name="plus" />
-            Add loan
+            {tl('Add loan')}
           </button>
         )}
       </div>
       {adding && <LoanForm onDone={() => setAdding(false)} />}
       {loans.length === 0 && !adding && (
         <p className="muted small">
-          Add a home, bike, education or personal loan to see what is left, the next EMI and what
-          paying a little more would save. Track the EMI itself as a recurring payment.
+          {tl(
+            'Add a home, bike, education or personal loan to see what is left, the next EMI and what paying a little more would save. Track the EMI itself as a recurring payment.',
+          )}
         </p>
       )}
       {loans.map((l) => (

@@ -9,18 +9,19 @@ import {
 import type { Category } from '../../domain/types';
 import { tick } from '../../kit/haptics';
 import { Subcategories } from './Subcategories';
+import { msg, tl } from '../../domain/i18n';
 
 const COLOUR_NAMES = [
-  'Clay',
-  'Sky',
-  'Olive',
-  'Sand',
-  'Rose',
-  'Navy',
-  'Rust',
-  'Lavender',
-  'Teal',
-  'Grey',
+  msg('Clay'),
+  msg('Sky'),
+  msg('Olive'),
+  msg('Sand'),
+  msg('Rose'),
+  msg('Navy'),
+  msg('Rust'),
+  msg('Lavender'),
+  msg('Teal'),
+  msg('Grey'),
 ];
 
 function Row({
@@ -73,7 +74,7 @@ function Row({
       <button
         type="button"
         className="btn btn-ghost btn-icon drag-handle"
-        aria-label={`Move ${c.name}. Drag, or use the up and down arrow keys`}
+        aria-label={tl('Move {0}. Drag, or use the up and down arrow keys', c.name)}
         onPointerDown={onHandleDown}
         onPointerMove={onHandleMove}
         onPointerUp={onHandleUp}
@@ -93,7 +94,7 @@ function Row({
         type="button"
         className="swatch-button"
         style={{ background: c.color }}
-        aria-label={`Colour for ${c.name}`}
+        aria-label={tl('Colour for {0}', c.name)}
         aria-expanded={colours}
         onClick={() => setColours((v) => !v)}
       />
@@ -108,7 +109,7 @@ function Row({
           }}
         >
           <label className="visually-hidden" htmlFor={`cat-name-${c.id}`}>
-            Name
+            {tl('Name')}
           </label>
           <input
             id={`cat-name-${c.id}`}
@@ -121,11 +122,11 @@ function Row({
         </form>
       )}
       <span className="muted small cat-count">
-        {entries === 1 ? '1 entry' : `${entries} entries`}
+        {entries === 1 ? tl('1 entry') : tl('{0} entries', entries)}
       </span>
       {!fixed && (
         <button type="button" className="btn btn-ghost" onClick={() => setDeleting((v) => !v)}>
-          Delete
+          {tl('Delete')}
         </button>
       )}
       {nameError && (
@@ -134,20 +135,24 @@ function Row({
         </p>
       )}
       {colours && (
-        <div className="swatches cat-wide" role="radiogroup" aria-label={`Colour for ${c.name}`}>
+        <div
+          className="swatches cat-wide"
+          role="radiogroup"
+          aria-label={tl('Colour for {0}', c.name)}
+        >
           {CATEGORY_PALETTE.map((color, i) => (
             <button
               key={color}
               type="button"
               role="radio"
               aria-checked={c.color === color}
-              aria-label={COLOUR_NAMES[i] ?? color}
+              aria-label={tl(COLOUR_NAMES[i] ?? color)}
               className="swatch"
               style={{ background: color }}
               onClick={() => void recolorCategory(c.id, color)}
             />
           ))}
-          <span className="muted small">A colour in use swaps with that category.</span>
+          <span className="muted small">{tl('A colour in use swaps with that category.')}</span>
         </div>
       )}
       <Subcategories c={c} />
@@ -155,8 +160,11 @@ function Row({
         <div className="preview cat-wide">
           <label htmlFor={`move-${c.id}`}>
             {entries > 0
-              ? `Move its ${entries === 1 ? 'entry' : `${entries} entries`}, rules and budgets to`
-              : 'Move any rules and budgets to'}
+              ? tl(
+                  'Move its {0}, rules and budgets to',
+                  entries === 1 ? tl('entry') : tl('{0} entries', entries),
+                )
+              : tl('Move any rules and budgets to')}
           </label>
           <div className="btn-row">
             <select
@@ -178,10 +186,10 @@ function Row({
               className="btn btn-primary"
               onClick={() => void deleteCategory(c.id, moveTo)}
             >
-              Delete {c.name}
+              {tl('Delete {0}', c.name)}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => setDeleting(false)}>
-              Cancel
+              {tl('Cancel')}
             </button>
           </div>
         </div>
@@ -227,10 +235,11 @@ export function CategoryManager() {
 
   return (
     <section className="card" aria-labelledby="cats-manager-title">
-      <h2 id="cats-manager-title">Categories</h2>
+      <h2 id="cats-manager-title">{tl('Categories')}</h2>
       <p className="muted small">
-        Drag the handle to reorder. The ten built-in categories keep their names; your own can be
-        renamed or deleted.
+        {tl(
+          'Drag the handle to reorder. The ten built-in categories keep their names; your own can be renamed or deleted.',
+        )}
       </p>
       <ul className="cat-list" ref={list} data-dragging={drag ? '' : undefined}>
         {categories.map((c, i) => (
@@ -265,12 +274,12 @@ export function CategoryManager() {
       </ul>
       <form className="bulk-tag" onSubmit={(e) => void add(e)}>
         <label className="visually-hidden" htmlFor="new-category">
-          New category name
+          {tl('New category name')}
         </label>
         <input
           id="new-category"
           className="input"
-          placeholder="New category"
+          placeholder={tl('New category')}
           maxLength={40}
           value={name}
           onChange={(e) => {
@@ -279,7 +288,7 @@ export function CategoryManager() {
           }}
         />
         <button type="submit" className="btn">
-          Add category
+          {tl('Add category')}
         </button>
       </form>
       {error && (

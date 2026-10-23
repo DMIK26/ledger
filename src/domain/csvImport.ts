@@ -11,6 +11,7 @@ import {
   type PaymentMethod,
   type Transaction,
 } from './types';
+import { tl } from './i18n';
 
 export const CSV_FIELDS = [
   'date',
@@ -204,13 +205,13 @@ export function planCsvImport(
     if (!date) {
       plan.errors.push({
         row: rowNo,
-        message: `Row ${rowNo}: the date "${cell(r, 'date')}" is not readable`,
+        message: tl('Row {0}: the date "{1}" is not readable', rowNo, cell(r, 'date')),
       });
       return;
     }
     const amount = parseCsvAmount(cell(r, 'amount'));
     if (amount === null || amount === 0) {
-      plan.errors.push({ row: rowNo, message: `Row ${rowNo}: no amount` });
+      plan.errors.push({ row: rowNo, message: tl('Row {0}: no amount', rowNo) });
       return;
     }
     if (amount < 0) {

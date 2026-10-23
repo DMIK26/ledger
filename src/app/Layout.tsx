@@ -2,8 +2,9 @@ import { replaceRoute, useBackClose } from '../pwa/back';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLedger } from '../data/store';
 import { AddSheet } from './AddSheet';
+import { useAppBadge } from './appBadge';
 import { Icon, type IconName } from './icons';
-import { LockScreen } from './deferred';
+import { FolderBackupCheck, LockScreen, NotesPanel, SketchToolbar } from './deferred';
 import { usePrivacy } from './Money';
 import { addPath, closeAddPath, href, navigate, type RoutePath } from './router';
 import { Toast } from './Toast';
@@ -13,12 +14,14 @@ import { LiveRegion, MonthSwitcher, PinBar, UndoControls, useNavInfo } from '../
 import { useView } from '../kit/view';
 import { useUi } from '../kit/ui';
 import { useSheetSnap } from '../kit/sheet';
+import { SpaceSwitcher } from './spaces/SpaceSwitcher';
 import { Companion } from '../doodle/Companion';
 import { DoodleLayer } from '../doodle/DoodleLayer';
 import { DoodleDefs } from '../doodle/art';
 import { useIsDesktop } from '../doodle/anchors';
-import { DoodleBurst, NotesPanel, SketchToolbar, useDoodleKeys } from '../doodle/Studio';
+import { DoodleBurst, useDoodleKeys } from '../doodle/bits';
 import { useDoodle } from '../doodle/state';
+import { tl } from '../domain/i18n';
 
 // Opened on first use, so they cost nothing at start-up.
 const Palette = lazy(() => import('./Palette').then((m) => ({ default: m.Palette })));
@@ -33,19 +36,61 @@ interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: 'home' },
-  { path: '/transactions', label: 'Transactions', icon: 'list' },
-  { path: '/money', label: 'Money', icon: 'coins' },
-  { path: '/budgets', label: 'Budgets', icon: 'wallet' },
-  { path: '/reports', label: 'Reports', icon: 'chart' },
-  { path: '/recurring', label: 'Recurring', icon: 'repeat' },
-  { path: '/settings', label: 'Settings', icon: 'gear' },
+  {
+    path: '/',
+    get label() {
+      return tl('Dashboard');
+    },
+    icon: 'home',
+  },
+  {
+    path: '/transactions',
+    get label() {
+      return tl('Transactions');
+    },
+    icon: 'list',
+  },
+  {
+    path: '/money',
+    get label() {
+      return tl('Money');
+    },
+    icon: 'coins',
+  },
+  {
+    path: '/budgets',
+    get label() {
+      return tl('Budgets');
+    },
+    icon: 'wallet',
+  },
+  {
+    path: '/reports',
+    get label() {
+      return tl('Reports');
+    },
+    icon: 'chart',
+  },
+  {
+    path: '/recurring',
+    get label() {
+      return tl('Recurring');
+    },
+    icon: 'repeat',
+  },
+  {
+    path: '/settings',
+    get label() {
+      return tl('Settings');
+    },
+    icon: 'gear',
+  },
 ];
 
 const MORE: RoutePath[] = ['/money', '/budgets', '/recurring', '/settings'];
 
 export const titleFor = (path: RoutePath): string =>
-  path === '/merchant' ? 'Merchant' : (NAV.find((n) => n.path === path)?.label ?? 'Ledger');
+  path === '/merchant' ? tl('Merchant') : (NAV.find((n) => n.path === path)?.label ?? tl('Ledger'));
 
 export const AUTO_LOCK_MS = 30_000;
 
@@ -154,9 +199,9 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
       <button
         type="button"
         className="btn btn-ghost btn-icon"
-        aria-label="Search and commands"
+        aria-label={tl('Search and commands')}
         aria-keyshortcuts="Control+K Meta+K"
-        title="Search and commands (Ctrl+K)"
+        title={tl('Search and commands (Ctrl+K)')}
         onClick={() => setPalette(true)}
       >
         <Icon name="search" />
@@ -168,19 +213,19 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
           className="btn btn-ghost sketch-toggle"
           aria-pressed={sketchOn}
           aria-keyshortcuts="D"
-          title="Sketch on this page (D)"
+          title={tl('Sketch on this page (D)')}
           onClick={toggleSketch}
         >
           <Icon name="edit" />
-          Sketch
+          {tl('Sketch')}
         </button>
       )}
       <button
         type="button"
         className="btn btn-ghost btn-icon"
         aria-pressed={privacy}
-        aria-label="Privacy mode"
-        title={privacy ? 'Show amounts' : 'Hide amounts'}
+        aria-label={tl('Privacy mode')}
+        title={privacy ? tl('Show amounts') : tl('Hide amounts')}
         onClick={() => void setSetting('privacy', !privacy)}
       >
         <Icon name={privacy ? 'eyeOff' : 'eye'} />
@@ -191,7 +236,7 @@ function TopBar({ title, path }: { title: string; path: RoutePath }) {
         onClick={() => navigate(addPath())}
       >
         <Icon name="plus" />
-        Add
+        {tl('Add')}
       </button>
     </header>
   );
@@ -212,10 +257,10 @@ function TabBar({ path }: { path: RoutePath }) {
 
   return (
     <>
-      <nav className="tabbar" aria-label="Main">
+      <nav className="tabbar" aria-label={tl('Main')}>
         <a className="tab" href={href('/')} aria-current={path === '/' ? 'page' : undefined}>
           <Icon name="home" />
-          Dashboard
+          {tl('Dashboard')}
         </a>
         <a
           className="tab"
@@ -223,12 +268,12 @@ function TabBar({ path }: { path: RoutePath }) {
           aria-current={path === '/transactions' ? 'page' : undefined}
         >
           <Icon name="list" />
-          Transactions
+          {tl('Transactions')}
         </a>
         <button
           type="button"
           className="tab-add"
-          aria-label="Add expense"
+          aria-label={tl('Add expense')}
           onClick={() => navigate(addPath())}
         >
           <Icon name="plus" size={24} />
@@ -239,7 +284,7 @@ function TabBar({ path }: { path: RoutePath }) {
           aria-current={path === '/reports' ? 'page' : undefined}
         >
           <Icon name="chart" />
-          Reports
+          {tl('Reports')}
         </a>
         <button
           type="button"
@@ -252,7 +297,7 @@ function TabBar({ path }: { path: RoutePath }) {
           }}
         >
           <Icon name="more" />
-          More
+          {tl('More')}
         </button>
       </nav>
       <dialog
@@ -268,7 +313,7 @@ function TabBar({ path }: { path: RoutePath }) {
       >
         <div className="sheet-body">
           <div {...snap.handleProps} />
-          <h2 id="more-title">More</h2>
+          <h2 id="more-title">{tl('More')}</h2>
           <ul className="sheet-list">
             {NAV.filter((n) => MORE.includes(n.path)).map((n) => (
               <li key={n.path}>
@@ -317,20 +362,26 @@ export function Layout({
   // Mounted from the first opening on, so the palette reopens fast.
   const paletteUsed = useUi((s) => s.paletteUsed);
   const recap = useUi((s) => s.recap);
+  const folderBackup = useLedger((s) => s.settings.folderBackupName !== '');
+  // The sketch tools and the notes list load the first time they open.
+  const sketchOn = useDoodle((s) => s.sketchOn);
+  const notesOpen = useDoodle((s) => s.notesOpen);
   useAutoLock();
+  useAppBadge();
 
   useEffect(() => {
-    document.title = path === '/' ? 'Ledger' : `${title} · Ledger`;
+    document.title = path === '/' ? tl('Ledger') : tl('{0} · Ledger', title);
   }, [path, title]);
 
   if (error) {
     return (
       <main className="state" id="main">
         <div>
-          <h1>Ledger cannot open its storage</h1>
+          <h1>{tl('Ledger cannot open its storage')}</h1>
           <p className="muted">
-            This browser blocked local storage, which usually means a private window. Open Ledger in
-            a normal window to keep your entries.
+            {tl(
+              'This browser blocked local storage, which usually means a private window. Open Ledger in a normal window to keep your entries.',
+            )}
           </p>
           <p className="small muted">{error}</p>
         </div>
@@ -342,8 +393,8 @@ export function Layout({
     return (
       <main className="state" id="main" aria-busy="true">
         <div>
-          <h1>Ledger</h1>
-          <p className="muted">Opening your ledger…</p>
+          <h1>{tl('Ledger')}</h1>
+          <p className="muted">{tl('Opening your ledger…')}</p>
         </div>
       </main>
     );
@@ -366,11 +417,11 @@ export function Layout({
           document.getElementById('main')?.focus();
         }}
       >
-        Skip to content
+        {tl('Skip to content')}
       </a>
       <aside className="sidebar">
-        <p className="wordmark">Ledger</p>
-        <nav aria-label="Sections">
+        <p className="wordmark">{tl('Ledger')}</p>
+        <nav aria-label={tl('Sections')}>
           <ul className="nav-list">
             {NAV.map((n) => {
               const badge = nav.badges[n.path];
@@ -404,18 +455,26 @@ export function Layout({
       <div className="main">
         <TopBar title={title} path={path} />
         <div className="context-bar">
+          <SpaceSwitcher />
           {(path === '/' || path === '/budgets' || path === '/money') && <MonthSwitcher />}
           <PinBar />
         </div>
         <main id="main" tabIndex={-1} className="content">
+          {folderBackup && (
+            <Suspense fallback={null}>
+              <FolderBackupCheck />
+            </Suspense>
+          )}
           {children}
           <DoodleLayer path={path} />
         </main>
       </div>
       <TabBar path={path} />
       <AddSheet open={adding} date={addDate} onClose={() => navigate(closeAddPath())} />
-      <SketchToolbar path={path} />
-      <NotesPanel />
+      <Suspense fallback={null}>
+        {sketchOn && <SketchToolbar path={path} />}
+        {notesOpen && <NotesPanel />}
+      </Suspense>
       <DoodleBurst />
       <DoodleDefs />
       <HoverCard />

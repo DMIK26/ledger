@@ -48,9 +48,25 @@ test.beforeEach(async ({ page }) => {
   await seed(page);
 });
 
-test('no serious or critical accessibility problems on any page', async ({ page }) => {
-  // Every page, each analysed in full.
-  test.setTimeout(150_000);
+/** Switches the interface language from Settings (Drop 13). */
+async function useLanguage(page: Page, language: 'te' | 'hi') {
+  await page.goto('./#/settings');
+  await page.getByTestId(`language-${language}`).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', language);
+}
+
+for (const language of ['en', 'te', 'hi'] as const)
+  test(`no serious or critical accessibility problems on any page (${language})`, async ({
+    page,
+  }, info) => {
+    test.skip(language !== 'en' && info.project.name === 'phone', 'Languages: desktop is enough');
+    // Every page, each analysed in full.
+    test.setTimeout(150_000);
+    if (language !== 'en') await useLanguage(page, language);
+    await axeEveryPage(page);
+  });
+
+async function axeEveryPage(page: Page) {
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);
     await page.getByRole('heading', { level: 1 }).waitFor();
@@ -69,12 +85,22 @@ test('no serious or critical accessibility problems on any page', async ({ page 
       );
     expect(bad, bad.join('\n')).toEqual([]);
   }
-});
+}
 
-for (const width of [360, 390, 430]) {
-  test(`at ${width}px: no sideways scroll, 44px controls, 16px inputs`, async ({ page }, info) => {
+// Every width in English; Telugu and Hindi, whose words run longer, at the narrowest.
+for (const [width, language] of [
+  [360, 'en'],
+  [390, 'en'],
+  [430, 'en'],
+  [360, 'te'],
+  [360, 'hi'],
+] as const) {
+  test(`at ${width}px (${language}): no sideways scroll, 44px controls, 16px inputs`, async ({
+    page,
+  }, info) => {
     test.skip(info.project.name === 'desktop', 'Phone widths');
     test.setTimeout(150_000);
+    if (language !== 'en') await useLanguage(page, language);
     await page.setViewportSize({ width, height: 800 });
     const all: string[] = [];
     for (const hash of PAGES) {

@@ -1,6 +1,7 @@
 import { categoryById } from './categories';
 import { minorToPlain } from './money';
 import type { Category, ISODate, Transaction } from './types';
+import { tl } from './i18n';
 
 /**
  * Tax summary (Drop 12): entries tagged with an income-tax deduction, totalled for a financial year
@@ -22,25 +23,59 @@ export interface TaxSection {
 export const TAX_SECTIONS: TaxSection[] = [
   {
     id: '80C',
-    what: 'PF, PPF, ELSS, life insurance, tuition fees, home loan principal',
+    get what() {
+      return tl('PF, PPF, ELSS, life insurance, tuition fees, home loan principal');
+    },
     limitMinor: 1_50_000_00,
   },
-  { id: '80CCD(1B)', what: 'NPS, over and above 80C', limitMinor: 50_000_00 },
+  {
+    id: '80CCD(1B)',
+    get what() {
+      return tl('NPS, over and above 80C');
+    },
+    limitMinor: 50_000_00,
+  },
   {
     id: '80D',
-    what: 'Health insurance and check-ups',
+    get what() {
+      return tl('Health insurance and check-ups');
+    },
     limitMinor: 25_000_00,
-    note: 'Higher for senior citizens; insurance for parents has its own limit.',
+    get note() {
+      return tl('Higher for senior citizens; insurance for parents has its own limit.');
+    },
   },
-  { id: '80E', what: 'Interest on an education loan', limitMinor: null },
+  {
+    id: '80E',
+    get what() {
+      return tl('Interest on an education loan');
+    },
+    limitMinor: null,
+  },
   {
     id: '80G',
-    what: 'Donations to approved charities',
+    get what() {
+      return tl('Donations to approved charities');
+    },
     limitMinor: null,
-    note: 'Half or all of a donation counts, depending on the charity.',
+    get note() {
+      return tl('Half or all of a donation counts, depending on the charity.');
+    },
   },
-  { id: '24(b)', what: 'Interest on a home loan you live in', limitMinor: 2_00_000_00 },
-  { id: 'Other', what: 'Any other deduction', limitMinor: null },
+  {
+    id: '24(b)',
+    get what() {
+      return tl('Interest on a home loan you live in');
+    },
+    limitMinor: 2_00_000_00,
+  },
+  {
+    id: 'Other',
+    get what() {
+      return tl('Any other deduction');
+    },
+    limitMinor: null,
+  },
 ];
 
 export const taxSectionById = (id: string | undefined): TaxSection | undefined =>

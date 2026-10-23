@@ -1,7 +1,8 @@
 import { categoryById } from './categories';
-import { fmtDate } from './dates';
+import { fmtDate, parseISO } from './dates';
 import { normalizeMerchantKey } from './categoriser';
 import type { Category, ISODate, PaymentMethod, Transaction } from './types';
+import { tl } from './i18n';
 
 export const PAGE_SIZE = 15;
 
@@ -130,10 +131,10 @@ export function groupTransactions(
       label = fmtDate(t.date);
     } else if (by === 'category') {
       key = t.categoryId;
-      label = categoryById(categories, t.categoryId)?.name ?? 'Other';
+      label = categoryById(categories, t.categoryId)?.name ?? tl('Other');
     } else if (by === 'merchant') {
       key = normalizeMerchantKey(t.merchant) || '(none)';
-      label = t.merchant || 'Untitled';
+      label = t.merchant || tl('Untitled');
     } else {
       key = t.method;
       label = t.method;
@@ -160,4 +161,16 @@ export function pageSlice<T>(list: readonly T[], page: number, size = PAGE_SIZE)
 
 export function allTags(list: readonly Transaction[]): string[] {
   return [...new Set(list.flatMap((t) => t.tags))].sort();
+}
+
+/** Filters from the address, as other pages link to Transactions (a category, a date range). */
+export function filtersFromQuery(query: URLSearchParams): Filters {
+  const date = (v: string | null) => (v && parseISO(v) ? v : undefined);
+  const category = query.get('category');
+  return {
+    ...EMPTY_FILTERS,
+    categories: category ? [category] : [],
+    from: date(query.get('from')),
+    to: date(query.get('to')),
+  };
 }

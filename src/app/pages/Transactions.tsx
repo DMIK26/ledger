@@ -1,5 +1,5 @@
 import { LoadSampleButton } from '../SampleData';
-import { EmptyDoodle } from '../../doodle/Studio';
+import { EmptyDoodle } from '../../doodle/bits';
 import {
   lazy,
   Suspense,
@@ -10,9 +10,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { newId, useLedger } from '../../data/store';
+import { newId, useLedger, viewOf } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
-import { fmtDate, parseISO, todayISO } from '../../domain/dates';
+import { fmtDate, todayISO } from '../../domain/dates';
 import { safeText, toCsv } from '../../domain/csv';
 import { exportRows } from '../../domain/csvExport';
 import {
@@ -32,7 +32,7 @@ import {
 } from '../../domain/filters';
 import { CURRENCIES, parseAmountToMinor } from '../../domain/money';
 import { normalizeTag } from '../../domain/tags';
-import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
 import { forWhomNames } from '../../domain/forWhom';
 import type { SearchQuery } from '../../domain/search';
 import { findSubcategory } from '../../domain/subcategories';
@@ -45,6 +45,8 @@ import { QuickAdd } from '../QuickAdd';
 import { ReceiptViewer } from '../ReceiptViewer';
 import { href } from '../router';
 import { TxList } from '../TxList';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 // Loaded on first use, so the list stays quick to open.
 const CalendarView = lazy(() =>
@@ -56,11 +58,21 @@ const WarrantiesView = lazy(() =>
 );
 
 const FLAG_LABEL = {
-  tax: 'Tax deduction',
-  warranty: 'Has a warranty',
-  receipt: 'Has a receipt',
-  split: 'Split',
-  unsure: 'Unsure',
+  get tax() {
+    return tl('Tax deduction');
+  },
+  get warranty() {
+    return tl('Has a warranty');
+  },
+  get receipt() {
+    return tl('Has a receipt');
+  },
+  get split() {
+    return tl('Split');
+  },
+  get unsure() {
+    return tl('Unsure');
+  },
 } as const;
 
 /** What the search understood, as chips (amounts through Money, so privacy mode hides them). */
@@ -75,18 +87,16 @@ function SearchChips({ q }: { q: SearchQuery }) {
   if (a)
     chips.push(
       a.kind === 'between' ? (
-        <>
-          {m(a.minor)} to {m(a.to)}
-        </>
+        <>{tr('{0} to {1}', m(a.minor), m(a.to))}</>
       ) : (
         <>
           {
             {
-              over: 'Over',
-              under: 'Under',
-              atLeast: 'At least',
-              atMost: 'Up to',
-              exact: 'Exactly',
+              over: tl('Over'),
+              under: tl('Under'),
+              atLeast: tl('At least'),
+              atMost: tl('Up to'),
+              exact: tl('Exactly'),
             }[a.kind]
           }{' '}
           {m(a.minor)}
@@ -97,14 +107,14 @@ function SearchChips({ q }: { q: SearchQuery }) {
   for (const id of q.subcategoryIds) chips.push(findSubcategory(categories, id)?.sub.name ?? id);
   for (const x of q.methods) chips.push(x);
   for (const t of q.tags) chips.push(`#${t}`);
-  for (const w of q.forWhom) chips.push(w ? `For ${w}` : 'For you');
+  for (const w of q.forWhom) chips.push(w ? tl('For {0}', w) : tl('For you'));
   for (const id of q.projectIds) chips.push(projects.find((p) => p.id === id)?.name ?? id);
-  for (const x of q.taxSections) chips.push(`Tax ${x}`);
+  for (const x of q.taxSections) chips.push(tl('Tax {0}', x));
   for (const f of q.flags) chips.push(FLAG_LABEL[f]);
   for (const w of q.words) chips.push(`“${w}”`);
   return (
     <p className="search-chips" aria-live="polite" data-testid="search-chips">
-      <span className="muted small">Looking for</span>
+      <span className="muted small">{tl('Looking for')}</span>
       {chips.map((c, i) => (
         <span key={i} className="chip">
           {c}
@@ -129,7 +139,7 @@ function SearchBox({ initial, onChange }: { initial: string; onChange: (text: st
   return (
     <form className="search-box" role="search" onSubmit={(e) => e.preventDefault()}>
       <label className="visually-hidden" htmlFor="tx-search">
-        Search entries
+        {tl('Search entries')}
       </label>
       <Icon name="search" />
       <input
@@ -140,7 +150,7 @@ function SearchBox({ initial, onChange }: { initial: string; onChange: (text: st
         autoComplete="off"
         spellCheck={false}
         enterKeyHint="search"
-        placeholder="Search: food last month over 500 upi"
+        placeholder={tl('Search: food last month over 500 upi')}
         onChange={(e) => {
           setHasText(e.target.value !== '');
           onChange(e.target.value);
@@ -156,7 +166,7 @@ function SearchBox({ initial, onChange }: { initial: string; onChange: (text: st
             onChange('');
           }}
         >
-          Clear search
+          {tl('Clear search')}
         </button>
       )}
     </form>
@@ -164,10 +174,30 @@ function SearchBox({ initial, onChange }: { initial: string; onChange: (text: st
 }
 
 const COLUMNS: Array<{ id: string; label: string }> = [
-  { id: 'category', label: 'Category' },
-  { id: 'method', label: 'Method' },
-  { id: 'account', label: 'Account' },
-  { id: 'tags', label: 'Tags' },
+  {
+    id: 'category',
+    get label() {
+      return tl('Category');
+    },
+  },
+  {
+    id: 'method',
+    get label() {
+      return tl('Method');
+    },
+  },
+  {
+    id: 'account',
+    get label() {
+      return tl('Account');
+    },
+  },
+  {
+    id: 'tags',
+    get label() {
+      return tl('Tags');
+    },
+  },
 ];
 
 /** Columns: which parts of each row Transactions shows. Saved on this device. */
@@ -176,9 +206,9 @@ function ColumnsMenu() {
   const setSetting = useLedger((s) => s.setSetting);
   return (
     <details className="columns-menu">
-      <summary className="btn btn-ghost">Columns</summary>
+      <summary className="btn btn-ghost">{tl('Columns')}</summary>
       <fieldset className="columns-panel">
-        <legend className="visually-hidden">Show these columns</legend>
+        <legend className="visually-hidden">{tl('Show these columns')}</legend>
         {COLUMNS.map((c) => (
           <label key={c.id} className="check">
             <input
@@ -202,16 +232,16 @@ function ColumnsMenu() {
 function ViewTabs({ current }: { current: 'list' | 'calendar' | 'review' }) {
   const unsure = useLedger((s) => s.transactions.filter((t) => t.unsure).length);
   const tabs: Array<{ id: typeof current; label: string; to: string }> = [
-    { id: 'list', label: 'List', to: '/transactions' },
-    { id: 'calendar', label: 'Calendar', to: '/transactions?view=calendar' },
+    { id: 'list', label: tl('List'), to: '/transactions' },
+    { id: 'calendar', label: tl('Calendar'), to: '/transactions?view=calendar' },
     {
       id: 'review',
-      label: unsure > 0 ? `Review (${unsure})` : 'Review',
+      label: unsure > 0 ? tl('Review ({0})', unsure) : tl('Review'),
       to: '/transactions?view=review',
     },
   ];
   return (
-    <div className="segmented page-views" role="group" aria-label="Show">
+    <div className="segmented page-views" role="group" aria-label={tl('Show')}>
       {tabs.map((t) => (
         <a
           key={t.id}
@@ -227,18 +257,73 @@ function ViewTabs({ current }: { current: 'list' | 'calendar' | 'review' }) {
 }
 
 const SORTS: Array<{ value: string; label: string; sort: Sort }> = [
-  { value: 'date-desc', label: 'Newest first', sort: { key: 'date', dir: 'desc' } },
-  { value: 'date-asc', label: 'Oldest first', sort: { key: 'date', dir: 'asc' } },
-  { value: 'amount-desc', label: 'Largest first', sort: { key: 'amount', dir: 'desc' } },
-  { value: 'amount-asc', label: 'Smallest first', sort: { key: 'amount', dir: 'asc' } },
-  { value: 'merchant-asc', label: 'Merchant A to Z', sort: { key: 'merchant', dir: 'asc' } },
+  {
+    value: 'date-desc',
+    get label() {
+      return tl('Newest first');
+    },
+    sort: { key: 'date', dir: 'desc' },
+  },
+  {
+    value: 'date-asc',
+    get label() {
+      return tl('Oldest first');
+    },
+    sort: { key: 'date', dir: 'asc' },
+  },
+  {
+    value: 'amount-desc',
+    get label() {
+      return tl('Largest first');
+    },
+    sort: { key: 'amount', dir: 'desc' },
+  },
+  {
+    value: 'amount-asc',
+    get label() {
+      return tl('Smallest first');
+    },
+    sort: { key: 'amount', dir: 'asc' },
+  },
+  {
+    value: 'merchant-asc',
+    get label() {
+      return tl('Merchant A to Z');
+    },
+    sort: { key: 'merchant', dir: 'asc' },
+  },
 ];
 const GROUPS: Array<{ value: GroupBy; label: string }> = [
-  { value: 'none', label: 'No grouping' },
-  { value: 'day', label: 'By day' },
-  { value: 'category', label: 'By category' },
-  { value: 'merchant', label: 'By merchant' },
-  { value: 'method', label: 'By method' },
+  {
+    value: 'none',
+    get label() {
+      return tl('No grouping');
+    },
+  },
+  {
+    value: 'day',
+    get label() {
+      return tl('By day');
+    },
+  },
+  {
+    value: 'category',
+    get label() {
+      return tl('By category');
+    },
+  },
+  {
+    value: 'merchant',
+    get label() {
+      return tl('By merchant');
+    },
+  },
+  {
+    value: 'method',
+    get label() {
+      return tl('By method');
+    },
+  },
 ];
 
 const sortValue = (s: Sort) => `${s.key}-${s.dir}`;
@@ -259,10 +344,10 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
   };
 
   return (
-    <section className="card filter-panel" aria-label="Filters">
+    <section className="card filter-panel" aria-label={tl('Filters')}>
       <div className="form-grid">
         <div className="field">
-          <label htmlFor="f-from">From</label>
+          <label htmlFor="f-from">{tl('From')}</label>
           <input
             id="f-from"
             className="input"
@@ -272,7 +357,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
           />
         </div>
         <div className="field">
-          <label htmlFor="f-to">To</label>
+          <label htmlFor="f-to">{tl('To')}</label>
           <input
             id="f-to"
             className="input"
@@ -282,7 +367,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
           />
         </div>
         <div className="field">
-          <label htmlFor="f-min">Amount at least</label>
+          <label htmlFor="f-min">{tl('Amount at least')}</label>
           <input
             id="f-min"
             className="input"
@@ -297,7 +382,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
           />
         </div>
         <div className="field">
-          <label htmlFor="f-max">Amount at most</label>
+          <label htmlFor="f-max">{tl('Amount at most')}</label>
           <input
             id="f-max"
             className="input"
@@ -313,7 +398,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
         </div>
       </div>
       <fieldset className="facet">
-        <legend>Category</legend>
+        <legend>{tl('Category')}</legend>
         <div className="chips">
           {categories.map((c) => (
             <button
@@ -331,7 +416,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
         </div>
       </fieldset>
       <fieldset className="facet">
-        <legend>Paid by</legend>
+        <legend>{tl('Paid by')}</legend>
         <div className="chips">
           {PAYMENT_METHODS.map((m: PaymentMethod) => (
             <button
@@ -341,7 +426,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
               aria-pressed={filters.methods.includes(m)}
               onClick={() => onChange({ ...filters, methods: toggle(filters.methods, m) })}
             >
-              {m}
+              {methodLabel(m)}
               <span className="count">{counts.methods[m] ?? 0}</span>
             </button>
           ))}
@@ -349,7 +434,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
       </fieldset>
       {tags.length > 0 && (
         <fieldset className="facet">
-          <legend>Tags</legend>
+          <legend>{tl('Tags')}</legend>
           <div className="chips">
             {tags.map((t) => (
               <button
@@ -376,7 +461,7 @@ function FilterPanel({ filters, onChange }: { filters: Filters; onChange: (f: Fi
             onChange(EMPTY_FILTERS);
           }}
         >
-          Clear filters
+          {tl('Clear filters')}
         </button>
       )}
     </section>
@@ -400,6 +485,10 @@ function BulkBar({
   const copyToToday = useLedger((s) => s.copyToToday);
   const saveFavourite = useLedger((s) => s.saveFavourite);
   const setEntriesProject = useLedger((s) => s.setEntriesProject);
+  const moveToSpace = useLedger((s) => s.moveToSpace);
+  const spacesOn = useLedger((s) => s.settings.spacesOn);
+  const view = useLedger((s) => viewOf(s.settings));
+  const shopName = tl(useLedger((s) => s.settings.shopName) || 'Shop');
   const allProjects = useLedger((s) => s.projects);
   const projects = allProjects.filter((p) => !p.archived);
   const transactions = useLedger((s) => s.transactions);
@@ -407,13 +496,13 @@ function BulkBar({
   const single = ids.length === 1 ? transactions.find((t) => t.id === ids[0]) : undefined;
 
   return (
-    <section className="bulk-bar" aria-label="Bulk actions">
+    <section className="bulk-bar" aria-label={tl('Bulk actions')}>
       <p aria-live="polite" data-testid="bulk-total">
-        {ids.length === 1 ? '1 selected' : `${ids.length} selected`},{' '}
+        {ids.length === 1 ? tl('1 selected') : tl('{0} selected', ids.length)},{' '}
         <Money minor={totalMinor} currency={currency} />
       </p>
       <label className="visually-hidden" htmlFor="bulk-category">
-        Move selected to
+        {tl('Move selected to')}
       </label>
       <select
         id="bulk-category"
@@ -423,7 +512,7 @@ function BulkBar({
           if (e.target.value) void bulkSetCategory(ids, e.target.value).then(onDone);
         }}
       >
-        <option value="">Move to…</option>
+        <option value="">{tl('Move to…')}</option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
@@ -433,7 +522,7 @@ function BulkBar({
       {projects.length > 0 && (
         <>
           <label className="visually-hidden" htmlFor="bulk-project">
-            Add selected to a trip or project
+            {tl('Add selected to a trip or project')}
           </label>
           <select
             id="bulk-project"
@@ -444,13 +533,13 @@ function BulkBar({
               if (v) void setEntriesProject(ids, v === 'none' ? null : v).then(onDone);
             }}
           >
-            <option value="">Trip or project…</option>
+            <option value="">{tl('Trip or project…')}</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
             ))}
-            <option value="none">No trip or project</option>
+            <option value="none">{tl('No trip or project')}</option>
           </select>
         </>
       )}
@@ -464,23 +553,41 @@ function BulkBar({
         }}
       >
         <label className="visually-hidden" htmlFor="bulk-tag">
-          Tag to add
+          {tl('Tag to add')}
         </label>
         <input
           id="bulk-tag"
           className="input"
-          placeholder="Add tag"
+          placeholder={tl('Add tag')}
           autoComplete="off"
           value={tag}
           onChange={(e) => setTag(e.target.value)}
         />
         <button type="submit" className="btn">
-          Tag
+          {tl('Tag')}
         </button>
       </form>
+      {spacesOn && view !== 'shop' && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void moveToSpace(ids, 'shop').then(onDone)}
+        >
+          {tl('Move to {0}', shopName)}
+        </button>
+      )}
+      {spacesOn && view !== 'personal' && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void moveToSpace(ids, 'personal').then(onDone)}
+        >
+          {tl('Move to Personal')}
+        </button>
+      )}
       <button type="button" className="btn" onClick={() => void copyToToday(ids).then(onDone)}>
         <Icon name="copy" />
-        Copy to today
+        {tl('Copy to today')}
       </button>
       {single && (
         <button
@@ -489,15 +596,15 @@ function BulkBar({
           onClick={() => void saveFavourite(single).then(onDone)}
         >
           <Icon name="star" />
-          Save as favourite
+          {tl('Save as favourite')}
         </button>
       )}
       <button type="button" className="btn" onClick={() => void bulkDelete(ids).then(onDone)}>
         <Icon name="trash" />
-        Delete
+        {tl('Delete')}
       </button>
       <button type="button" className="btn btn-ghost" onClick={onDone}>
-        Clear selection
+        {tl('Clear selection')}
       </button>
     </section>
   );
@@ -520,7 +627,7 @@ function SavedViews({
   return (
     <div className="saved-views">
       <label className="visually-hidden" htmlFor="view-select">
-        Saved view
+        {tl('Saved view')}
       </label>
       <select
         id="view-select"
@@ -532,7 +639,7 @@ function SavedViews({
           if (v) onApply(v);
         }}
       >
-        <option value="">Saved views</option>
+        <option value="">{tl('Saved views')}</option>
         {views.map((v) => (
           <option key={v.id} value={v.id}>
             {v.name}
@@ -548,7 +655,7 @@ function SavedViews({
             setActiveId('');
           }}
         >
-          Delete view
+          {tl('Delete view')}
         </button>
       )}
       {naming ? (
@@ -566,23 +673,23 @@ function SavedViews({
           }}
         >
           <label className="visually-hidden" htmlFor="view-name">
-            View name
+            {tl('View name')}
           </label>
           <input
             id="view-name"
             className="input"
-            placeholder="Name this view"
+            placeholder={tl('Name this view')}
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <button type="submit" className="btn">
-            Save
+            {tl('Save')}
           </button>
         </form>
       ) : (
         <button type="button" className="btn btn-ghost" onClick={() => setNaming(true)}>
-          Save view
+          {tl('Save view')}
         </button>
       )}
     </div>
@@ -598,21 +705,21 @@ function TrashView() {
   return (
     <>
       <p>
-        <a href={href('/transactions')}>Back to transactions</a>
+        <a href={href('/transactions')}>{tl('Back to transactions')}</a>
       </p>
       {trash.length === 0 ? (
         <section className="card empty">
           <EmptyDoodle art="jar" />
-          <h2>Trash is empty</h2>
-          <p className="muted">Deleted entries stay here for {TRASH_DAYS} days.</p>
+          <h2>{tl('Trash is empty')}</h2>
+          <p className="muted">{tl('Deleted entries stay here for {0} days.', TRASH_DAYS)}</p>
         </section>
       ) : (
         <section className="card" aria-labelledby="trash-title">
-          <h2 id="trash-title">Trash</h2>
+          <h2 id="trash-title">{tl('Trash')}</h2>
           <p className="muted small">
-            Entries are removed for good {TRASH_DAYS} days after deletion.
+            {tl('Entries are removed for good {0} days after deletion.', TRASH_DAYS)}
           </p>
-          <ul className="tx-list" aria-label="Deleted entries">
+          <ul className="tx-list" aria-label={tl('Deleted entries')}>
             {trash.map((item) => {
               const left = Math.max(
                 0,
@@ -621,9 +728,10 @@ function TrashView() {
               return (
                 <li key={item.id} className="trash-row" data-testid="trash-row">
                   <span className="tx-merchant">
-                    <span>{item.tx.merchant || 'Untitled'}</span>
+                    <span>{item.tx.merchant || tl('Untitled')}</span>
                     <span className="tx-raw">
-                      {fmtDate(item.tx.date)} · {left === 1 ? '1 day left' : `${left} days left`}
+                      {fmtDate(item.tx.date)} ·{' '}
+                      {left === 1 ? tl('1 day left') : tl('{0} days left', left)}
                     </span>
                   </span>
                   <Money
@@ -633,14 +741,14 @@ function TrashView() {
                   />
                   <span className="btn-row">
                     <button type="button" className="btn" onClick={() => void restore(item.id)}>
-                      Restore
+                      {tl('Restore')}
                     </button>
                     <button
                       type="button"
                       className="btn btn-ghost"
                       onClick={() => void purge(item.id)}
                     >
-                      Delete for good
+                      {tl('Delete for good')}
                     </button>
                   </span>
                 </li>
@@ -775,15 +883,15 @@ function Ledger({
         <QuickAdd />
         <section className="card empty">
           <EmptyDoodle art="receipt" />
-          <h2>Nothing logged yet</h2>
-          <p className="muted">Every expense you add shows up here, newest first.</p>
+          <h2>{tl('Nothing logged yet')}</h2>
+          <p className="muted">{tl('Every expense you add shows up here, newest first.')}</p>
           <div className="btn-row empty-actions">
             <LoadSampleButton />
           </div>
         </section>
         {trashCount > 0 && (
           <p>
-            <a href={href('/transactions?view=trash')}>Trash ({trashCount})</a>
+            <a href={href('/transactions?view=trash')}>{tl('Trash ({0})', trashCount)}</a>
           </p>
         )}
       </>
@@ -811,10 +919,10 @@ function Ledger({
           onClick={() => setFiltersOpen((o) => !o)}
         >
           <Icon name="filter" />
-          {activeFilters > 0 ? `Filters (${activeFilters})` : 'Filters'}
+          {activeFilters > 0 ? tl('Filters ({0})', activeFilters) : tl('Filters')}
         </button>
         <label className="visually-hidden" htmlFor="sort-select">
-          Sort
+          {tl('Sort')}
         </label>
         <select
           id="sort-select"
@@ -831,7 +939,7 @@ function Ledger({
           ))}
         </select>
         <label className="visually-hidden" htmlFor="group-select">
-          Group
+          {tl('Group')}
         </label>
         <select
           id="group-select"
@@ -855,7 +963,7 @@ function Ledger({
           }}
         />
         <ExportButton
-          label="Export CSV"
+          label={tl('Export CSV')}
           className="btn btn-ghost"
           disabled={filtered.length === 0}
           build={() =>
@@ -875,11 +983,11 @@ function Ledger({
         <ColumnsMenu />
         {warrantyCount > 0 && (
           <a className="btn btn-ghost" href={href('/transactions?view=warranties')}>
-            Warranties ({warrantyCount})
+            {tl('Warranties ({0})', warrantyCount)}
           </a>
         )}
         <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
-          {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}
+          {trashCount > 0 ? tl('Trash ({0})', trashCount) : tl('Trash')}
         </a>
       </div>
       {filtersOpen && (
@@ -899,9 +1007,11 @@ function Ledger({
       {filtered.length === 0 ? (
         <section className="card empty">
           <EmptyDoodle art="receipt" />
-          <h2>No matches</h2>
+          <h2>{tl('No matches')}</h2>
           <p className="muted">
-            {query ? 'Nothing fits this search and these filters.' : 'Nothing fits these filters.'}
+            {query
+              ? tl('Nothing fits this search and these filters.')
+              : tl('Nothing fits these filters.')}
           </p>
           <p>
             <button
@@ -912,14 +1022,14 @@ function Ledger({
                 setPanelKey((k) => k + 1);
               }}
             >
-              Clear filters
+              {tl('Clear filters')}
             </button>
           </p>
         </section>
       ) : (
         <section
           className="card marquee-area"
-          aria-label="All transactions"
+          aria-label={tl('All transactions')}
           ref={listRef}
           {...marquee.handlers}
         >
@@ -951,7 +1061,7 @@ function Ledger({
                 })
               }
             />
-            Select all on this page
+            {tl('Select all on this page')}
           </label>
           {groups.map((g) => (
             <div key={g.key} className="tx-group">
@@ -966,7 +1076,7 @@ function Ledger({
                 </h3>
               )}
               <TxList
-                label={g.label || 'Transactions'}
+                label={g.label || tl('Transactions')}
                 transactions={g.items}
                 onDelete={(id) => void removeTransaction(id)}
                 onEdit={setEditingId}
@@ -979,31 +1089,31 @@ function Ledger({
             </div>
           ))}
           {pages > 1 && (
-            <nav className="pager" aria-label="Pages">
+            <nav className="pager" aria-label={tl('Pages')}>
               <button
                 type="button"
                 className="btn"
                 disabled={current <= 1}
                 onClick={() => setPage(current - 1)}
               >
-                Previous
+                {tl('Previous')}
               </button>
-              <span className="muted small">
-                Page {current} of {pages}
-              </span>
+              <span className="muted small">{tl('Page {0} of {1}', current, pages)}</span>
               <button
                 type="button"
                 className="btn"
                 disabled={current >= pages}
                 onClick={() => setPage(current + 1)}
               >
-                Next
+                {tl('Next')}
               </button>
             </nav>
           )}
           <div className="tx-footer" data-testid="tx-footer">
             <span>
-              {filtered.length === 1 ? '1 transaction' : `${filtered.length} transactions`}
+              {filtered.length === 1
+                ? tl('1 transaction')
+                : tl('{0} transactions', filtered.length)}
             </span>
             <Money minor={total} currency={currency} />
           </div>
@@ -1015,17 +1125,6 @@ function Ledger({
 }
 
 /** Filters passed in the address, e.g. from a donut slice: ?category=food&from=2026-10-01&to=2026-10-19 */
-export function filtersFromQuery(query: URLSearchParams): Filters {
-  const date = (v: string | null) => (v && parseISO(v) ? v : undefined);
-  const category = query.get('category');
-  return {
-    ...EMPTY_FILTERS,
-    categories: category ? [category] : [],
-    from: date(query.get('from')),
-    to: date(query.get('to')),
-  };
-}
-
 export function Transactions({
   view,
   initialFilters = EMPTY_FILTERS,
@@ -1041,7 +1140,7 @@ export function Transactions({
       <Suspense
         fallback={
           <p className="muted page-loading" aria-busy="true">
-            Opening…
+            {tl('Opening…')}
           </p>
         }
       >
@@ -1055,7 +1154,7 @@ export function Transactions({
       <Suspense
         fallback={
           <p className="muted page-loading" aria-busy="true">
-            Opening…
+            {tl('Opening…')}
           </p>
         }
       >

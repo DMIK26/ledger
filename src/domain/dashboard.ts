@@ -1,3 +1,4 @@
+import { tl } from './i18n';
 /**
  * The Dashboard's movable cards (Drop 11). Quick add stays first and the time-limited cards (check-in,
  * close the month, recap) stay on top; these can be reordered and hidden.
@@ -20,17 +21,39 @@ export const DASHBOARD_CARDS = [
 export type DashboardCard = (typeof DASHBOARD_CARDS)[number];
 
 export const DASHBOARD_CARD_LABEL: Record<DashboardCard, string> = {
-  safe: 'Safe to spend today',
-  kpis: 'This month at a glance',
-  budget: 'Budget',
-  risk: 'Budgets to watch',
-  cards: 'Cards due',
-  nudges: 'Worth a look',
-  insights: 'Worth knowing',
-  day: 'Day by day',
-  charts: 'Where it went and last six months',
-  sketchbook: 'Sketchbook',
-  recent: 'Recent entries',
+  get safe() {
+    return tl('Safe to spend today');
+  },
+  get kpis() {
+    return tl('This month at a glance');
+  },
+  get budget() {
+    return tl('Budget');
+  },
+  get risk() {
+    return tl('Budgets to watch');
+  },
+  get cards() {
+    return tl('Cards due');
+  },
+  get nudges() {
+    return tl('Worth a look');
+  },
+  get insights() {
+    return tl('Worth knowing');
+  },
+  get day() {
+    return tl('Day by day');
+  },
+  get charts() {
+    return tl('Where it went and last six months');
+  },
+  get sketchbook() {
+    return tl('Sketchbook');
+  },
+  get recent() {
+    return tl('Recent entries');
+  },
 };
 
 const isCard = (id: string): id is DashboardCard =>

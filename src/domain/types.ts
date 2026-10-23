@@ -1,10 +1,16 @@
+import { tl, type Language } from './i18n';
 import type { ForeignAmount } from './fx';
 import type { Split } from './splits';
+import type { Space, SpaceView } from './spaces';
 
 export type ISODate = string; // 'YYYY-MM-DD', a local calendar date
 export type CategoryId = string;
 
 export const PAYMENT_METHODS = ['UPI', 'Cash', 'Card', 'Bank transfer', 'Other'] as const;
+
+/** A payment method as shown, in the interface language; stored values stay English (Drop 13). */
+export const methodLabel = (m: string): string => tl(m);
+
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export type TxSource =
@@ -12,6 +18,8 @@ export type TxSource =
 
 export interface Transaction {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   date: ISODate;
   /** Integer minor units (paise, cents). Never a float. */
   amountMinor: number;
@@ -118,6 +126,18 @@ export interface Settings {
   wryLines: boolean;
   /** Recaps opened or put away, so each is offered once ('month:2026-10'). */
   recapsSeen: string[];
+  /** A Shop ledger beside the personal one (Drop 13). */
+  spacesOn: boolean;
+  shopName: string;
+  /** The space the switcher is on; remembered on this device. */
+  space: SpaceView;
+  /** The folder chosen for weekly backups ('' when none) and when it last got one (Drop 13). */
+  folderBackupName: string;
+  folderBackupAt: number;
+  /** Bills due this week on the app icon, where the device supports it (Drop 13). */
+  appBadge: boolean;
+  /** The interface language (Drop 13); amounts keep Western digits either way. */
+  language: Language;
 }
 
 export type AddMode = 'form' | 'keypad' | 'several';
@@ -142,6 +162,13 @@ export const DEFAULT_SETTINGS: Settings = {
   hiddenColumns: [],
   wryLines: false,
   recapsSeen: [],
+  spacesOn: false,
+  shopName: 'Shop',
+  space: 'personal',
+  folderBackupName: '',
+  folderBackupAt: 0,
+  appBadge: false,
+  language: 'en',
 };
 
 export interface AuditEvent {
@@ -170,6 +197,8 @@ export interface LockConfig {
 export interface Budget {
   /** `${month}|${scope}`, see budgetId(). */
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   /** 'YYYY-MM' */
   month: string;
   scope: 'overall' | CategoryId;

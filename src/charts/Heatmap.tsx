@@ -2,11 +2,12 @@ import { useRef, useState, type PointerEvent } from 'react';
 import { usePrivacy } from '../app/Money';
 import { entityKey } from '../kit/entityKeys';
 import { useRoving } from '../kit/roving';
-import { diffDays, fmtDate, MONTHS, parseISO, weekdayOf } from '../domain/dates';
+import { dayShort, diffDays, fmtDate, monthShort, parseISO, weekdayOf } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import type { DayCell } from '../domain/reports';
+import { tl } from '../domain/i18n';
+import { tr } from '../app/tr';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** Monday = 0 ... Sunday = 6 */
 const mondayIndex = (iso: string) => (weekdayOf(iso) + 6) % 7;
 
@@ -89,7 +90,7 @@ export function Heatmap({
     const p = parseISO(d.date)!;
     if (i === 0 || p.d === 1) {
       const week = Math.floor((offset + i) / 7);
-      monthTicks.push({ x: left + week * (cell + gap), label: MONTHS[p.m - 1]!.slice(0, 3) });
+      monthTicks.push({ x: left + week * (cell + gap), label: monthShort(p.m) });
     }
   });
 
@@ -99,19 +100,22 @@ export function Heatmap({
         width={width}
         height={height}
         role="group"
-        aria-label={`Spending by day. Arrow keys move by day and week; Enter pins a day.${onRange ? ' Drag across days with a mouse to pick a range.' : ''}`}
+        aria-label={tl(
+          'Spending by day. Arrow keys move by day and week; Enter pins a day.{0}',
+          onRange ? ' ' + tl('Drag across days with a mouse to pick a range.') : '',
+        )}
         data-roving-group=""
       >
-        {DAYS.map((d, i) =>
+        {[1, 2, 3, 4, 5, 6, 0].map((day, i) =>
           i % 2 === 0 ? (
             <text
-              key={d}
+              key={day}
               className="hm-axis"
               x={0}
               y={top + i * (cell + gap) + cell / 2}
               dy="0.32em"
             >
-              {d}
+              {dayShort(day)}
             </text>
           ) : null,
         )}
@@ -126,7 +130,7 @@ export function Heatmap({
           const key = entityKey('day', d.date);
           const x = left + Math.floor(i / 7) * (cell + gap);
           const y = top + (i % 7) * (cell + gap);
-          const label = `${fmtDate(d.date)}, ${d.totalMinor > 0 ? fmtMoney(d.totalMinor, { currency }) : 'nothing spent'}`;
+          const label = `${fmtDate(d.date)}, ${d.totalMinor > 0 ? fmtMoney(d.totalMinor, { currency }) : tl('nothing spent')}`;
           return (
             <rect
               key={d.date}
@@ -168,11 +172,10 @@ export function Heatmap({
         })}
       </svg>
       <p className="hm-legend muted small" aria-hidden="true">
-        Less
-        {[0, 1, 2, 3, 4].map((l) => (
-          <span key={l} className={`hm-swatch hm-${l}`} />
-        ))}
-        More
+        {tr(
+          'Less{0}More',
+          [0, 1, 2, 3, 4].map((l) => <span key={l} className={`hm-swatch hm-${l}`} />),
+        )}
       </p>
     </div>
   );

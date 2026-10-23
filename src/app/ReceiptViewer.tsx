@@ -5,6 +5,7 @@ import { fmtDate } from '../domain/dates';
 import { Icon } from './icons';
 import { usePrivacy } from './Money';
 import { useObjectUrl } from './receiptImage';
+import { tl } from '../domain/i18n';
 
 /** Shows a stored receipt. Blurred while privacy mode is on, because receipts show amounts. */
 export function ReceiptViewer({ id, onClose }: { id: string | null; onClose: () => void }) {
@@ -46,12 +47,12 @@ export function ReceiptViewer({ id, onClose }: { id: string | null; onClose: () 
       <div className="sheet-body">
         <div className="sheet-head">
           <h2 id="receipt-title">
-            {tx ? `Receipt: ${tx.merchant}, ${fmtDate(tx.date)}` : 'Receipt'}
+            {tx ? tl('Receipt: {0}, {1}', tx.merchant, fmtDate(tx.date)) : tl('Receipt')}
           </h2>
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label="Close"
+            aria-label={tl('Close')}
             onClick={onClose}
           >
             <Icon name="close" />
@@ -61,11 +62,11 @@ export function ReceiptViewer({ id, onClose }: { id: string | null; onClose: () 
           <img
             className="receipt-full"
             src={url}
-            alt={tx ? `Receipt for ${tx.merchant}` : 'Receipt'}
+            alt={tx ? tl('Receipt for {0}', tx.merchant) : tl('Receipt')}
             data-masked={masked ? '' : undefined}
           />
         ) : (
-          <p className="muted">No receipt stored for this entry.</p>
+          <p className="muted">{tl('No receipt stored for this entry.')}</p>
         )}
       </div>
     </dialog>

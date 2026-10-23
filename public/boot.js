@@ -3,6 +3,7 @@
   try {
     var boot = JSON.parse(localStorage.getItem('ledger.boot') || '{}');
     var root = document.documentElement;
+    if (boot.language === 'te' || boot.language === 'hi') root.lang = boot.language;
     var dark;
     if (boot.theme === 'light' || boot.theme === 'dark') {
       root.dataset.theme = boot.theme;

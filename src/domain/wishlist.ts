@@ -1,5 +1,6 @@
 import { addDays, diffDays } from './dates';
 import type { CategoryId, ISODate } from './types';
+import type { Space } from './spaces';
 
 /**
  * The wishlist: things you want, held for a wait before you decide. When the wait is over you buy it
@@ -13,6 +14,8 @@ export type WishStatus = 'waiting' | 'bought' | 'skipped';
 
 export interface WishItem {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   priceMinor: number;
   /** Used when it is bought; guessed from the name when missing. */

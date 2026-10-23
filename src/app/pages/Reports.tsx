@@ -1,4 +1,4 @@
-import { EmptyDoodle } from '../../doodle/Studio';
+import { EmptyDoodle } from '../../doodle/bits';
 import { Fragment, useMemo, useState } from 'react';
 import { Heatmap } from '../../charts/Heatmap';
 import { Sparkline } from '../../charts/Sparkline';
@@ -6,7 +6,7 @@ import { useLedger } from '../../data/store';
 import { categoryById } from '../../domain/categories';
 import { safeText, toCsv } from '../../domain/csv';
 import { exportRows } from '../../domain/csvExport';
-import { fmtDate, todayISO, WEEKDAYS } from '../../domain/dates';
+import { dayName, fmtDate, todayISO } from '../../domain/dates';
 import { CURRENCIES } from '../../domain/money';
 import {
   customPeriod,
@@ -26,6 +26,7 @@ import { ForWhom } from '../reports/ForWhom';
 import { NeedsWants } from '../reports/NeedsWants';
 import { SavedReports } from '../reports/SavedReports';
 import { TaxCard } from '../reports/TaxCard';
+import { ProfitLoss } from '../reports/ProfitLoss';
 import { averageWindow, buildReport, inRange, scaleCompare } from '../../domain/reports';
 import { diffDays, monthKey, shiftMonthKey } from '../../domain/dates';
 import { moneyFlow, type FlowNode } from '../../domain/flow';
@@ -39,25 +40,53 @@ import { csvFile, ExportButton } from '../files';
 import { useScopedTransactions, useView } from '../../kit/view';
 import { Money } from '../Money';
 import { href } from '../router';
+import { tl } from '../../domain/i18n';
+import { methodLabel } from '../../domain/types';
+import { tr } from '../tr';
 
 type Kind = PeriodKind | 'relative';
 
 const KINDS: Array<{ value: Kind; label: string }> = [
-  { value: 'month', label: 'Month' },
-  { value: 'quarter', label: 'Quarter' },
-  { value: 'fy', label: 'Financial year' },
-  { value: 'relative', label: 'Recent' },
-  { value: 'custom', label: 'Custom' },
+  {
+    value: 'month',
+    get label() {
+      return tl('Month');
+    },
+  },
+  {
+    value: 'quarter',
+    get label() {
+      return tl('Quarter');
+    },
+  },
+  {
+    value: 'fy',
+    get label() {
+      return tl('Financial year');
+    },
+  },
+  {
+    value: 'relative',
+    get label() {
+      return tl('Recent');
+    },
+  },
+  {
+    value: 'custom',
+    get label() {
+      return tl('Custom');
+    },
+  },
 ];
 
 type CompareMode = 'previous' | 'lastYear' | 'average';
 
 function Change({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="muted">No comparison</span>;
-  if (pct === 0) return <span>Same</span>;
+  if (pct === null) return <span className="muted">{tl('No comparison')}</span>;
+  if (pct === 0) return <span>{tl('Same')}</span>;
   return (
     <span className={pct > 0 ? 'status-over' : undefined}>
-      {Math.abs(pct)}% {pct > 0 ? 'more' : 'less'}
+      {Math.abs(pct)}% {pct > 0 ? tl('more') : tl('less')}
     </span>
   );
 }
@@ -172,7 +201,7 @@ export function Reports() {
       for (const t of range) {
         if (t.categoryId !== treeCat) continue;
         const key = normalizeMerchantKey(t.merchant) || 'untitled';
-        const m = byM.get(key) ?? { label: t.merchant || 'Untitled', value: 0 };
+        const m = byM.get(key) ?? { label: t.merchant || tl('Untitled'), value: 0 };
         m.value += t.amountMinor;
         byM.set(key, m);
       }
@@ -186,7 +215,7 @@ export function Reports() {
         const c = categoryById(categories, r.categoryId);
         return {
           id: r.categoryId,
-          label: c?.name ?? 'Other',
+          label: c?.name ?? tl('Other'),
           valueMinor: r.totalMinor,
           color: fillFor(c),
         };
@@ -203,12 +232,12 @@ export function Reports() {
             ? fillFor(categoryById(categories, flowCat ?? ''))
             : 'var(--faint)';
   const symbol = (CURRENCIES[currency] ?? CURRENCIES.INR!).symbol;
-  const name = (id: string) => categoryById(categories, id)?.name ?? 'Other';
+  const name = (id: string) => categoryById(categories, id)?.name ?? tl('Other');
 
   return (
     <div className="report">
-      <section className="card report-controls no-print" aria-label="Report period">
-        <div className="segmented" role="group" aria-label="Period">
+      <section className="card report-controls no-print" aria-label={tl('Report period')}>
+        <div className="segmented" role="group" aria-label={tl('Period')}>
           {KINDS.map((k) => (
             <button
               key={k.value}
@@ -225,7 +254,7 @@ export function Reports() {
         </div>
         {kind === 'relative' ? (
           <div className="field">
-            <label htmlFor="r-relative">Range</label>
+            <label htmlFor="r-relative">{tl('Range')}</label>
             <select
               id="r-relative"
               className="select input"
@@ -242,7 +271,7 @@ export function Reports() {
         ) : kind === 'custom' ? (
           <div className="form-grid">
             <div className="field">
-              <label htmlFor="r-from">From</label>
+              <label htmlFor="r-from">{tl('From')}</label>
               <input
                 id="r-from"
                 className="input"
@@ -253,7 +282,7 @@ export function Reports() {
               />
             </div>
             <div className="field">
-              <label htmlFor="r-to">To</label>
+              <label htmlFor="r-to">{tl('To')}</label>
               <input
                 id="r-to"
                 className="input"
@@ -267,7 +296,7 @@ export function Reports() {
         ) : (
           <div className="period-nav">
             <button type="button" className="btn" onClick={() => setOffset((o) => o - 1)}>
-              Previous
+              {tl('Previous')}
             </button>
             <span className="period-label" aria-live="polite">
               {period.label}
@@ -278,33 +307,33 @@ export function Reports() {
               disabled={offset >= 0}
               onClick={() => setOffset((o) => o + 1)}
             >
-              Next
+              {tl('Next')}
             </button>
           </div>
         )}
         <div className="field-row">
-          <span className="small">Compare with</span>
-          <div className="segmented" role="group" aria-label="Compare with">
+          <span className="small">{tl('Compare with')}</span>
+          <div className="segmented" role="group" aria-label={tl('Compare with')}>
             <button
               type="button"
               aria-pressed={compareMode === 'previous'}
               onClick={() => setCompareMode('previous')}
             >
-              Previous period
+              {tl('Previous period')}
             </button>
             <button
               type="button"
               aria-pressed={compareMode === 'lastYear'}
               onClick={() => setCompareMode('lastYear')}
             >
-              Same period last year
+              {tl('Same period last year')}
             </button>
             <button
               type="button"
               aria-pressed={compareMode === 'average'}
               onClick={() => setCompareMode('average')}
             >
-              12-month average
+              {tl('12-month average')}
             </button>
           </div>
         </div>
@@ -318,7 +347,7 @@ export function Reports() {
               setCompareMode('lastYear');
             }}
           >
-            Year to date against last year
+            {tl('Year to date against last year')}
           </button>
           <SavedReports current={saved} onApply={applySaved} />
           {kind === 'month' && (
@@ -327,7 +356,7 @@ export function Reports() {
               className="btn btn-ghost"
               onClick={() => openRecap(monthRecap(shiftMonthKey(monthKey(today), offset)))}
             >
-              Story recap
+              {tl('Story recap')}
             </button>
           )}
         </div>
@@ -337,7 +366,7 @@ export function Reports() {
         <div className="card-head">
           <h2 id="summary-title">{period.label}</h2>
           <span className="muted small">
-            {fmtDate(report.start)} to {fmtDate(report.end)}
+            {tl('{0} to {1}', fmtDate(report.start), fmtDate(report.end))}
           </span>
         </div>
         <p className="big-figure" data-testid="report-total">
@@ -346,35 +375,47 @@ export function Reports() {
         <p className="small" data-testid="report-compare">
           {report.changePct === null ? (
             <>
-              Nothing to compare with in {fmtDate(report.compareStart)} to{' '}
-              {fmtDate(report.compareEnd)}.
+              {tl(
+                'Nothing to compare with in {0} to {1}.',
+                fmtDate(report.compareStart),
+                fmtDate(report.compareEnd),
+              )}
             </>
           ) : (
             <>
-              <Change pct={report.changePct} /> than{' '}
-              {compareMode === 'average' ? (
-                <>
-                  the average of {fmtDate(report.compareStart)} to {fmtDate(report.compareEnd)} for
-                  the same number of days (
-                  <Money minor={report.compareMinor} currency={currency} />)
-                </>
-              ) : (
-                <>
-                  {fmtDate(report.compareStart)} to {fmtDate(report.compareEnd)} (
-                  <Money minor={report.compareMinor} currency={currency} />)
-                  {span.partial && ', comparing the same number of days so far'}
-                </>
+              <Change pct={report.changePct} />{' '}
+              {tr(
+                'than {0}.',
+                compareMode === 'average' ? (
+                  <>
+                    {tr(
+                      'the average of {0} to {1} for the same number of days ({2})',
+                      fmtDate(report.compareStart),
+                      fmtDate(report.compareEnd),
+                      <Money minor={report.compareMinor} currency={currency} />,
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {tr(
+                      '{0} to {1} ({2}){3}',
+                      fmtDate(report.compareStart),
+                      fmtDate(report.compareEnd),
+                      <Money minor={report.compareMinor} currency={currency} />,
+                      span.partial && tl(', comparing the same number of days so far'),
+                    )}
+                  </>
+                ),
               )}
-              .
             </>
           )}
         </p>
         <p className="muted small">
-          {report.entries === 1 ? '1 entry' : `${report.entries} entries`}
+          {report.entries === 1 ? tl('1 entry') : tl('{0} entries', report.entries)}
         </p>
         <div className="btn-row no-print">
           <ExportButton
-            label="Export CSV"
+            label={tl('Export CSV')}
             disabled={report.entries === 0}
             build={() =>
               csvFile(
@@ -393,23 +434,33 @@ export function Reports() {
             }
           />
           <button type="button" className="btn" onClick={() => window.print()}>
-            Print or save as PDF
+            {tl('Print or save as PDF')}
           </button>
         </div>
       </section>
 
+      <ProfitLoss
+        transactions={transactions}
+        start={period.start}
+        end={span.end}
+        label={period.label}
+      />
+
       {report.entries === 0 ? (
         <section className="card empty">
           <EmptyDoodle art="chart" />
-          <h2>Nothing in this period</h2>
+          <h2>{tl('Nothing in this period')}</h2>
           <p className="muted">
-            Pick another period above, or <a href={href('/transactions')}>add entries</a>.
+            {tr(
+              'Pick another period above, or {0}.',
+              <a href={href('/transactions')}>{tl('add entries')}</a>,
+            )}
           </p>
         </section>
       ) : (
         <>
           <section className="card" aria-labelledby="cat-table-title">
-            <h2 id="cat-table-title">By category</h2>
+            <h2 id="cat-table-title">{tl('By category')}</h2>
             {/* Focusable so the table can be scrolled sideways with the keyboard on narrow screens. */}
             <div
               className="table-wrap"
@@ -420,20 +471,20 @@ export function Reports() {
               <table className="report-table">
                 <thead>
                   <tr>
-                    <th scope="col">Category</th>
+                    <th scope="col">{tl('Category')}</th>
                     <th scope="col" className="num">
-                      Spent
+                      {tl('Spent')}
                     </th>
                     <th scope="col" className="num">
-                      Share
+                      {tl('Share')}
                     </th>
                     <th scope="col" className="num">
-                      Compared
+                      {tl('Compared')}
                     </th>
                     <th scope="col" className="num">
-                      Change
+                      {tl('Change')}
                     </th>
-                    <th scope="col">Last six months</th>
+                    <th scope="col">{tl('Last six months')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -460,7 +511,7 @@ export function Reports() {
                                 aria-expanded={Boolean(open)}
                                 onClick={() => setSubsOf(open ? null : r.categoryId)}
                               >
-                                {open ? 'Hide subcategories' : 'Subcategories'}
+                                {open ? tl('Hide subcategories') : tl('Subcategories')}
                               </button>
                             )}
                           </th>
@@ -488,7 +539,7 @@ export function Reports() {
                               {Math.round((x.totalMinor / Math.max(1, r.totalMinor)) * 100)}%
                             </td>
                             <td colSpan={3} className="muted small">
-                              {x.count === 1 ? '1 entry' : `${x.count} entries`}
+                              {x.count === 1 ? tl('1 entry') : tl('{0} entries', x.count)}
                             </td>
                           </tr>
                         ))}
@@ -504,29 +555,32 @@ export function Reports() {
             <div className="card-head">
               <h2 id="tree-title">
                 {treeCat
-                  ? `${categoryById(categories, treeCat)?.name ?? 'Other'}, by merchant`
-                  : 'Where it went'}
+                  ? tl('{0}, by merchant', categoryById(categories, treeCat)?.name ?? tl('Other'))
+                  : tl('Where it went')}
               </h2>
               {treeCat && (
                 <button type="button" className="btn btn-ghost" onClick={() => setTreeCat(null)}>
-                  Back to all categories
+                  {tl('Back to all categories')}
                 </button>
               )}
             </div>
             <Treemap
               tiles={treeTiles}
               currency={currency}
-              label={treeCat ? 'Merchants' : 'Categories'}
+              label={treeCat ? tl('Merchants') : tl('Categories')}
               onPick={treeCat ? undefined : (id) => setTreeCat(id)}
             />
           </section>
 
           <section className="card" aria-labelledby="flow-title">
             <div className="card-head">
-              <h2 id="flow-title">Money flow</h2>
+              <h2 id="flow-title">{tl('Money flow')}</h2>
               <span className="muted small">
-                <Money minor={flow.inMinor} currency={currency} /> in,{' '}
-                <Money minor={flow.spentMinor} currency={currency} /> spent
+                {tr(
+                  '{0} in, {1} spent',
+                  <Money minor={flow.inMinor} currency={currency} />,
+                  <Money minor={flow.spentMinor} currency={currency} />,
+                )}
               </span>
             </div>
             <FlowChart
@@ -540,14 +594,14 @@ export function Reports() {
 
           <div className="report-grid">
             <section className="card" aria-labelledby="merchants-title">
-              <h2 id="merchants-title">Top merchants</h2>
+              <h2 id="merchants-title">{tl('Top merchants')}</h2>
               <Bars
                 currency={currency}
                 rows={report.merchants.map((m) => ({
                   key: m.merchant,
                   label: m.merchant,
                   value: m.totalMinor,
-                  note: m.count === 1 ? '1 entry' : `${m.count} entries`,
+                  note: m.count === 1 ? tl('1 entry') : tl('{0} entries', m.count),
                   href: href(
                     `/merchant?key=${encodeURIComponent(normalizeMerchantKey(m.merchant) || 'untitled')}`,
                   ),
@@ -555,12 +609,12 @@ export function Reports() {
               />
             </section>
             <section className="card" aria-labelledby="methods-title">
-              <h2 id="methods-title">Paid by</h2>
+              <h2 id="methods-title">{tl('Paid by')}</h2>
               <Bars
                 currency={currency}
                 rows={report.methods.map((m) => ({
                   key: m.method,
-                  label: m.method,
+                  label: methodLabel(m.method),
                   value: m.totalMinor,
                   note: `${Math.round((m.totalMinor / Math.max(1, report.totalMinor)) * 100)}%`,
                 }))}
@@ -572,19 +626,19 @@ export function Reports() {
           <ForWhom transactions={transactions} start={period.start} end={span.end} />
 
           <section className="card" aria-labelledby="weekday-title">
-            <h2 id="weekday-title">Average by weekday</h2>
+            <h2 id="weekday-title">{tl('Average by weekday')}</h2>
             <Bars
               currency={currency}
               rows={report.weekdays.map((w) => ({
                 key: String(w.weekday),
-                label: WEEKDAYS[w.weekday]!,
+                label: dayName(w.weekday),
                 value: w.averageMinor,
               }))}
             />
           </section>
 
           <section className="card" aria-labelledby="heat-title">
-            <h2 id="heat-title">Day by day</h2>
+            <h2 id="heat-title">{tl('Day by day')}</h2>
             <Heatmap
               days={report.days}
               currency={currency}
@@ -596,7 +650,7 @@ export function Reports() {
               onPick={(date) => togglePin({ kind: 'day', id: date, label: fmtDate(date) })}
             />
             <p className="muted small no-print">
-              Drag across days to report on just those; click a day to pin it to every page.
+              {tl('Drag across days to report on just those; click a day to pin it to every page.')}
             </p>
           </section>
         </>

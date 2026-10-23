@@ -4,6 +4,9 @@ import { categoryById } from '../../domain/categories';
 import { fmtDate } from '../../domain/dates';
 import { Money } from '../Money';
 import { href } from '../router';
+import { methodLabel } from '../../domain/types';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const SWIPE = 80;
 
@@ -33,20 +36,25 @@ export function ReviewView() {
   if (!tx) {
     return (
       <section className="card empty" data-testid="review-done">
-        <h2>{unsure.length === 0 ? 'Nothing to review' : 'You have been through them all'}</h2>
+        <h2>
+          {unsure.length === 0 ? tl('Nothing to review') : tl('You have been through them all')}
+        </h2>
         <p className="muted">
           {unsure.length === 0
-            ? 'Entries whose category was a guess show up here.'
-            : `${skipped.length === 1 ? '1 entry was' : `${skipped.length} entries were`} skipped for now.`}
+            ? tl('Entries whose category was a guess show up here.')
+            : tl(
+                '{0} skipped for now.',
+                skipped.length === 1 ? tl('1 entry was') : tl('{0} entries were', skipped.length),
+              )}
         </p>
         <p className="btn-row">
           {skipped.length > 0 && (
             <button type="button" className="btn" onClick={() => setSkipped([])}>
-              Go through skipped ones
+              {tl('Go through skipped ones')}
             </button>
           )}
           <a className="btn btn-ghost" href={href('/transactions')}>
-            Back to the list
+            {tl('Back to the list')}
           </a>
         </p>
       </section>
@@ -87,9 +95,9 @@ export function ReviewView() {
   return (
     <section className="card review" aria-labelledby="review-title">
       <div className="card-head">
-        <h2 id="review-title">Review</h2>
+        <h2 id="review-title">{tl('Review')}</h2>
         <span className="muted small" data-testid="review-left">
-          {queue.length === 1 ? '1 to go' : `${queue.length} to go`}
+          {queue.length === 1 ? tl('1 to go') : tl('{0} to go', queue.length)}
         </span>
       </div>
       <div
@@ -98,7 +106,12 @@ export function ReviewView() {
         tabIndex={0}
         data-testid="review-card"
         aria-describedby="review-help"
-        aria-label={`${tx.merchant || 'Untitled'}, ${fmtDate(tx.date)}, guessed ${category?.name ?? 'Other'}`}
+        aria-label={tl(
+          '{0}, {1}, guessed {2}',
+          tx.merchant || tl('Untitled'),
+          fmtDate(tx.date),
+          category?.name ?? tl('Other'),
+        )}
         style={dx ? { transform: `translateX(${dx}px) rotate(${dx / 40}deg)` } : undefined}
         data-lean={dx >= SWIPE ? 'accept' : dx <= -SWIPE ? 'skip' : undefined}
         onKeyDown={onKeyDown}
@@ -116,34 +129,38 @@ export function ReviewView() {
           setDx(0);
         }}
       >
-        <p className="review-merchant">{tx.merchant || 'Untitled'}</p>
+        <p className="review-merchant">{tx.merchant || tl('Untitled')}</p>
         <p className="review-amount">
           <Money minor={tx.amountMinor} currency={tx.currency} />
         </p>
         <p className="muted small">
-          {fmtDate(tx.date)} · {tx.method}
+          {fmtDate(tx.date)} · {methodLabel(tx.method)}
         </p>
         <p>
-          Guessed:{' '}
-          <span className="chip">
-            <span className="dot" style={{ background: category?.color ?? 'var(--faint)' }} />
-            {category?.name ?? 'Other'}
-          </span>
+          {tr(
+            'Guessed: {0}',
+            <span className="chip">
+              <span className="dot" style={{ background: category?.color ?? 'var(--faint)' }} />
+              {category?.name ?? tl('Other')}
+            </span>,
+          )}
         </p>
       </div>
       <p id="review-help" className="muted small">
-        Right arrow or swipe right accepts; left arrow or swipe left skips; 1 to 9 picks a category.
+        {tl(
+          'Right arrow or swipe right accepts; left arrow or swipe left skips; 1 to 9 picks a category.',
+        )}
       </p>
       <div className="btn-row">
         <button type="button" className="btn" onClick={skip}>
-          Skip
+          {tl('Skip')}
         </button>
         <button type="button" className="btn btn-primary" onClick={accept}>
-          Accept {category?.name ?? 'Other'}
+          {tl('Accept {0}', category?.name ?? tl('Other'))}
         </button>
       </div>
       <fieldset className="review-cats">
-        <legend className="small">Or move it to</legend>
+        <legend className="small">{tl('Or move it to')}</legend>
         {open.map((c, i) => (
           <button
             key={c.id}

@@ -1,67 +1,58 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLedger } from '../data/store';
-import { categoryById } from '../domain/categories';
 import { anchorLabel, noteText, STAMPS, STAMP_LABEL, MAX_NOTE_LENGTH } from '../domain/notes';
 import { SKETCH_COLORS, type SketchColor } from '../domain/sketch';
 import { Icon } from '../app/icons';
 import { usePrivacy } from '../app/Money';
 import { replaceRoute, useBackClose } from '../pwa/back';
 import { useViewMonth } from '../kit/view';
-import { artForCategory, Doodle, EMPTY_ART, STAMP_ART } from './art';
+import { Doodle, STAMP_ART } from './art';
 import { findAnchor, useDoodle, type SketchToolChoice } from './state';
+import { msg, tl } from '../domain/i18n';
 
 const PAGE_NAME: Record<string, string> = {
-  '/': 'Dashboard',
-  '/transactions': 'Transactions',
-  '/budgets': 'Budgets',
-  '/reports': 'Reports',
-  '/recurring': 'Recurring',
-  '/settings': 'Settings',
+  get '/'() {
+    return tl('Dashboard');
+  },
+  get '/transactions'() {
+    return tl('Transactions');
+  },
+  get '/budgets'() {
+    return tl('Budgets');
+  },
+  get '/reports'() {
+    return tl('Reports');
+  },
+  get '/recurring'() {
+    return tl('Recurring');
+  },
+  get '/settings'() {
+    return tl('Settings');
+  },
 };
 
 const COLOR_NAME: Record<SketchColor, string> = {
-  ink: 'Ink',
-  clay: 'Clay',
-  blue: 'Blue',
-  green: 'Green',
+  get ink() {
+    return tl('Ink');
+  },
+  get clay() {
+    return tl('Clay');
+  },
+  get blue() {
+    return tl('Blue');
+  },
+  get green() {
+    return tl('Green');
+  },
 };
 
 const TOOLS: [SketchToolChoice, string][] = [
-  ['pen', 'Pen'],
-  ['highlighter', 'Highlighter'],
-  ['eraser', 'Eraser'],
-  ['note', 'Note'],
-  ['stamp', 'Stamp'],
+  ['pen', msg('Pen')],
+  ['highlighter', msg('Highlighter')],
+  ['eraser', msg('Eraser')],
+  ['note', msg('Note')],
+  ['stamp', msg('Stamp')],
 ];
-
-const isTyping = (el: Element | null): boolean =>
-  el instanceof HTMLElement &&
-  (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
-
-/** D toggles sketch mode, Escape leaves it, Shift+N opens the notes list. */
-export function useDoodleKeys(): void {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(document.activeElement)) return;
-      const d = useDoodle.getState();
-      if (e.key === 'Escape' && d.sketchOn && !e.defaultPrevented) {
-        e.preventDefault();
-        d.setSketch(false);
-        return;
-      }
-      if (document.querySelector('dialog[open]')) return;
-      if ((e.key === 'd' || e.key === 'D') && !e.shiftKey) {
-        e.preventDefault();
-        d.toggleSketch();
-      } else if (e.key === 'N' && e.shiftKey) {
-        e.preventDefault();
-        d.setNotesOpen(!d.notesOpen);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-}
 
 /** The sketch tools, fixed at the bottom of the screen while sketch mode is on. */
 export function SketchToolbar({ path }: { path: string }) {
@@ -86,10 +77,10 @@ export function SketchToolbar({ path }: { path: string }) {
     <div
       className="sketch-toolbar"
       role="toolbar"
-      aria-label="Sketch tools"
+      aria-label={tl('Sketch tools')}
       data-testid="sketch-toolbar"
     >
-      <div className="tool-group" role="group" aria-label="Tool">
+      <div className="tool-group" role="group" aria-label={tl('Tool')}>
         {TOOLS.map(([id, label]) => (
           <button
             key={id}
@@ -98,12 +89,12 @@ export function SketchToolbar({ path }: { path: string }) {
             aria-pressed={tool === id}
             onClick={() => setTool(id)}
           >
-            {label}
+            {tl(label)}
           </button>
         ))}
       </div>
       {tool === 'stamp' ? (
-        <div className="tool-group" role="group" aria-label="Stamp">
+        <div className="tool-group" role="group" aria-label={tl('Stamp')}>
           {STAMPS.map((s) => (
             <button
               key={s}
@@ -118,7 +109,7 @@ export function SketchToolbar({ path }: { path: string }) {
           ))}
         </div>
       ) : (
-        <div className="tool-group" role="group" aria-label="Colour">
+        <div className="tool-group" role="group" aria-label={tl('Colour')}>
           {SKETCH_COLORS.map((c) => (
             <button
               key={c}
@@ -137,14 +128,14 @@ export function SketchToolbar({ path }: { path: string }) {
           className="btn btn-ghost"
           aria-pressed={fade}
           onClick={() => setFade(!fade)}
-          title="Strokes fade after three seconds and are not saved"
+          title={tl('Strokes fade after three seconds and are not saved')}
         >
-          Fading ink
+          {tl('Fading ink')}
         </button>
         <button
           type="button"
           className="btn btn-ghost btn-icon"
-          aria-label="Undo"
+          aria-label={tl('Undo')}
           disabled={!canUndo}
           onClick={() => void undo()}
         >
@@ -153,7 +144,7 @@ export function SketchToolbar({ path }: { path: string }) {
         <button
           type="button"
           className="btn btn-ghost btn-icon"
-          aria-label="Redo"
+          aria-label={tl('Redo')}
           disabled={!canRedo}
           onClick={() => void redo()}
         >
@@ -165,14 +156,14 @@ export function SketchToolbar({ path }: { path: string }) {
           disabled={!hasStrokes}
           onClick={() => void clearSketch(path, month)}
         >
-          Clear
+          {tl('Clear')}
         </button>
         <button type="button" className="btn btn-primary" onClick={() => setSketch(false)}>
-          Done
+          {tl('Done')}
         </button>
       </div>
       <p className="small muted sketch-tip">
-        Hold still for a moment to snap to a line, circle or box.
+        {tl('Hold still for a moment to snap to a line, circle or box.')}
       </p>
     </div>
   );
@@ -224,7 +215,7 @@ function NoteRow({ id }: { id: string }) {
             }}
           >
             <label className="visually-hidden" htmlFor={`note-${note.id}`}>
-              Note
+              {tl('Note')}
             </label>
             <textarea
               id={`note-${note.id}`}
@@ -237,10 +228,10 @@ function NoteRow({ id }: { id: string }) {
             />
             <div className="btn-row">
               <button type="submit" className="btn btn-primary">
-                Save
+                {tl('Save')}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(false)}>
-                Cancel
+                {tl('Cancel')}
               </button>
             </div>
           </form>
@@ -250,22 +241,22 @@ function NoteRow({ id }: { id: string }) {
           </p>
         )}
         <p className="small muted">
-          On {where}, {PAGE_NAME[note.page] ?? 'Dashboard'}
+          {tl('On {0}, {1}', where, PAGE_NAME[note.page] ?? tl('Dashboard'))}
         </p>
       </div>
       <div className="btn-row">
         <button type="button" className="btn btn-ghost" onClick={show}>
-          Show
+          {tl('Show')}
         </button>
         {!editing && (
           <button type="button" className="btn btn-ghost" onClick={() => setEditing(true)}>
-            Edit
+            {tl('Edit')}
           </button>
         )}
         <button
           type="button"
           className="btn btn-ghost btn-icon"
-          aria-label={`Delete note on ${where}`}
+          aria-label={tl('Delete note on {0}', where)}
           onClick={() => void deleteNote(note.id)}
         >
           <Icon name="trash" />
@@ -308,15 +299,16 @@ export function NotesPanel() {
     >
       <div className="sheet-body">
         <div className="card-head">
-          <h2 id="notes-title">Notes</h2>
+          <h2 id="notes-title">{tl('Notes')}</h2>
           <button type="button" className="btn btn-ghost" onClick={() => setNotesOpen(false)}>
-            Close
+            {tl('Close')}
           </button>
         </div>
         {list.length === 0 ? (
           <p className="muted">
-            No notes yet. Press D (or ask the pencil) to sketch, then pick Note or Stamp and tap a
-            bar, slice, row, day or budget.
+            {tl(
+              'No notes yet. Press D (or ask the pencil) to sketch, then pick Note or Stamp and tap a bar, slice, row, day or budget.',
+            )}
           </p>
         ) : (
           <ul className="notes-list" data-testid="notes-list">
@@ -328,53 +320,4 @@ export function NotesPanel() {
       </div>
     </dialog>
   );
-}
-
-/** When an entry is saved, its category's drawing draws itself in the corner, then fades. */
-export function DoodleBurst() {
-  const doodles = useLedger((s) => s.settings.doodles);
-  const categories = useLedger((s) => s.categories);
-  const [burst, setBurst] = useState<{ id: string; categoryId: string } | null>(null);
-
-  useEffect(() => {
-    const known = new Set(useLedger.getState().transactions.map((t) => t.id));
-    let timer = 0;
-    const unsubscribe = useLedger.subscribe((state, prev) => {
-      if (state.transactions === prev.transactions) return;
-      const fresh = state.transactions.filter((t) => !known.has(t.id));
-      for (const t of fresh) known.add(t.id);
-      // One new entry typed or added just now; not imports, restores or undone deletes.
-      const t = fresh.length === 1 ? fresh[0]! : null;
-      if (!t || (t.source !== 'quick' && t.source !== 'form')) return;
-      if (Math.abs(Date.now() - t.createdAt) > 5000) return;
-      window.clearTimeout(timer);
-      setBurst({ id: t.id, categoryId: t.categoryId });
-      timer = window.setTimeout(() => setBurst(null), 2200);
-    });
-    return () => {
-      unsubscribe();
-      window.clearTimeout(timer);
-    };
-  }, []);
-
-  if (!doodles || !burst) return null;
-  const name = categoryById(categories, burst.categoryId)?.name ?? 'Other';
-  return (
-    <div
-      className="doodle-burst doodle-ui"
-      aria-hidden="true"
-      data-testid="doodle-burst"
-      key={burst.id}
-    >
-      <Doodle art={artForCategory(burst.categoryId)} size={72} draw />
-      <span className="burst-caption">{name}</span>
-    </div>
-  );
-}
-
-/** The drawing above an empty state. */
-export function EmptyDoodle({ art }: { art: keyof typeof EMPTY_ART }) {
-  const doodles = useLedger((s) => s.settings.doodles);
-  if (!doodles) return null;
-  return <Doodle art={EMPTY_ART[art]!} size={88} draw className="empty-doodle doodle-ui" />;
 }

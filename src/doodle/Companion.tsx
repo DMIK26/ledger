@@ -23,6 +23,7 @@ import { usePrivacy } from '../app/Money';
 import { createSpring2D, motionReduced } from '../kit/spring';
 import { useScopedTransactions, useView, useViewMonth } from '../kit/view';
 import { findAnchor, useDoodle } from './state';
+import { tl } from '../domain/i18n';
 
 const PROP_PATH: Record<Prop, string> = {
   cup: 'M2 46h9v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3ZM11 48h2a2 2 0 0 1 0 4h-2M5 42c-1-2 1-3 0-5',
@@ -340,10 +341,10 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
 
   const questions = PAGE_QUESTIONS[path] ?? PAGE_QUESTIONS['/']!;
   const items: { key: string; label: string }[] = [
-    ...(placement === 'header' ? [{ key: 'insight', label: 'What should I know?' }] : []),
+    ...(placement === 'header' ? [{ key: 'insight', label: tl('What should I know?') }] : []),
     ...questions.map((q) => ({ key: q, label: QUESTION_LABEL[q] })),
-    { key: 'sketch', label: 'Sketch on this page' },
-    { key: 'notes', label: 'Notes' },
+    { key: 'sketch', label: tl('Sketch on this page') },
+    { key: 'notes', label: tl('Notes') },
   ];
 
   const runItem = (key: string) => {
@@ -363,7 +364,7 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
         id={menuId}
         className={menu.list ? 'ask-ring ask-list' : 'ask-ring'}
         role="group"
-        aria-label="Ask the pencil"
+        aria-label={tl('Ask the pencil')}
         style={menu.list ? { top: menu.y } : undefined}
       >
         {items.map((it, i) => {
@@ -399,7 +400,11 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
           ref={body}
           type="button"
           className="companion-button"
-          aria-label={`The pencil, ${MOOD_LABEL[mood]}. ${placement === 'header' ? 'Ask the pencil' : 'Show the top insight'}`}
+          aria-label={tl(
+            'The pencil, {0}. {1}',
+            MOOD_LABEL[mood],
+            placement === 'header' ? tl('Ask the pencil') : tl('Show the top insight'),
+          )}
           aria-expanded={placement === 'header' ? menu !== null : undefined}
           data-mood={mood}
           onClick={onClick}
@@ -446,7 +451,7 @@ export function Companion({ path, placement }: { path: string; placement: 'sideb
         aria-controls={menu ? menuId : undefined}
         onClick={openMenu}
       >
-        Ask
+        {tl('Ask')}
       </button>
       {bubble && (
         <p className="companion-bubble" role="status" data-testid="companion-bubble">

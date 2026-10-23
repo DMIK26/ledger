@@ -4,9 +4,10 @@ import { evaluateAmount } from '../domain/calc';
 import { categorise } from '../domain/categoriser';
 import { parseISO, todayISO } from '../domain/dates';
 import { fmtMoney, maskedMoney } from '../domain/money';
-import { PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
+import { methodLabel, PAYMENT_METHODS, type PaymentMethod } from '../domain/types';
 import { Icon } from './icons';
 import { usePrivacy } from './Money';
+import { tl } from '../domain/i18n';
 
 const OPERATORS = ['+', '−', '×', '÷'] as const;
 const MAX_LENGTH = 32;
@@ -58,12 +59,24 @@ const ROWS = [
 ];
 
 const KEY_LABEL: Record<string, string> = {
-  '÷': 'Divide',
-  '×': 'Times',
-  '−': 'Minus',
-  '+': 'Plus',
-  '.': 'Point',
-  back: 'Delete',
+  get '÷'() {
+    return tl('Divide');
+  },
+  get '×'() {
+    return tl('Times');
+  },
+  get '−'() {
+    return tl('Minus');
+  },
+  get '+'() {
+    return tl('Plus');
+  },
+  get '.'() {
+    return tl('Point');
+  },
+  get back() {
+    return tl('Delete');
+  },
 };
 
 /**
@@ -117,15 +130,15 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
   const save = async (categoryId: string) => {
     if (saving) return;
     if (amount === null) {
-      setError(result && !result.ok ? result.error : 'Type an amount first');
+      setError(result && !result.ok ? result.error : tl('Type an amount first'));
       pad.current?.focus();
       return;
     }
     if (!parseISO(date)) {
-      setError('Pick a valid date');
+      setError(tl('Pick a valid date'));
       return;
     }
-    const name = categories.find((c) => c.id === categoryId)?.name ?? 'Expense';
+    const name = categories.find((c) => c.id === categoryId)?.name ?? tl('Expense');
     setSaving(true);
     try {
       await addEntry(
@@ -161,7 +174,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
         className="keypad"
         tabIndex={0}
         role="group"
-        aria-label="Amount keypad. Type digits and + − × ÷, Enter to choose a category."
+        aria-label={tl('Amount keypad. Type digits and + − × ÷, Enter to choose a category.')}
         onKeyDown={onKey}
       >
         <div className="keypad-display">
@@ -194,7 +207,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
       )}
       <div className="keypad-what">
         <div className="field">
-          <label htmlFor={`${uid}-what`}>What for (optional)</label>
+          <label htmlFor={`${uid}-what`}>{tl('What for (optional)')}</label>
           <input
             id={`${uid}-what`}
             className="input"
@@ -206,7 +219,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
         </div>
       </div>
       <h3 className="keypad-pick" id={`${uid}-pick`}>
-        Tap a category to save
+        {tl('Tap a category to save')}
       </h3>
       <div className="keypad-categories" ref={grid} role="group" aria-labelledby={`${uid}-pick`}>
         {categories
@@ -217,7 +230,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
               type="button"
               className="keypad-category"
               data-suggested={c.id === suggested ? '' : undefined}
-              aria-label={`Save ${shown} to ${c.name}`}
+              aria-label={tl('Save {0} to {1}', shown, c.name)}
               disabled={saving}
               onClick={() => void save(c.id)}
             >
@@ -228,7 +241,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
       </div>
       <div className="keypad-details">
         <div className="field">
-          <label htmlFor={`${uid}-date`}>Date</label>
+          <label htmlFor={`${uid}-date`}>{tl('Date')}</label>
           <input
             id={`${uid}-date`}
             className="input"
@@ -238,7 +251,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
           />
         </div>
         <div className="field">
-          <label htmlFor={`${uid}-method`}>Paid by</label>
+          <label htmlFor={`${uid}-method`}>{tl('Paid by')}</label>
           <select
             id={`${uid}-method`}
             className="select input"
@@ -247,7 +260,7 @@ export function Keypad({ initialDate, onDone }: { initialDate?: string; onDone: 
           >
             {PAYMENT_METHODS.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {methodLabel(m)}
               </option>
             ))}
           </select>

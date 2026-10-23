@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useLedger } from '../../data/store';
 import { dueRecap } from '../../domain/recap';
 import { useUi } from '../../kit/ui';
+import { tl } from '../../domain/i18n';
 
 // The weekly digest loads only on the days it shows (Drop 12).
 const WeekDigest = lazy(() => import('./WeekDigest').then((m) => ({ default: m.WeekDigest })));
@@ -25,25 +26,25 @@ export function RecapCard({ today }: { today: string }) {
         <WeekDigest period={due} today={today} onOpen={() => openRecap(due)} onDone={putAway} />
       </Suspense>
     );
-  const what = due.kind === 'month' ? due.label : `Your ${due.label}`;
+  const what = due.kind === 'month' ? due.label : tl('Your {0}', due.label);
   return (
     <section
       className="card recap-offer"
       aria-labelledby="recap-offer-title"
       data-testid="recap-offer"
     >
-      <h2 id="recap-offer-title">{what}, in a few cards</h2>
+      <h2 id="recap-offer-title">{tl('{0}, in a few cards', what)}</h2>
       <p className="muted small">
         {due.kind === 'month'
-          ? 'Guess what you spent first, then see how it went.'
-          : 'A short look back.'}
+          ? tl('Guess what you spent first, then see how it went.')
+          : tl('A short look back.')}
       </p>
       <div className="btn-row">
         <button type="button" className="btn btn-primary" onClick={() => openRecap(due)}>
-          Open the recap
+          {tl('Open the recap')}
         </button>
         <button type="button" className="btn btn-ghost" onClick={putAway}>
-          Not interested
+          {tl('Not interested')}
         </button>
       </div>
     </section>

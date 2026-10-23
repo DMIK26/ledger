@@ -5,3 +5,4 @@ export { Recurring } from './Recurring';
 export { Settings } from './Settings';
 export { MoneyPage } from './Money';
 export { MerchantPage } from './Merchant';
+export { Transactions } from './Transactions';

@@ -1,5 +1,6 @@
 import { useLedger } from '../data/store';
 import { isSampleId } from '../domain/sample';
+import { tl } from '../domain/i18n';
 
 /** True while sample entries are in the ledger. */
 export function useHasSample(): boolean {
@@ -12,7 +13,7 @@ export function LoadSampleButton({ className = 'btn' }: { className?: string }) 
   if (has) return null;
   return (
     <button type="button" className={className} onClick={() => void load()}>
-      Load sample data
+      {tl('Load sample data')}
     </button>
   );
 }
@@ -23,14 +24,19 @@ export function SampleBanner() {
   const remove = useLedger((s) => s.removeSampleData);
   if (!has) return null;
   return (
-    <div className="banner" role="region" aria-label="Sample data" data-testid="sample-banner">
+    <div
+      className="banner"
+      role="region"
+      aria-label={tl('Sample data')}
+      data-testid="sample-banner"
+    >
       <p>
-        You are looking at sample data: three months of made-up spending, five recurring payments
-        and budgets. Try pinning, drilling into the charts and asking the pencil. Your own entries
-        stay when you remove it.
+        {tl(
+          'You are looking at sample data: three months of made-up spending, five recurring payments and budgets. Try pinning, drilling into the charts and asking the pencil. Your own entries stay when you remove it.',
+        )}
       </p>
       <button type="button" className="btn" onClick={() => void remove()}>
-        Remove sample data
+        {tl('Remove sample data')}
       </button>
     </div>
   );
@@ -42,16 +48,20 @@ export function SampleCard() {
   const remove = useLedger((s) => s.removeSampleData);
   return (
     <section className="card" aria-labelledby="sample-title">
-      <h2 id="sample-title">Sample data</h2>
+      <h2 id="sample-title">{tl('Sample data')}</h2>
       <p className="muted small">
         {has
-          ? 'Sample data is loaded. Removing it deletes only the sample entries, recurring payments and the budgets it added (unless you changed them).'
-          : 'See how Ledger works with three months of made-up spending, recurring payments and budgets. It sits alongside your own entries and comes out again in one tap.'}
+          ? tl(
+              'Sample data is loaded. Removing it deletes only the sample entries, recurring payments and the budgets it added (unless you changed them).',
+            )
+          : tl(
+              'See how Ledger works with three months of made-up spending, recurring payments and budgets. It sits alongside your own entries and comes out again in one tap.',
+            )}
       </p>
       <div className="btn-row">
         {has ? (
           <button type="button" className="btn" onClick={() => void remove()}>
-            Remove sample data
+            {tl('Remove sample data')}
           </button>
         ) : (
           <LoadSampleButton />

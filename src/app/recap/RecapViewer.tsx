@@ -14,6 +14,7 @@ import { useUi } from '../../kit/ui';
 import { Icon } from '../icons';
 import { usePrivacy } from '../Money';
 import { drawCard, shareImage } from './image';
+import { tl } from '../../domain/i18n';
 
 export interface Slide {
   id: string;
@@ -28,10 +29,10 @@ export interface Slide {
 
 const pctText = (pct: number | null, before: string): string =>
   pct === null
-    ? `Nothing to compare with ${before}.`
+    ? tl('Nothing to compare with {0}.', before)
     : pct === 0
-      ? `The same as ${before}.`
-      : `${Math.abs(pct)}% ${pct > 0 ? 'more' : 'less'} than ${before}.`;
+      ? tl('The same as {0}.', before)
+      : tl('{0}% {1} than {2}.', Math.abs(pct), pct > 0 ? tl('more') : tl('less'), before);
 
 export function recapSlides(
   r: Recap,
@@ -41,81 +42,89 @@ export function recapSlides(
   const m = (v: number) => fmtMoney(v, { currency });
   const what =
     r.period.kind === 'week'
-      ? 'that week'
+      ? tl('that week')
       : r.period.kind === 'month'
         ? r.period.label
         : r.period.label;
   const before =
     r.period.kind === 'week'
-      ? 'the week before'
+      ? tl('the week before')
       : r.period.kind === 'month'
-        ? 'the month before'
-        : 'the year before';
+        ? tl('the month before')
+        : tl('the year before');
   const out: Slide[] = [
     {
       id: 'total',
-      heading: `You spent in ${what}`,
+      heading: tl('You spent in {0}', what),
       figure: m(r.totalMinor),
-      detail: `${r.entries === 1 ? '1 entry' : `${r.entries} entries`}. ${pctText(r.changePct, before)}`,
-      plain: `${r.entries === 1 ? '1 entry' : `${r.entries} entries`}. ${pctText(r.changePct, before)}`,
+      detail: `${r.entries === 1 ? tl('1 entry') : tl('{0} entries', r.entries)}. ${pctText(r.changePct, before)}`,
+      plain: `${r.entries === 1 ? tl('1 entry') : tl('{0} entries', r.entries)}. ${pctText(r.changePct, before)}`,
     },
   ];
   if (r.topCategory)
     out.push({
       id: 'category',
-      heading: `${categoryName(r.topCategory.categoryId)} took the most`,
+      heading: tl('{0} took the most', categoryName(r.topCategory.categoryId)),
       figure: m(r.topCategory.totalMinor),
-      detail: `${Math.round(r.topCategory.share * 100)}% of everything.`,
-      plain: `${Math.round(r.topCategory.share * 100)}% of everything.`,
+      detail: tl('{0}% of everything.', Math.round(r.topCategory.share * 100)),
+      plain: tl('{0}% of everything.', Math.round(r.topCategory.share * 100)),
     });
   if (r.topMerchant)
     out.push({
       id: 'merchant',
-      heading: `Top merchant: ${r.topMerchant.name}`,
+      heading: tl('Top merchant: {0}', r.topMerchant.name),
       figure: m(r.topMerchant.totalMinor),
-      detail: r.topMerchant.count === 1 ? 'One visit.' : `${r.topMerchant.count} visits.`,
-      plain: r.topMerchant.count === 1 ? 'One visit.' : `${r.topMerchant.count} visits.`,
+      detail: r.topMerchant.count === 1 ? tl('One visit.') : tl('{0} visits.', r.topMerchant.count),
+      plain: r.topMerchant.count === 1 ? tl('One visit.') : tl('{0} visits.', r.topMerchant.count),
     });
   if (r.busiestDay)
     out.push({
       id: 'day',
-      heading: `Busiest day: ${fmtDate(r.busiestDay.date)}`,
+      heading: tl('Busiest day: {0}', fmtDate(r.busiestDay.date)),
       figure: m(r.busiestDay.totalMinor),
-      detail: 'The most spent on a single day.',
-      plain: 'The most spent on a single day.',
+      detail: tl('The most spent on a single day.'),
+      plain: tl('The most spent on a single day.'),
     });
   out.push({
     id: 'quiet',
     heading:
-      r.quietDays === 1 ? '1 day with nothing spent' : `${r.quietDays} days with nothing spent`,
+      r.quietDays === 1
+        ? tl('1 day with nothing spent')
+        : tl('{0} days with nothing spent', r.quietDays),
     figure: null,
-    detail: r.quietDays > 0 ? 'Quiet days count too.' : 'Something every day. Busy times.',
-    plain: r.quietDays > 0 ? 'Quiet days count too.' : 'Something every day. Busy times.',
+    detail: r.quietDays > 0 ? tl('Quiet days count too.') : tl('Something every day. Busy times.'),
+    plain: r.quietDays > 0 ? tl('Quiet days count too.') : tl('Something every day. Busy times.'),
   });
   if (r.biggest)
     out.push({
       id: 'biggest',
-      heading: `Biggest single expense: ${r.biggest.merchant}`,
+      heading: tl('Biggest single expense: {0}', r.biggest.merchant),
       figure: m(r.biggest.amountMinor),
-      detail: `On ${fmtDate(r.biggest.date)}.`,
-      plain: `On ${fmtDate(r.biggest.date)}.`,
+      detail: tl('On {0}.', fmtDate(r.biggest.date)),
+      plain: tl('On {0}.', fmtDate(r.biggest.date)),
     });
   if (r.leftMinor !== null)
     out.push({
       id: 'left',
-      heading: r.leftMinor >= 0 ? 'Left after spending' : 'Spent more than came in',
+      heading: r.leftMinor >= 0 ? tl('Left after spending') : tl('Spent more than came in'),
       figure: m(Math.abs(r.leftMinor)),
-      detail: `${m(r.inMinor)} came in.`,
-      plain: 'Money in, less spending, interest and fees.',
+      detail: tl('{0} came in.', m(r.inMinor)),
+      plain: tl('Money in, less spending, interest and fees.'),
     });
   return out;
 }
 
 const VERDICT: Record<ReturnType<typeof guessResult>['verdict'], string> = {
-  'spot-on': 'Spot on.',
+  get 'spot-on'() {
+    return tl('Spot on.');
+  },
   close: 'Close.',
-  under: 'You guessed under.',
-  over: 'You guessed over.',
+  get under() {
+    return tl('You guessed under.');
+  },
+  get over() {
+    return tl('You guessed over.');
+  },
 };
 
 /**
@@ -137,7 +146,7 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
     [period, transactions, flows],
   );
   const slides = useMemo(
-    () => recapSlides(recap, (id) => categoryById(categories, id)?.name ?? 'Other', currency),
+    () => recapSlides(recap, (id) => categoryById(categories, id)?.name ?? tl('Other'), currency),
     // `masked` too: the figures are formatted text, masked while privacy is on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [recap, categories, currency, masked],
@@ -168,9 +177,9 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
 
   const share = async () => {
     const blob = await drawCard(slide, period.label, masked);
-    if (!blob) return setNote('This browser cannot make the image.');
+    if (!blob) return setNote(tl('This browser cannot make the image.'));
     const how = await shareImage(blob, `ledger-${period.id.replace(':', '-')}-${slide.id}.png`);
-    setNote(how === 'shared' ? '' : how === 'saved' ? 'Image saved to your downloads.' : '');
+    setNote(how === 'shared' ? '' : how === 'saved' ? tl('Image saved to your downloads.') : '');
   };
 
   return (
@@ -200,7 +209,7 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
           <button
             type="button"
             className="btn btn-ghost btn-icon"
-            aria-label="Close"
+            aria-label={tl('Close')}
             onClick={close}
           >
             <Icon name="close" />
@@ -208,12 +217,14 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
         </div>
         {!guessed ? (
           <div className="recap-card" data-testid="recap-guess">
-            <p className="recap-heading">Guess first: how much did you spend in {period.label}?</p>
+            <p className="recap-heading">
+              {tl('Guess first: how much did you spend in {0}?', period.label)}
+            </p>
             <p className="recap-figure" aria-hidden="true">
               {fmtMoney(guess, { currency })}
             </p>
             <label className="visually-hidden" htmlFor="recap-guess">
-              Your guess
+              {tl('Your guess')}
             </label>
             <input
               id="recap-guess"
@@ -227,7 +238,7 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
               onChange={(e) => setGuess(Number(e.target.value))}
             />
             <button type="button" className="btn btn-primary" onClick={() => setGuessed(true)}>
-              Show me
+              {tl('Show me')}
             </button>
           </div>
         ) : (
@@ -250,8 +261,12 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
             <p className="muted">{slide.detail}</p>
             {asksGuess && slide.id === 'total' && (
               <p className="small" data-testid="recap-guess-result">
-                You guessed {fmtMoney(guess, { currency })}. {VERDICT[result.verdict]}
-                {result.verdict !== 'spot-on' ? ` Off by ${result.offPct}%.` : ''}
+                {tl(
+                  'You guessed {0}. {1}{2}',
+                  fmtMoney(guess, { currency }),
+                  VERDICT[result.verdict],
+                  result.verdict !== 'spot-on' ? ' ' + tl('Off by {0}%.', result.offPct) : '',
+                )}
               </p>
             )}
           </div>
@@ -260,24 +275,24 @@ export function RecapViewer({ period }: { period: RecapPeriod }) {
           <>
             <div className="recap-nav">
               <button type="button" className="btn" disabled={i === 0} onClick={() => go(-1)}>
-                Previous
+                {tl('Previous')}
               </button>
               <span className="muted small" aria-live="polite">
-                {i + 1} of {n}
+                {tl('{0} of {1}', i + 1, n)}
               </span>
               <button type="button" className="btn" disabled={i === n - 1} onClick={() => go(1)}>
-                Next
+                {tl('Next')}
               </button>
             </div>
             <div className="btn-row">
               <button type="button" className="btn btn-ghost" onClick={() => void share()}>
                 <Icon name="share" />
-                Share this card
+                {tl('Share this card')}
               </button>
             </div>
             {masked && (
               <p className="muted small">
-                Privacy mode is on, so a shared image leaves amounts out.
+                {tl('Privacy mode is on, so a shared image leaves amounts out.')}
               </p>
             )}
             {note && (

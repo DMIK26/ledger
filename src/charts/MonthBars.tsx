@@ -1,11 +1,11 @@
 import { MoodFaceG, MOOD_OF } from '../doodle/faces';
 import { budgetStatus } from '../domain/budgets';
-import { scaleBand, scaleLinear } from 'd3-scale';
+import { bandScale, linearScale } from './scale';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { Money, usePrivacy } from '../app/Money';
 import type { MonthPoint } from '../domain/aggregates';
 import { BUDGET_STEP, snapToStep } from '../domain/budgets';
-import { monthLabel } from '../domain/dates';
+import { monthLabel, monthShortLabel } from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import type { Category } from '../domain/types';
 import { entityKey } from '../kit/entityKeys';
@@ -14,6 +14,8 @@ import { useRoving } from '../kit/roving';
 import { createSpring2D } from '../kit/spring';
 import { fillFor, HatchDefs } from './fills';
 import { useSize } from './useSize';
+import { tl } from '../domain/i18n';
+import { tr } from '../app/tr';
 
 export type BarMode = 'total' | 'category';
 
@@ -36,7 +38,7 @@ interface Props {
 const MIN_HEIGHT = 220;
 const M = { top: 16, right: 16, bottom: 28, left: 52 };
 
-const shortMonth = (key: string) => monthLabel(key).slice(0, 3);
+const shortMonth = (key: string) => monthShortLabel(key);
 
 export function MonthBars({
   series,
@@ -74,14 +76,12 @@ export function MonthBars({
     budgetMinor ?? 0,
     BUDGET_STEP * 4,
   );
-  const y = scaleLinear()
-    .domain([0, frozenMax ?? dataMax * 1.1])
-    .nice(4)
-    .range([HEIGHT - M.bottom, M.top]);
-  const x = scaleBand<string>()
-    .domain(series.map((p) => p.month))
-    .range([M.left, Math.max(M.left + 60, width - M.right)])
-    .padding(0.35);
+  const y = linearScale([0, frozenMax ?? dataMax * 1.1], [HEIGHT - M.bottom, M.top], 4);
+  const x = bandScale(
+    series.map((p) => p.month),
+    [M.left, Math.max(M.left + 60, width - M.right)],
+    0.35,
+  );
   const yMax = y.domain()[1] ?? 0;
   const current = selectedMonth ?? series[series.length - 1]?.month;
 
@@ -152,7 +152,9 @@ export function MonthBars({
         height={HEIGHT}
         className={`bars-svg bars-${mode}`}
         role="group"
-        aria-label="Spending in the last six months. Use the arrow keys to move between months and Enter to open one."
+        aria-label={tl(
+          'Spending in the last six months. Use the arrow keys to move between months and Enter to open one.',
+        )}
         data-roving-group=""
       >
         <HatchDefs categories={categories} />
@@ -183,7 +185,11 @@ export function MonthBars({
               className="bar"
               role="button"
               aria-pressed={p.month === current}
-              aria-label={`${monthLabel(p.month)}, ${fmtMoney(p.totalMinor, { currency })}. Open this month`}
+              aria-label={tl(
+                '{0}, {1}. Open this month',
+                monthLabel(p.month),
+                fmtMoney(p.totalMinor, { currency }),
+              )}
               data-testid={`bar-${p.month}`}
               data-anchor={`month:${p.month}`}
               {...rv}
@@ -266,7 +272,9 @@ export function MonthBars({
             data-dragging={draft !== null ? '' : undefined}
             tabIndex={0}
             role="slider"
-            aria-label="Monthly budget. Drag, or use the arrow keys, to change it in steps of 500"
+            aria-label={tl(
+              'Monthly budget. Drag, or use the arrow keys, to change it in steps of 500',
+            )}
             aria-valuetext={fmtMoney(budget, { currency })}
             aria-valuemin={masked ? undefined : 0}
             aria-valuemax={masked ? undefined : Math.round(yMax / 100)}
@@ -292,7 +300,7 @@ export function MonthBars({
       </svg>
       {budget !== null && (
         <div className="budget-tag" ref={tag} aria-hidden="true">
-          Budget <Money minor={budget} currency={currency} />
+          {tr('Budget {0}', <Money minor={budget} currency={currency} />)}
         </div>
       )}
       {hovered && (
@@ -314,7 +322,7 @@ export function MonthBars({
               .slice(0, 3)
               .map(([id, v]) => (
                 <span key={id} className="tip-row">
-                  <span>{categories.find((c) => c.id === id)?.name ?? 'Other'}</span>
+                  <span>{categories.find((c) => c.id === id)?.name ?? tl('Other')}</span>
                   <Money minor={v} currency={currency} />
                 </span>
               ))}

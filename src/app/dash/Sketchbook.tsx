@@ -5,6 +5,8 @@ import { categoryById } from '../../domain/categories';
 import { fmtDate, monthLabel, todayISO } from '../../domain/dates';
 import { artForCategory, Doodle } from '../../doodle/art';
 import { useViewMonth } from '../../kit/view';
+import { tl } from '../../domain/i18n';
+import { tr } from '../tr';
 
 const REST = { ink: 'M14 40c8-10 28-10 36 0M20 30h6M38 30h6', accent: 'M44 14h8l-8 8h8' };
 
@@ -30,15 +32,19 @@ export function Sketchbook() {
       data-testid="sketchbook"
     >
       <div className="card-head">
-        <h2 id="sketchbook-title">Sketchbook</h2>
+        <h2 id="sketchbook-title">{tl('Sketchbook')}</h2>
         <span className="muted small">
-          {drawn === 1 ? '1 drawing' : `${drawn} drawings`} in {monthLabel(month).split(' ')[0]}
+          {tr(
+            '{0} in {1}',
+            drawn === 1 ? tl('1 drawing') : tl('{0} drawings', drawn),
+            monthLabel(month).split(' ')[0],
+          )}
         </span>
       </div>
-      <ol className="sketch-page" aria-label={`Drawings for ${monthLabel(month)}`}>
+      <ol className="sketch-page" aria-label={tl('Drawings for {0}', monthLabel(month))}>
         {days.map((d) => {
           const name =
-            d.kind === 'drawn' ? (categoryById(categories, d.categoryId)?.name ?? 'Other') : '';
+            d.kind === 'drawn' ? (categoryById(categories, d.categoryId)?.name ?? tl('Other')) : '';
           return (
             <li
               key={d.date}
@@ -47,8 +53,8 @@ export function Sketchbook() {
                 d.kind === 'drawn'
                   ? `${fmtDate(d.date)}: ${name}`
                   : d.kind === 'rest'
-                    ? `${fmtDate(d.date)}: no spend`
-                    : `${fmtDate(d.date)}: ${d.kind === 'future' ? 'still to come' : 'nothing logged'}`
+                    ? tl('{0}: no spend', fmtDate(d.date))
+                    : `${fmtDate(d.date)}: ${d.kind === 'future' ? tl('still to come') : tl('nothing logged')}`
               }
             >
               {/* Drawn by CSS from data-day, so a page of numbers never reads as one long figure. */}
@@ -59,7 +65,9 @@ export function Sketchbook() {
           );
         })}
       </ol>
-      <p className="muted small">Every day you log adds a drawing of its biggest category.</p>
+      <p className="muted small">
+        {tl('Every day you log adds a drawing of its biggest category.')}
+      </p>
     </section>
   );
 }

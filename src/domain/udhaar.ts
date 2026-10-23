@@ -1,6 +1,8 @@
 import { fmtMoney } from './money';
 import { fmtDate } from './dates';
 import type { ISODate } from './types';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 /**
  * Udhaar: money lent to and borrowed from people, settled in parts over time (like a personal khata).
@@ -10,20 +12,32 @@ import type { ISODate } from './types';
 export type UdhaarKind = 'lent' | 'borrowed' | 'got-back' | 'paid-back';
 
 export const UDHAAR_LABEL: Record<UdhaarKind, string> = {
-  lent: 'I lent',
-  borrowed: 'I borrowed',
-  'got-back': 'They paid me back',
-  'paid-back': 'I paid back',
+  get lent() {
+    return tl('I lent');
+  },
+  get borrowed() {
+    return tl('I borrowed');
+  },
+  get 'got-back'() {
+    return tl('They paid me back');
+  },
+  get 'paid-back'() {
+    return tl('I paid back');
+  },
 };
 
 export interface Person {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   name: string;
   createdAt: number;
 }
 
 export interface UdhaarEntry {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   personId: string;
   kind: UdhaarKind;
   date: ISODate;
@@ -109,8 +123,13 @@ export function reminderText(
   currency = 'INR',
 ): string {
   const amount = fmtMoney(balanceMinor, { currency, reveal: true });
-  const when = since ? ` from ${fmtDate(since)}` : '';
-  return `Hi ${name}, a gentle reminder about the ${amount}${when}. No rush, whenever it suits you. Thanks.`;
+  const when = since ? ' ' + tl('from {0}', fmtDate(since)) : '';
+  return tl(
+    'Hi {0}, a gentle reminder about the {1}{2}. No rush, whenever it suits you. Thanks.',
+    name,
+    amount,
+    when,
+  );
 }
 
 export const MAX_PERSON_NAME = 40;

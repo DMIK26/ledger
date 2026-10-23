@@ -1,12 +1,16 @@
 import { normalizeMerchantKey } from './categoriser';
 import { addDays, daysInMonth, diffDays, isoFromYMD, parseISO, shiftMonth } from './dates';
 import type { CategoryId, ISODate, PaymentMethod, Transaction } from './types';
+import type { Space } from './spaces';
+import { tl } from './i18n';
 
 export type Cadence = 'weekly' | 'monthly' | 'yearly';
 
 /** A repeating payment the user has confirmed or added. */
 export interface RecurringItem {
   id: string;
+  /** The Shop ledger's rows say 'shop'; missing means Personal (Drop 13). */
+  space?: Space;
   merchant: string;
   categoryId: CategoryId;
   method: PaymentMethod;
@@ -18,9 +22,15 @@ export interface RecurringItem {
 }
 
 export const CADENCE_LABEL: Record<Cadence, string> = {
-  weekly: 'Every week',
-  monthly: 'Every month',
-  yearly: 'Every year',
+  get weekly() {
+    return tl('Every week');
+  },
+  get monthly() {
+    return tl('Every month');
+  },
+  get yearly() {
+    return tl('Every year');
+  },
 };
 
 const PER_YEAR: Record<Cadence, number> = { weekly: 52, monthly: 12, yearly: 1 };
