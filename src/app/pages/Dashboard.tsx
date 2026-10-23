@@ -48,7 +48,7 @@ import { CardDue } from '../money/CardDue';
 import { InstallBanner } from '../InstallBanner';
 import { LoadSampleButton, SampleBanner } from '../SampleData';
 import { SafeToSpendCard } from '../plan/SafeToSpend';
-import { MonthCloseCard } from '../plan/MonthClose';
+import { MonthCloseCard } from '../deferred';
 import { AtRiskCard } from '../plan/AtRisk';
 import { RecapCard } from '../dash/RecapCard';
 import { ScrubChart, type DayPoint } from '../../charts/ScrubChart';
@@ -63,6 +63,7 @@ import { useUi } from '../../kit/ui';
 const Sketchbook = lazy(() =>
   import('../dash/Sketchbook').then((m) => ({ default: m.Sketchbook })),
 );
+const Nudges = lazy(() => import('../dash/Nudges').then((m) => ({ default: m.Nudges })));
 const LONG_PRESS_MS = 600;
 
 const PER_DAY_STEP = 1000; // ₹10
@@ -512,6 +513,11 @@ export function Dashboard() {
     ),
     risk: planned ? <AtRiskCard today={today} /> : null,
     cards: current ? <CardDue /> : null,
+    nudges: planned ? (
+      <Suspense fallback={null}>
+        <Nudges />
+      </Suspense>
+    ) : null,
     insights: current ? (
       <Insights overallBudgetMinor={pins.length === 0 ? mine.overall : null} />
     ) : null,
@@ -713,7 +719,11 @@ export function Dashboard() {
       <BackupReminder />
       <QuickAdd followMonth />
       <CheckIn />
-      {planned && <MonthCloseCard today={today} />}
+      {planned && (
+        <Suspense fallback={null}>
+          <MonthCloseCard today={today} />
+        </Suspense>
+      )}
       {planned && <RecapCard today={today} />}
       {customising && (
         <section className="card customise-bar" aria-labelledby="customise-title">

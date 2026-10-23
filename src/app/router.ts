@@ -8,6 +8,7 @@ export const ROUTES = [
   '/reports',
   '/recurring',
   '/settings',
+  '/merchant',
 ] as const;
 export type RoutePath = (typeof ROUTES)[number];
 

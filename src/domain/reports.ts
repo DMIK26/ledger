@@ -1,6 +1,7 @@
 import { lastMonths, monthSeries } from './aggregates';
 import { normalizeMerchantKey } from './categoriser';
 import { addDays, daysInMonth, diffDays, isoFromYMD, parseISO, weekdayOf } from './dates';
+import type { RelativeRange } from './periods';
 import type { CategoryId, ISODate, PaymentMethod, Transaction } from './types';
 
 export const inRange = (
@@ -194,4 +195,16 @@ export function scaleCompare(report: Report, rangeDays: number): Report {
       compareMinor: Math.round(c.compareMinor * f),
     })),
   };
+}
+
+/** A report kept under a name (Drop 12). Month, quarter and year keep their offset from today. */
+export interface SavedReport {
+  id: string;
+  name: string;
+  range:
+    | { kind: 'month' | 'quarter' | 'fy'; offset: number }
+    | { kind: 'relative'; id: RelativeRange }
+    | { kind: 'custom'; start: ISODate; end: ISODate };
+  compare: 'previous' | 'lastYear' | 'average';
+  createdAt: number;
 }

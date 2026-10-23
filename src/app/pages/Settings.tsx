@@ -24,6 +24,7 @@ import { href } from '../router';
 import { CategoryManager } from '../settings/CategoryManager';
 import { CsvImport } from '../settings/CsvImport';
 import { Activity } from '../settings/Activity';
+import { RulesCard } from '../settings/Rules';
 
 const THEMES: Array<{ value: ThemeChoice; label: string }> = [
   { value: 'system', label: 'System' },
@@ -735,8 +736,18 @@ function About() {
   );
 }
 
-export function Settings({ view }: { view?: string | null }) {
+export function Settings({ view, merchant }: { view?: string | null; merchant?: string | null }) {
   if (view === 'activity') return <Activity />;
+  if (view === 'rules')
+    return (
+      <>
+        <p>
+          <a href={href('/settings')}>Back to settings</a>
+        </p>
+        <RulesCard startText={merchant} />
+        <LearnedRules />
+      </>
+    );
   return (
     <>
       <Appearance />
@@ -745,6 +756,7 @@ export function Settings({ view }: { view?: string | null }) {
       <MoneySettings />
       <CategoryManager />
       <Favourites />
+      <RulesCard />
       <LearnedRules />
       <Data />
       <SampleCard />

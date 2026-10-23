@@ -1,9 +1,9 @@
 # Handoff: where the build stands
 
-Updated 22 Oct 2026. **Drops 1 to 10 are complete and published** at
-https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 11 is built and verified here; it goes live
-once Dhaarmik commits and pushes it with GitHub Desktop.** Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`,
-`docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
+Updated 23 Oct 2026. **Drops 1 to 11 are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.0.0**. **Drop 12 is built and verified here; it goes live
+once Dhaarmik commits and pushes it with GitHub Desktop.** Next is Drop 13 (reach and polish, v1.1.0).
+Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified
 
@@ -37,7 +37,48 @@ sideways at phone width (that test caught and fixed an overflowing Reports heade
 CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull request. The Pages deploy
 (`deploy.yml`) runs on its own and does not wait for CI.
 
-## Drop 11: interactive (22 Oct 2026, built, awaiting publish)
+## Drop 12: insight (23 Oct 2026, built, awaiting publish)
+
+- **Search** (Transactions, `?q=`; the palette's "Search entries for …"): `src/domain/search.ts` reads
+  periods, amounts, methods, categories and subcategories, tags, people ("for amma"), trips, tax
+  sections and flags; other words must appear in the merchant, notes, typed text or tags. Chips show
+  what was understood. The module loads when someone first searches (start-up budget).
+- **Your rules** (Settings > Rules, `?view=rules&merchant=` from a merchant page; `src/domain/rules.ts`):
+  merchant contains, starts with or is; optional amount range and method; set category, subcategory,
+  tag, for whom, tax section. Tested live on past entries; saving can apply it to them (one undo).
+  Order: your rules, then learned categories, then subcategory names, then built-in words. Quick add
+  and several at once take everything a rule sets; the form keeps its category and fills what is empty.
+  Rules are the settings list `customRules`.
+- **Merchant pages** (`#/merchant?key=`, lazy page): totals, average, visits, how often, the rule that
+  files it, 12 months, full history. Linked from the palette (merchants now open here), Reports' top
+  merchants and the merchant grouping in Transactions.
+- **Nudges** (Dashboard card "Worth a look", `src/domain/nudges.ts`): repeats within a day, unusual
+  amounts (twice the median of 3+ earlier entries and ₹200 more), recurring price rises, warranties
+  ending within 30 days. "Fine" puts one away (settings list `nudgesDismissed`, not backed up).
+- **Weekly digest**: the week recap offer is now a digest card (`dash/WeekDigest.tsx`, lazy).
+- **Trips, projects and festivals** (Budgets > Trips, store `projects`, schema v4): dates, budget, and
+  "collect entries in these days" so new entries join by date. `Transaction.projectId`; the form, bulk
+  bar and search use it. Deleting one keeps its entries.
+- **Subcategories**: `Category.subcategories` (`id` is `${categoryId}/${slug}`), `Transaction.subcategoryId`.
+  Every total still counts the category, so charts and budgets roll up by themselves. Settings >
+  Categories edits them; Reports' category table opens them; quick add picks one named in the entry.
+- **Reports**: "Recent" ranges (last 30 days, 3, 6, 12 months, this calendar year), saved reports
+  (`savedReports`), 50/30/20 (`Category.need`, defaults in `needs.ts`), spent for whom, tax summary
+  for the financial year with CSV export (`tax.ts`; old-regime limits as a guide; notes the 2025 Act's
+  renumbering).
+- **Form** ("Who it was for, tax and warranty"): `forWhom`, `taxSection`, `warrantyMonths`; a trip
+  select when trips exist. Rows show these as a muted line. Transactions > Warranties lists them.
+- **Start-up size**: the Add sheet's forms, the lock screen and the close-the-month card now load on
+  first use (`src/app/deferred.tsx`, swapped for `deferred.eager.tsx` in tests); CSV export moved to
+  `src/domain/csvExport.ts`. Start-up JavaScript 164 of 170 KB, all JavaScript 244 of 300 KB, CSS 14 of
+  16 KB, precache 1263 of 1300 KB (close; Drop 13 should trim).
+
+Verified: lint, typecheck, 473 unit tests (44 files), build with budgets, Playwright 103 passed and 15
+skipped with `CI=1` (new `e2e/drop12.spec.ts`; the axe, dark-contrast, phone-size and privacy sweeps
+include Trips, Rules, Warranties, a merchant page and a search). Not verified on real phones: the tax CSV
+through the share sheet, how the search box feels with the phone keyboard.
+
+## Drop 11: interactive (22 Oct 2026, published)
 
 - **Transactions** has List, Calendar and Review views (`?view=calendar`, `?view=review`, loaded on
   first use from `src/app/views/`). Calendar: Monday-first weeks with spending, bills, money in, card

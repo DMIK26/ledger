@@ -8,6 +8,7 @@ import {
 } from '../../domain/categories';
 import type { Category } from '../../domain/types';
 import { tick } from '../../kit/haptics';
+import { Subcategories } from './Subcategories';
 
 const COLOUR_NAMES = [
   'Clay',
@@ -149,6 +150,7 @@ function Row({
           <span className="muted small">A colour in use swaps with that category.</span>
         </div>
       )}
+      <Subcategories c={c} />
       {deleting && (
         <div className="preview cat-wide">
           <label htmlFor={`move-${c.id}`}>

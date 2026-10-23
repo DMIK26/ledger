@@ -1,11 +1,20 @@
 import { LoadSampleButton } from '../SampleData';
 import { EmptyDoodle } from '../../doodle/Studio';
-import { lazy, Suspense, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { newId, useLedger } from '../../data/store';
 import { TRASH_DAYS } from '../../data/bus';
 import { fmtDate, parseISO, todayISO } from '../../domain/dates';
 import { safeText, toCsv } from '../../domain/csv';
-import { exportRows } from '../../domain/csvImport';
+import { exportRows } from '../../domain/csvExport';
 import {
   allTags,
   applyFilters,
@@ -24,6 +33,9 @@ import {
 import { CURRENCIES, parseAmountToMinor } from '../../domain/money';
 import { normalizeTag } from '../../domain/tags';
 import { PAYMENT_METHODS, type PaymentMethod } from '../../domain/types';
+import { forWhomNames } from '../../domain/forWhom';
+import type { SearchQuery } from '../../domain/search';
+import { findSubcategory } from '../../domain/subcategories';
 import { csvFile, ExportButton } from '../files';
 import { useMarquee } from '../../kit/useMarquee';
 import { useScopedTransactions } from '../../kit/view';
@@ -39,6 +51,117 @@ const CalendarView = lazy(() =>
   import('../views/Calendar').then((m) => ({ default: m.CalendarView })),
 );
 const ReviewView = lazy(() => import('../views/Review').then((m) => ({ default: m.ReviewView })));
+const WarrantiesView = lazy(() =>
+  import('../views/Warranties').then((m) => ({ default: m.WarrantiesView })),
+);
+
+const FLAG_LABEL = {
+  tax: 'Tax deduction',
+  warranty: 'Has a warranty',
+  receipt: 'Has a receipt',
+  split: 'Split',
+  unsure: 'Unsure',
+} as const;
+
+/** What the search understood, as chips (amounts through Money, so privacy mode hides them). */
+function SearchChips({ q }: { q: SearchQuery }) {
+  const categories = useLedger((s) => s.categories);
+  const projects = useLedger((s) => s.projects);
+  const currency = useLedger((s) => s.settings.currency);
+  const chips: ReactNode[] = [];
+  const m = (minor: number) => <Money minor={minor} currency={currency} />;
+  if (q.period) chips.push(q.period.label);
+  const a = q.amount;
+  if (a)
+    chips.push(
+      a.kind === 'between' ? (
+        <>
+          {m(a.minor)} to {m(a.to)}
+        </>
+      ) : (
+        <>
+          {
+            {
+              over: 'Over',
+              under: 'Under',
+              atLeast: 'At least',
+              atMost: 'Up to',
+              exact: 'Exactly',
+            }[a.kind]
+          }{' '}
+          {m(a.minor)}
+        </>
+      ),
+    );
+  for (const id of q.categoryIds) chips.push(categories.find((c) => c.id === id)?.name ?? id);
+  for (const id of q.subcategoryIds) chips.push(findSubcategory(categories, id)?.sub.name ?? id);
+  for (const x of q.methods) chips.push(x);
+  for (const t of q.tags) chips.push(`#${t}`);
+  for (const w of q.forWhom) chips.push(w ? `For ${w}` : 'For you');
+  for (const id of q.projectIds) chips.push(projects.find((p) => p.id === id)?.name ?? id);
+  for (const x of q.taxSections) chips.push(`Tax ${x}`);
+  for (const f of q.flags) chips.push(FLAG_LABEL[f]);
+  for (const w of q.words) chips.push(`“${w}”`);
+  return (
+    <p className="search-chips" aria-live="polite" data-testid="search-chips">
+      <span className="muted small">Looking for</span>
+      {chips.map((c, i) => (
+        <span key={i} className="chip">
+          {c}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/**
+ * Plain-words search (Drop 12). The typed text is set as a property only, like AmountInput, so an
+ * amount typed here never lands in a DOM attribute while privacy mode is on.
+ */
+function SearchBox({ initial, onChange }: { initial: string; onChange: (text: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [hasText, setHasText] = useState(initial !== '');
+  useEffect(() => {
+    if (ref.current) ref.current.value = initial;
+    // Only on mount: the page remounts when the address (and so ?q=) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <form className="search-box" role="search" onSubmit={(e) => e.preventDefault()}>
+      <label className="visually-hidden" htmlFor="tx-search">
+        Search entries
+      </label>
+      <Icon name="search" />
+      <input
+        ref={ref}
+        id="tx-search"
+        className="input"
+        type="search"
+        autoComplete="off"
+        spellCheck={false}
+        enterKeyHint="search"
+        placeholder="Search: food last month over 500 upi"
+        onChange={(e) => {
+          setHasText(e.target.value !== '');
+          onChange(e.target.value);
+        }}
+      />
+      {hasText && (
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => {
+            if (ref.current) ref.current.value = '';
+            setHasText(false);
+            onChange('');
+          }}
+        >
+          Clear search
+        </button>
+      )}
+    </form>
+  );
+}
 
 const COLUMNS: Array<{ id: string; label: string }> = [
   { id: 'category', label: 'Category' },
@@ -276,6 +399,9 @@ function BulkBar({
   const bulkAddTag = useLedger((s) => s.bulkAddTag);
   const copyToToday = useLedger((s) => s.copyToToday);
   const saveFavourite = useLedger((s) => s.saveFavourite);
+  const setEntriesProject = useLedger((s) => s.setEntriesProject);
+  const allProjects = useLedger((s) => s.projects);
+  const projects = allProjects.filter((p) => !p.archived);
   const transactions = useLedger((s) => s.transactions);
   const [tag, setTag] = useState('');
   const single = ids.length === 1 ? transactions.find((t) => t.id === ids[0]) : undefined;
@@ -304,6 +430,30 @@ function BulkBar({
           </option>
         ))}
       </select>
+      {projects.length > 0 && (
+        <>
+          <label className="visually-hidden" htmlFor="bulk-project">
+            Add selected to a trip or project
+          </label>
+          <select
+            id="bulk-project"
+            className="select input"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) void setEntriesProject(ids, v === 'none' ? null : v).then(onDone);
+            }}
+          >
+            <option value="">Trip or project…</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+            <option value="none">No trip or project</option>
+          </select>
+        </>
+      )}
       <form
         className="bulk-tag"
         onSubmit={(e) => {
@@ -503,8 +653,31 @@ function TrashView() {
   );
 }
 
-function Ledger({ initialFilters }: { initialFilters: Filters }) {
+function Ledger({
+  initialFilters,
+  initialSearch,
+}: {
+  initialFilters: Filters;
+  initialSearch: string;
+}) {
   const transactions = useScopedTransactions();
+  const everything = useLedger((s) => s.transactions);
+  const projects = useLedger((s) => s.projects);
+  const people = useLedger((s) => s.people);
+  const fyStart = useLedger((s) => s.settings.fyStartMonth);
+  const [search, setSearch] = useState(initialSearch);
+  // The search's words are only loaded once someone searches (Drop 12), to keep start-up small.
+  const [searchMod, setSearchMod] = useState<typeof import('../../domain/search') | null>(null);
+  const loadSearch = useCallback(() => {
+    if (!searchMod) void import('../../domain/search').then((m) => setSearchMod(m));
+  }, [searchMod]);
+  useEffect(() => {
+    if (initialSearch) loadSearch();
+  }, [initialSearch, loadSearch]);
+  const names = useMemo(
+    () => [...forWhomNames(everything), ...people.map((p) => p.name)],
+    [everything, people],
+  );
   const allCount = useLedger((s) => s.transactions.length);
   const listRef = useRef<HTMLElement>(null);
   const categories = useLedger((s) => s.categories);
@@ -524,9 +697,30 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [receiptId, setReceiptId] = useState<string | null>(null);
 
+  const query = useMemo(() => {
+    if (!search.trim() || !searchMod) return null;
+    const q = searchMod.parseSearch(search, {
+      today: todayISO(),
+      fyStart,
+      categories,
+      projects,
+      people: names,
+    });
+    return searchMod.isEmptySearch(q) ? null : q;
+  }, [search, searchMod, fyStart, categories, projects, names]);
+  const warrantyCount = useMemo(
+    () => everything.filter((t) => t.warrantyMonths).length,
+    [everything],
+  );
   const filtered = useMemo(
-    () => sortTransactions(applyFilters(transactions, filters), sort),
-    [transactions, filters, sort],
+    () =>
+      sortTransactions(
+        applyFilters(transactions, filters).filter(
+          (t) => !query || !searchMod || searchMod.searchMatches(t, query),
+        ),
+        sort,
+      ),
+    [transactions, filters, sort, query, searchMod],
   );
   const pages = pageCount(filtered.length);
   const current = Math.min(page, pages);
@@ -599,6 +793,15 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
   return (
     <>
       <QuickAdd />
+      <SearchBox
+        initial={initialSearch}
+        onChange={(text) => {
+          if (text.trim()) loadSearch();
+          setSearch(text);
+          setPage(1);
+        }}
+      />
+      {query && <SearchChips q={query} />}
       <div className="toolbar">
         <button
           type="button"
@@ -670,6 +873,11 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
           }
         />
         <ColumnsMenu />
+        {warrantyCount > 0 && (
+          <a className="btn btn-ghost" href={href('/transactions?view=warranties')}>
+            Warranties ({warrantyCount})
+          </a>
+        )}
         <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
           {trashCount > 0 ? `Trash (${trashCount})` : 'Trash'}
         </a>
@@ -692,7 +900,9 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
         <section className="card empty">
           <EmptyDoodle art="receipt" />
           <h2>No matches</h2>
-          <p className="muted">Nothing fits these filters.</p>
+          <p className="muted">
+            {query ? 'Nothing fits this search and these filters.' : 'Nothing fits these filters.'}
+          </p>
           <p>
             <button
               type="button"
@@ -747,7 +957,11 @@ function Ledger({ initialFilters }: { initialFilters: Filters }) {
             <div key={g.key} className="tx-group">
               {groupBy !== 'none' && (
                 <h3 className="group-head">
-                  <span>{g.label}</span>
+                  {groupBy === 'merchant' && g.key !== '(none)' ? (
+                    <a href={href(`/merchant?key=${encodeURIComponent(g.key)}`)}>{g.label}</a>
+                  ) : (
+                    <span>{g.label}</span>
+                  )}
                   <Money minor={g.totalMinor} currency={currency} />
                 </h3>
               )}
@@ -815,11 +1029,25 @@ export function filtersFromQuery(query: URLSearchParams): Filters {
 export function Transactions({
   view,
   initialFilters = EMPTY_FILTERS,
+  initialSearch = '',
 }: {
   view?: string | null;
   initialFilters?: Filters;
+  initialSearch?: string;
 }) {
   if (view === 'trash') return <TrashView />;
+  if (view === 'warranties')
+    return (
+      <Suspense
+        fallback={
+          <p className="muted page-loading" aria-busy="true">
+            Opening…
+          </p>
+        }
+      >
+        <WarrantiesView />
+      </Suspense>
+    );
   const current = view === 'calendar' || view === 'review' ? view : 'list';
   return (
     <>
@@ -834,7 +1062,9 @@ export function Transactions({
         {current === 'calendar' && <CalendarView />}
         {current === 'review' && <ReviewView />}
       </Suspense>
-      {current === 'list' && <Ledger initialFilters={initialFilters} />}
+      {current === 'list' && (
+        <Ledger initialFilters={initialFilters} initialSearch={initialSearch} />
+      )}
     </>
   );
 }

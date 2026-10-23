@@ -19,6 +19,11 @@ const PAGES = [
   '#/transactions?view=calendar',
   '#/transactions?view=review',
   '#/settings?view=activity',
+  '#/budgets?view=trips',
+  '#/settings?view=rules',
+  '#/transactions?view=warranties',
+  '#/merchant?key=swiggy',
+  '#/transactions?q=swiggy%20over%20300',
 ];
 
 async function seed(page: Page) {
@@ -44,8 +49,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('no serious or critical accessibility problems on any page', async ({ page }) => {
-  // Seventeen pages, each analysed in full.
-  test.setTimeout(90_000);
+  // Every page, each analysed in full.
+  test.setTimeout(150_000);
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);
     await page.getByRole('heading', { level: 1 }).waitFor();
@@ -69,7 +74,7 @@ test('no serious or critical accessibility problems on any page', async ({ page 
 for (const width of [360, 390, 430]) {
   test(`at ${width}px: no sideways scroll, 44px controls, 16px inputs`, async ({ page }, info) => {
     test.skip(info.project.name === 'desktop', 'Phone widths');
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     await page.setViewportSize({ width, height: 800 });
     const all: string[] = [];
     for (const hash of PAGES) {
@@ -190,6 +195,7 @@ test('on an iPhone the Dashboard explains installing and moving data from Safari
 
 test('dark theme keeps contrast on every page', async ({ page }, info) => {
   test.skip(info.project.name === 'phone', 'Colours are the same on both');
+  test.setTimeout(150_000);
   await page.emulateMedia({ colorScheme: 'dark' });
   for (const hash of PAGES) {
     await page.goto(`./${hash}`);

@@ -80,6 +80,10 @@ export default defineConfig({
         find: /^\.\/pages\/lazy$/,
         replacement: fileURLToPath(new URL('./src/app/pages/lazy.eager.tsx', import.meta.url)),
       },
+      {
+        find: /^(?:\.\/|\.\.\/)deferred$/,
+        replacement: fileURLToPath(new URL('./src/app/deferred.eager.tsx', import.meta.url)),
+      },
     ],
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],

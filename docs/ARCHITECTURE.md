@@ -69,8 +69,17 @@ has the same optional field and `composite` merges its children's. Screen-wide U
 open (palette, recap, Customise) lives in a small Zustand store, `src/kit/ui.ts`. The palette, the
 recap viewer, Calendar, Review, the split editor and the sketchbook load on first use.
 
-Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`); tests swap in
-`lazy.eager.tsx` through an alias in `vite.config.ts`.
+Schema v4 (Drop 12) adds `projects` (trips, projects and festival funds), through `putRow` /
+`removeRow`. Entries gain optional `subcategoryId`, `projectId`, `forWhom`, `taxSection` and
+`warrantyMonths`; categories gain `subcategories` and `need`. An entry always keeps its category, so a
+subcategory never changes a total. Your rules (`customRules`), saved reports (`savedReports`) and put-away
+nudges (`nudgesDismissed`) are settings lists. Pure logic: `search`, `rules`, `subcategories`, `nudges`,
+`merchant`, `projects`, `tax`, `needs`, `warranties`, `forWhom` in `src/domain`.
+
+Pages other than the Dashboard and Transactions load on demand (`src/app/pages/lazy.tsx`, which also
+has the merchant page); tests swap in `lazy.eager.tsx` through an alias in `vite.config.ts`. The Add
+sheet's forms, the lock screen and the close-the-month card load the same way from `src/app/deferred.tsx`
+(tests: `deferred.eager.tsx`), and the search words load on first search.
 
 New schema work is a **new entry** appended to `MIGRATIONS` in `src/data/migrations.ts`; never edit an old
 step. `DB_VERSION` is `MIGRATIONS.length`.

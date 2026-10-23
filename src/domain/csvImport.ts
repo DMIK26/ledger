@@ -2,7 +2,7 @@ import { categorise, normalizeMerchantKey } from './categoriser';
 import { categoryById, nextUnusedColor } from './categories';
 import { unsafeText } from './csv';
 import { isoFromYMD, isValidYMD } from './dates';
-import { minorToPlain, parseAmountToMinor } from './money';
+import { parseAmountToMinor } from './money';
 import { parseTags } from './tags';
 import {
   PAYMENT_METHODS,
@@ -263,35 +263,5 @@ export function planCsvImport(
   return plan;
 }
 
-export const exportHeaders = (symbol: string) => [
-  'Date',
-  'Merchant',
-  `Amount (${symbol})`,
-  'Currency',
-  'Category',
-  'Method',
-  'Tags',
-  'Notes',
-];
-
-/** Rows for a CSV export, header first. Reads back with planCsvImport unchanged. */
-export function exportRows(
-  list: readonly Transaction[],
-  categories: readonly Category[],
-  safe: (s: string) => string,
-  symbol = '₹',
-): string[][] {
-  return [
-    exportHeaders(symbol),
-    ...list.map((t) => [
-      t.date,
-      safe(t.merchant),
-      minorToPlain(t.amountMinor),
-      t.currency,
-      safe(categoryById(categories, t.categoryId)?.name ?? 'Other'),
-      t.method,
-      safe(t.tags.join('; ')),
-      safe(t.notes),
-    ]),
-  ];
-}
+// Kept here too, so the importer and its tests read exports from one place.
+export { exportHeaders, exportRows } from './csvExport';

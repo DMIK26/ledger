@@ -4,7 +4,6 @@ import { todayISO } from '../domain/dates';
 import { merchantMatches, rankItems, type PaletteItem } from '../domain/palette';
 import { lastMonth, lastWeek } from '../domain/recap';
 import { useUi } from '../kit/ui';
-import { useView } from '../kit/view';
 import { Icon } from './icons';
 import { addPath, navigate } from './router';
 
@@ -18,21 +17,25 @@ const GO: Array<[string, string, string?]> = [
   ['Calendar', '/transactions?view=calendar', 'month days bills'],
   ['Review unsure entries', '/transactions?view=review', 'check categories'],
   ['Trash', '/transactions?view=trash', 'deleted restore'],
+  ['Warranties', '/transactions?view=warranties', 'guarantee receipt repair'],
   ['Money', '/money', 'accounts income cash flow net worth'],
   ['Udhaar', '/money?view=udhaar', 'lent borrowed owe people splits'],
   ['Loans', '/money?view=loans', 'emi'],
   ['Budgets', '/budgets', 'plan limits'],
   ['Goals and funds', '/budgets?view=goals', 'save saving sinking'],
   ['Wishlist', '/budgets?view=wishlist', 'want wait buy'],
+  ['Trips and projects', '/budgets?view=trips', 'trip project festival holiday travel'],
   ['Reports', '/reports', 'charts treemap flow compare'],
   ['Recurring', '/recurring', 'bills subscriptions'],
   ['Settings', '/settings', 'preferences backup'],
   ['Activity', '/settings?view=activity', 'history log'],
+  ['Rules', '/settings?view=rules', 'automatic categorise merchant'],
 ];
 
 /**
  * The command palette (Drop 11): Ctrl+K or Cmd+K, or the search button. Type to narrow, arrow keys to
- * move, Enter to run, Escape to close. Typing a merchant offers to pin it and show its entries.
+ * move, Enter to run, Escape to close. Typing a merchant offers its page; anything typed can be
+ * searched for in Transactions (Drop 12).
  */
 export function Palette() {
   const open = useUi((s) => s.paletteOpen);
@@ -49,8 +52,6 @@ export function Palette() {
   const undo = useLedger((s) => s.undo);
   const redo = useLedger((s) => s.redo);
   const setSetting = useLedger((s) => s.setSetting);
-  const togglePin = useView((s) => s.togglePin);
-  const pins = useView((s) => s.pins);
   const ref = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -165,16 +166,23 @@ export function Palette() {
     const ranked = rankItems(commands, query);
     const merchants = merchantMatches(transactions, query, 5).map((m) => ({
       id: `m:${m.key}`,
-      label: `Entries from ${m.name} (${m.count})`,
-      group: 'Entries',
-      run: () => {
-        if (!pins.some((p) => p.kind === 'merchant' && p.id === m.key))
-          togglePin({ kind: 'merchant', id: m.key, label: m.name });
-        navigate('/transactions');
-      },
+      label: `${m.name}, ${m.count === 1 ? '1 entry' : `${m.count} entries`}`,
+      group: 'Merchant',
+      run: () => navigate(`/merchant?key=${encodeURIComponent(m.key)}`),
     }));
-    return [...ranked.slice(0, 12), ...merchants];
-  }, [commands, query, transactions, pins, togglePin]);
+    const text = query.trim();
+    const search: Command[] = text
+      ? [
+          {
+            id: 'search',
+            label: `Search entries for “${text}”`,
+            group: 'Search',
+            run: () => navigate(`/transactions?q=${encodeURIComponent(text)}`),
+          },
+        ]
+      : [];
+    return [...ranked.slice(0, 12), ...merchants, ...search];
+  }, [commands, query, transactions]);
 
   const pick = (c: Command | undefined) => {
     if (!c) return;
@@ -229,7 +237,7 @@ export function Palette() {
             aria-autocomplete="list"
             aria-activedescendant={current ? `pal-${current.id}` : undefined}
             aria-label="Search pages, actions and merchants"
-            placeholder="Go to, do, or find a merchant"
+            placeholder="Go to, do, find a merchant or search"
             autoComplete="off"
             spellCheck={false}
             value={query}

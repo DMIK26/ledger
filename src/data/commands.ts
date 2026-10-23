@@ -9,6 +9,7 @@ import type { Person, UdhaarEntry } from '../domain/udhaar';
 import type { Goal } from '../domain/goals';
 import type { WishItem } from '../domain/wishlist';
 import type { Asset } from '../domain/networth';
+import type { Project } from '../domain/projects';
 import type { Db, LedgerDB } from './db';
 
 /** Every data change is a Command, so it can be undone, redone and written to the audit log. */
@@ -255,9 +256,17 @@ export const removeRecurring = (item: RecurringItem): Command => ({
   },
 });
 
-/** The Drop 9 and Drop 10 stores, each a plain list of rows with an id. */
+/** The Drop 9, 10 and 12 stores, each a plain list of rows with an id. */
 export type RowStore =
-  'accounts' | 'flows' | 'people' | 'udhaar' | 'loans' | 'goals' | 'wishlist' | 'assets';
+  | 'accounts'
+  | 'flows'
+  | 'people'
+  | 'udhaar'
+  | 'loans'
+  | 'goals'
+  | 'wishlist'
+  | 'assets'
+  | 'projects';
 type RowOf<S extends RowStore> = LedgerDB[S]['value'];
 
 /** Adds or replaces one row; undo puts back the previous version (or removes a new row). */
@@ -293,6 +302,12 @@ export const NO_SPEND_KEY = 'noSpendDays';
 export const SETTLED_SPLITS_KEY = 'settledSplits';
 /** Months ('YYYY-MM') closed with "Close the month". */
 export const CLOSED_MONTHS_KEY = 'closedMonths';
+/** Your own rules, in order (Drop 12). */
+export const CUSTOM_RULES_KEY = 'customRules';
+/** Reports kept under a name (Drop 12). */
+export const SAVED_REPORTS_KEY = 'savedReports';
+/** Nudges put away with "Fine" (Drop 12); not part of backups. */
+export const NUDGES_DISMISSED_KEY = 'nudgesDismissed';
 
 /** Replaces one list kept in the settings store (favourites, no-spend days) as an undoable step. */
 export const setSettingsList = <T>(
@@ -342,6 +357,7 @@ export interface LedgerSnapshot {
   goals: Goal[];
   wishlist: WishItem[];
   assets: Asset[];
+  projects: Project[];
 }
 
 const SNAPSHOT_STORES = [
@@ -358,6 +374,7 @@ const SNAPSHOT_STORES = [
   'goals',
   'wishlist',
   'assets',
+  'projects',
 ] as const;
 
 async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
@@ -376,6 +393,7 @@ async function writeSnapshot(db: Db, s: LedgerSnapshot): Promise<void> {
   for (const x of s.goals) void t.objectStore('goals').put(x);
   for (const x of s.wishlist) void t.objectStore('wishlist').put(x);
   for (const x of s.assets) void t.objectStore('assets').put(x);
+  for (const x of s.projects) void t.objectStore('projects').put(x);
   await t.done;
 }
 

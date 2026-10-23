@@ -9,7 +9,9 @@ import {
 } from './indic';
 import { parseAmountToMinor } from './money';
 import { replaceNumberWords } from './numberWords';
-import type { CategoryId, ISODate, PaymentMethod } from './types';
+import { firstRule, type CustomRule } from './rules';
+import { subcategoryInText } from './subcategories';
+import type { Category, CategoryId, ISODate, PaymentMethod } from './types';
 
 export type TokenKind = 'amount' | 'date' | 'method' | 'income';
 export interface Token {
@@ -26,6 +28,10 @@ export interface ParseContext {
   lastMethod?: PaymentMethod;
   /** Learned rules: normalised merchant key to category id. */
   rules?: Record<string, CategoryId>;
+  /** Your own rules (Drop 12), tried first, in order. */
+  customRules?: readonly CustomRule[];
+  /** Categories, for picking a subcategory named in the entry (Drop 12). */
+  categories?: readonly Category[];
 }
 
 export interface ParsedEntry {
@@ -44,6 +50,10 @@ export interface ParsedEntry {
   confidence: Confidence;
   /** True when no rule or keyword matched and the category is a placeholder. */
   unsure: boolean;
+  /** A subcategory chosen by a rule or named in the entry (Drop 12). */
+  subcategoryId?: string;
+  /** Your rule that matched, if any; the store adds what else it sets. */
+  ruleId?: string;
   /** Money in ("salary 40k", "got 500 from Rahul") rather than spending. */
   kind: 'expense' | 'income';
   incomeKind: IncomeKind;
@@ -475,7 +485,30 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
 
   const merchantText = buildMerchant(text, taken);
   const merchant = merchantText || 'Expense';
-  const found = categorise(merchantText, ctx.rules);
+  const method = methodHit?.method ?? ctx.lastMethod ?? 'Other';
+  const found: { categoryId: CategoryId; confidence: Confidence; subcategoryId?: string } =
+    categorise(merchantText, ctx.rules);
+  // Your rules first (Drop 12), then a subcategory named in the entry, then what categorise found.
+  const rule = ctx.customRules
+    ? firstRule(ctx.customRules, { merchant: merchantText, amountMinor: amountMinor ?? 0, method })
+    : null;
+  if (rule?.set.categoryId) {
+    found.categoryId = rule.set.categoryId;
+    found.confidence = 'rule';
+    if (rule.set.subcategoryId) found.subcategoryId = rule.set.subcategoryId;
+  }
+  if (ctx.categories && !found.subcategoryId) {
+    const sub = subcategoryInText(merchantText, ctx.categories, {
+      categoryId: found.categoryId,
+      fromRule: found.confidence === 'rule',
+    });
+    if (sub) {
+      if (found.categoryId !== sub.categoryId || found.confidence === 'none')
+        found.confidence = 'keyword';
+      found.categoryId = sub.categoryId;
+      found.subcategoryId = sub.subcategoryId;
+    }
+  }
 
   return {
     raw: input,
@@ -485,11 +518,13 @@ export function parseQuickEntry(input: string, ctx: ParseContext): ParsedEntry {
     date,
     dateSource,
     upcoming,
-    method: methodHit?.method ?? ctx.lastMethod ?? 'Other',
+    method,
     methodTyped: Boolean(methodHit),
     categoryId: found.categoryId,
     confidence: found.confidence,
     unsure: found.confidence === 'none',
+    ...(found.subcategoryId ? { subcategoryId: found.subcategoryId } : {}),
+    ...(rule ? { ruleId: rule.id } : {}),
     kind: isIncome ? 'income' : 'expense',
     incomeKind: incomeKindFor(text),
     tokens: tokens.sort((a, b) => a.start - b.start),

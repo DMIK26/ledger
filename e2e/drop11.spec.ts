@@ -167,6 +167,8 @@ test('phones: swipe a row away, drag the sheet, long-press to customise', async 
 
   await page.getByRole('button', { name: 'Add expense' }).click();
   const sheet = page.getByRole('dialog', { name: 'Add expense' });
+  // The form loads on first use (Drop 12) and focuses its first field; wait for it first.
+  await expect(sheet.getByLabel('Describe it')).toBeFocused();
   const handle = sheet.getByRole('button', { name: 'Make the sheet smaller' });
   await handle.focus();
   await page.keyboard.press('ArrowDown');

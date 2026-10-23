@@ -5064,3 +5064,295 @@ button.tree-item:hover {
   gap: var(--s2);
   margin-top: var(--s3);
 }
+
+/* Drop 12: insight */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+
+.search-box .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0 0 var(--s3);
+}
+
+.chip-sub {
+  color: var(--muted);
+}
+
+.tx-extra {
+  display: block;
+}
+
+.more-details,
+.subcats {
+  margin-top: var(--s2);
+}
+
+.more-details > summary,
+.subcats > summary,
+.archived-projects > summary,
+.card details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--s3);
+  margin: var(--s3) 0;
+}
+
+.facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.facts dd {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+
+.month-cols {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.month-col {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.month-col-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 96px;
+}
+
+.month-col-bar {
+  display: block;
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+}
+
+.month-col-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rule-form fieldset {
+  min-width: 0;
+  margin: 0 0 var(--s3);
+  padding: 0;
+  border: 0;
+}
+
+.rule-form legend {
+  margin-bottom: var(--s2);
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rule-test {
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  margin-bottom: var(--s3);
+}
+
+.rule-test p {
+  margin: 0;
+}
+
+.rule-examples {
+  margin: var(--s2) 0;
+  padding-left: var(--s4);
+}
+
+.rule-list .rule-row.custom-rule {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sub-list {
+  margin: 0 0 var(--s2);
+  padding: 0;
+  list-style: none;
+}
+
+.sub-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) 0;
+}
+
+.sub-row .errors {
+  grid-column: 1 / -1;
+}
+
+.sub-toggle {
+  margin-left: var(--s2);
+  font-size: 13px;
+}
+
+.sub-tr th {
+  padding-left: var(--s5);
+  font-weight: 400;
+}
+
+.split-bar {
+  display: flex;
+  height: 10px;
+  overflow: hidden;
+  margin: var(--s3) 0;
+  border-radius: 5px;
+  background: var(--fill);
+}
+
+.split-bar span {
+  display: block;
+  height: 100%;
+}
+
+.split-needs {
+  background: var(--accent);
+}
+
+.split-wants {
+  background: var(--blue);
+}
+
+.split-left {
+  background: var(--green);
+}
+
+.hbar-label .dot {
+  display: inline-block;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+
+.need-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.need-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: var(--s1) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.need-row:last-child {
+  border-bottom: 0;
+}
+
+.tax-what {
+  display: block;
+  font-weight: 400;
+}
+
+.nudge-list,
+.digest {
+  display: grid;
+  gap: var(--s3);
+  margin: 0 0 var(--s3);
+  padding: 0;
+  list-style: none;
+}
+
+.nudge {
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--border);
+}
+
+.nudge:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.nudge p {
+  margin: 0 0 var(--s2);
+}
+
+.digest {
+  gap: var(--s1);
+  font-size: 15px;
+}
+
+.archived-projects {
+  display: grid;
+  gap: var(--s3);
+}
+
+@media (max-width: 599px) {
+  .search-box {
+    flex-wrap: wrap;
+  }
+
+  .month-col-label {
+    font-size: 11px;
+  }
+}
+
+.subcats-toggle {
+  justify-content: flex-start;
+  padding-left: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  white-space: normal;
+}
+
+.subcats .bulk-tag,
+.sub-row form {
+  display: flex;
+  gap: var(--s2);
+  max-width: 420px;
+}
+
+.subcats .bulk-tag .input,
+.sub-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-bar {
+  display: block;
+  margin: var(--s2) 0 var(--s3);
+}
+
+.search-box input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}

@@ -1,9 +1,10 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { Suspense, useRef, useState, type PointerEvent } from 'react';
 import { useLedger } from '../data/store';
 import { categoryById } from '../domain/categories';
+import { subcategoryName } from '../domain/subcategories';
 import { fmtDate } from '../domain/dates';
 import type { Transaction } from '../domain/types';
-import { EntryForm } from './EntryForm';
+import { EntryForm } from './deferred';
 import { Icon } from './icons';
 import { Money, usePrivacy } from './Money';
 import { normalizeMerchantKey } from '../domain/categoriser';
@@ -30,6 +31,9 @@ export const ROW_SWIPE = 90;
 function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
   const categories = useLedger((s) => s.categories);
   const accounts = useLedger((s) => s.accounts);
+  const project = useLedger((s) =>
+    tx.projectId ? s.projects.find((p) => p.id === tx.projectId) : undefined,
+  );
   const masked = usePrivacy();
   const [dx, setDx] = useState(0);
   const swipe = useRef<{ x: number; y: number; locked: boolean | null } | null>(null);
@@ -42,6 +46,16 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
         )
       : undefined;
   const category = categoryById(categories, tx.categoryId);
+  const sub = subcategoryName(categories, tx);
+  // Drop 12 details: who it was for, the trip, the tax section, a warranty. No amounts here.
+  const extras = [
+    tx.forWhom ? `For ${tx.forWhom}` : '',
+    project?.name ?? '',
+    tx.taxSection ? `Tax ${tx.taxSection}` : '',
+    tx.warrantyMonths ? `Warranty ${tx.warrantyMonths} months` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   // The typed text holds the amount, so privacy mode hides it along with every other figure.
   const showRaw = !masked && tx.raw && tx.raw.trim().toLowerCase() !== tx.merchant.toLowerCase();
   const name = tx.merchant || 'entry';
@@ -57,28 +71,35 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
     const close = () => actions.onEdit?.(null);
     return (
       <li className="tx-row tx-editing" data-testid="tx-edit">
-        <EntryForm
-          editing={{
-            id: tx.id,
-            hasReceipt: tx.hasReceipt,
-            split: tx.split,
-            draft: {
-              date: tx.date,
-              // A split is edited as the whole bill.
-              amountMinor: tx.split ? tx.split.totalMinor : tx.amountMinor,
-              merchant: tx.merchant,
-              categoryId: tx.categoryId,
-              method: tx.method,
-              notes: tx.notes,
-              tags: tx.tags,
-              accountId: tx.accountId,
-              foreign: tx.foreign,
-            },
-          }}
-          autoFocus
-          submitLabel="Save changes"
-          onDone={close}
-        />
+        <Suspense fallback={<p className="muted small">Opening…</p>}>
+          <EntryForm
+            editing={{
+              id: tx.id,
+              hasReceipt: tx.hasReceipt,
+              split: tx.split,
+              draft: {
+                date: tx.date,
+                // A split is edited as the whole bill.
+                amountMinor: tx.split ? tx.split.totalMinor : tx.amountMinor,
+                merchant: tx.merchant,
+                categoryId: tx.categoryId,
+                method: tx.method,
+                notes: tx.notes,
+                tags: tx.tags,
+                accountId: tx.accountId,
+                foreign: tx.foreign,
+                subcategoryId: tx.subcategoryId,
+                projectId: tx.projectId ?? null,
+                forWhom: tx.forWhom,
+                taxSection: tx.taxSection,
+                warrantyMonths: tx.warrantyMonths,
+              },
+            }}
+            autoFocus
+            submitLabel="Save changes"
+            onDone={close}
+          />
+        </Suspense>
       </li>
     );
   }
@@ -162,6 +183,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
           </button>
         </span>
         {showRaw && <span className="tx-raw">{tx.raw}</span>}
+        {extras && <span className="tx-raw tx-extra">{extras}</span>}
         {tx.tags.length > 0 && !hidden.includes('tags') && (
           <span className="tx-tags">
             {tx.tags.map((t) => (
@@ -192,6 +214,7 @@ function Row({ tx, actions }: { tx: Transaction; actions: RowActions }) {
         >
           <span className="dot" style={{ background: category?.color ?? 'var(--faint)' }} />
           {category?.name ?? 'Other'}
+          {sub && <span className="chip-sub"> · {sub}</span>}
           {tx.unsure && <span className="chip-note">unsure</span>}
         </button>
         <span className="tx-mobile-meta">

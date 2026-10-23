@@ -15,6 +15,12 @@ import { prepareReceipt, useObjectUrl } from './receiptImage';
 import { myShare, shareAmounts, type Split } from '../domain/splits';
 import type { AuditEvent } from '../domain/types';
 import { fmtTime } from '../domain/dates';
+import { projectForDate } from '../domain/projects';
+import { forWhomNames } from '../domain/forWhom';
+import { firstRule } from '../domain/rules';
+import { subcategoriesOf } from '../domain/subcategories';
+import { TAX_SECTIONS } from '../domain/tax';
+import { MAX_WARRANTY_MONTHS } from '../domain/warranties';
 import {
   emptySplit,
   previewParts,
@@ -62,6 +68,10 @@ function EntryHistory({ id }: { id: string }) {
   );
 }
 
+/** The date a new entry starts on: the one being edited, the one asked for, or today. */
+const date0 = (editing?: string, initial?: string): string =>
+  editing ?? (initial && parseISO(initial) ? initial : todayISO());
+
 interface Props {
   /** The entry being edited; omit to add a new one. */
   editing?: { id: string; draft: EntryDraft; hasReceipt?: boolean; split?: Split };
@@ -92,6 +102,8 @@ export function EntryForm({
   const editTransaction = useLedger((s) => s.editTransaction);
   const getReceipt = useLedger((s) => s.getReceipt);
   const people = useLedger((s) => s.people);
+  const customRules = useLedger((s) => s.customRules);
+  const projects = useLedger((s) => s.projects);
   const masked = usePrivacy();
 
   const start = editing?.draft;
@@ -99,10 +111,23 @@ export function EntryForm({
   const [merchant, setMerchant] = useState(start?.merchant ?? '');
   const [amount, setAmount] = useState<number | null>(start?.amountMinor ?? null);
   const [amountKey, setAmountKey] = useState(0);
-  const [date, setDate] = useState(
-    start?.date ?? (initialDate && parseISO(initialDate) ? initialDate : todayISO()),
-  );
+  const [date, setDate] = useState(date0(start?.date, initialDate));
   const [categoryId, setCategoryId] = useState(start?.categoryId ?? 'other');
+  const [subcategoryId, setSubcategoryId] = useState(start?.subcategoryId ?? '');
+  const autoProject = (d: string) => projectForDate(projects, d)?.id ?? '';
+  const [projectId, setProjectId] = useState(() =>
+    editing ? (start?.projectId ?? '') : autoProject(date0(start?.date, initialDate)),
+  );
+  const [projectTouched, setProjectTouched] = useState(editing !== undefined);
+  const [forWhom, setForWhom] = useState(start?.forWhom ?? '');
+  const [taxSection, setTaxSection] = useState(start?.taxSection ?? '');
+  const [warranty, setWarranty] = useState(
+    start?.warrantyMonths ? String(start.warrantyMonths) : '',
+  );
+  // Open from the start when editing an entry that uses these; never closed under someone typing.
+  const [moreOpen] = useState(
+    Boolean(start?.forWhom || start?.taxSection || start?.warrantyMonths),
+  );
   const [categoryTouched, setCategoryTouched] = useState(editing !== undefined);
   const [method, setMethod] = useState<PaymentMethod>(start?.method ?? lastMethod);
   const [tags, setTags] = useState((start?.tags ?? []).join(', '));
@@ -149,21 +174,33 @@ export function EntryForm({
   const fillFromQuick = (text: string) => {
     setQuick(text);
     if (!text.trim()) return;
-    const p = parseQuickEntry(text, { today: todayISO(), lastMethod, rules });
+    const p = parseQuickEntry(text, {
+      today: todayISO(),
+      lastMethod,
+      rules,
+      customRules,
+      categories,
+    });
     setMerchant(p.merchant);
     setAmount(p.amountMinor);
     setAmountKey((k) => k + 1);
     if (p.errors.length === 0) setDate(p.date);
     setMethod(p.method);
     setCategoryId(p.categoryId);
+    setSubcategoryId(p.subcategoryId ?? '');
     setCategoryTouched(false);
+    if (p.errors.length === 0 && !projectTouched) setProjectId(autoProject(p.date));
     setConfirmDuplicate(false);
   };
 
   const onMerchant = (value: string) => {
     setMerchant(value);
     setConfirmDuplicate(false);
-    if (!categoryTouched) setCategoryId(categorise(value, rules).categoryId);
+    if (categoryTouched) return;
+    // Your rules first, then what Ledger learned and its built-in words (Drop 12).
+    const rule = firstRule(customRules, { merchant: value, amountMinor: effective ?? 0, method });
+    setCategoryId(rule?.set.categoryId ?? categorise(value, rules).categoryId);
+    setSubcategoryId(rule?.set.categoryId ? (rule.set.subcategoryId ?? '') : '');
   };
 
   const draft = (): EntryDraft => ({
@@ -181,7 +218,15 @@ export function EntryForm({
         : undefined,
     // A split sends the whole bill and the people; turning one off on an edit removes it.
     ...(splitOn ? { split: splitDraft(split) } : editing?.split ? { split: null } : {}),
+    subcategoryId: subcategoryId || undefined,
+    projectId: projectId || null,
+    forWhom: forWhom.trim().replace(/\s+/g, ' ') || undefined,
+    taxSection: taxSection || undefined,
+    warrantyMonths: warranty ? Number(warranty) : undefined,
   });
+  const subs = subcategoriesOf(categories, categoryId);
+  const openProjects = projects.filter((p) => !p.archived || p.id === projectId);
+  const names = [...new Set([...forWhomNames(transactions), ...people.map((p) => p.name), 'Shop'])];
 
   const duplicate =
     effective !== null && effective > 0 && parseISO(date)
@@ -195,6 +240,11 @@ export function EntryForm({
     else if (effective === null || effective <= 0) problems.push('Enter an amount above zero');
     if (!merchant.trim()) problems.push('Say what it was for');
     if (!parseISO(date)) problems.push('Pick a valid date');
+    if (
+      warranty &&
+      !(/^\d+$/.test(warranty) && Number(warranty) >= 1 && Number(warranty) <= MAX_WARRANTY_MONTHS)
+    )
+      problems.push(`Warranty is in whole months, 1 to ${MAX_WARRANTY_MONTHS}`);
     if (splitOn && effective !== null && effective > 0) {
       const problem = splitProblem(split);
       const shares = shareAmounts(effective, split.mode, previewParts(split));
@@ -349,6 +399,8 @@ export function EntryForm({
             onChange={(e) => {
               setDate(e.target.value);
               setConfirmDuplicate(false);
+              if (!projectTouched && parseISO(e.target.value))
+                setProjectId(autoProject(e.target.value));
             }}
           />
         </div>
@@ -360,6 +412,7 @@ export function EntryForm({
             value={categoryId}
             onChange={(e) => {
               setCategoryId(e.target.value);
+              setSubcategoryId('');
               setCategoryTouched(true);
             }}
           >
@@ -370,6 +423,24 @@ export function EntryForm({
             ))}
           </select>
         </div>
+        {subs.length > 0 && (
+          <div className="field">
+            <label htmlFor={f('sub')}>Subcategory</label>
+            <select
+              id={f('sub')}
+              className="select input"
+              value={subcategoryId}
+              onChange={(e) => setSubcategoryId(e.target.value)}
+            >
+              <option value="">None</option>
+              {subs.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label htmlFor={f('method')}>Paid by</label>
           <select
@@ -419,7 +490,85 @@ export function EntryForm({
             onChange={(e) => setTags(e.target.value)}
           />
         </div>
+        {openProjects.length > 0 && (
+          <div className="field">
+            <label htmlFor={f('project')}>Trip or project</label>
+            <select
+              id={f('project')}
+              className="select input"
+              value={projectId}
+              onChange={(e) => {
+                setProjectId(e.target.value);
+                setProjectTouched(true);
+              }}
+            >
+              <option value="">None</option>
+              {openProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
+      <details className="more-details" open={moreOpen}>
+        <summary>Who it was for, tax and warranty</summary>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor={f('for')}>For</label>
+            <input
+              id={f('for')}
+              className="input"
+              type="text"
+              autoComplete="off"
+              list={f('for-names')}
+              placeholder="You"
+              value={forWhom}
+              onChange={(e) => setForWhom(e.target.value)}
+            />
+            <datalist id={f('for-names')}>
+              {names.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor={f('tax')}>Tax deduction</label>
+            <select
+              id={f('tax')}
+              className="select input"
+              value={taxSection}
+              onChange={(e) => setTaxSection(e.target.value)}
+            >
+              <option value="">None</option>
+              {TAX_SECTIONS.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.id === 'Other' ? 'Other deduction' : `${x.id}, ${x.what}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor={f('warranty')}>Warranty, months</label>
+            <input
+              id={f('warranty')}
+              className="input"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="12"
+              value={warranty}
+              onChange={(e) => setWarranty(e.target.value.trim())}
+            />
+          </div>
+        </div>
+        {warranty && !receipt && (
+          <p className="muted small">
+            Add a photo of the receipt below to keep it for the warranty.
+          </p>
+        )}
+      </details>
       {splitOn && (
         <Suspense fallback={<p className="muted small">Opening the split…</p>}>
           <SplitEditor totalMinor={effective} state={split} onChange={setSplit} />

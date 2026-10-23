@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSheetSnap } from '../kit/sheet';
 import { useLedger } from '../data/store';
 import type { AddMode } from '../domain/types';
-import { EntryForm } from './EntryForm';
+import { EntryForm, Keypad, Several } from './deferred';
 import { Icon } from './icons';
-import { Keypad } from './Keypad';
-import { Several } from './Several';
 
 const MODES: Array<{ id: AddMode; label: string }> = [
   { id: 'form', label: 'Form' },
@@ -87,18 +85,28 @@ export function AddSheet({
             </button>
           ))}
         </div>
-        {open && mode === 'form' && (
-          <EntryForm
-            key={round}
-            describe
-            autoFocus
-            initialDate={date}
-            submitLabel="Save"
-            onDone={onClose}
-          />
-        )}
-        {open && mode === 'keypad' && <Keypad key={round} initialDate={date} onDone={onClose} />}
-        {open && mode === 'several' && <Several key={round} initialDate={date} onDone={onClose} />}
+        <Suspense
+          fallback={
+            <p className="muted small" aria-busy="true">
+              Opening…
+            </p>
+          }
+        >
+          {open && mode === 'form' && (
+            <EntryForm
+              key={round}
+              describe
+              autoFocus
+              initialDate={date}
+              submitLabel="Save"
+              onDone={onClose}
+            />
+          )}
+          {open && mode === 'keypad' && <Keypad key={round} initialDate={date} onDone={onClose} />}
+          {open && mode === 'several' && (
+            <Several key={round} initialDate={date} onDone={onClose} />
+          )}
+        </Suspense>
       </div>
     </dialog>
   );

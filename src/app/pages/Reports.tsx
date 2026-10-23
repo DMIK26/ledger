@@ -1,21 +1,31 @@
 import { EmptyDoodle } from '../../doodle/Studio';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Heatmap } from '../../charts/Heatmap';
 import { Sparkline } from '../../charts/Sparkline';
 import { useLedger } from '../../data/store';
 import { categoryById } from '../../domain/categories';
 import { safeText, toCsv } from '../../domain/csv';
-import { exportRows } from '../../domain/csvImport';
+import { exportRows } from '../../domain/csvExport';
 import { fmtDate, todayISO, WEEKDAYS } from '../../domain/dates';
 import { CURRENCIES } from '../../domain/money';
 import {
   customPeriod,
   periodFor,
   previousPeriod,
+  RELATIVE_LABEL,
+  RELATIVE_RANGES,
+  relativePeriod,
   sameLastYear,
   toDate,
   type PeriodKind,
+  type RelativeRange,
 } from '../../domain/periods';
+import type { SavedReport } from '../../domain/reports';
+import { subcategoryBreakdown } from '../../domain/subcategories';
+import { ForWhom } from '../reports/ForWhom';
+import { NeedsWants } from '../reports/NeedsWants';
+import { SavedReports } from '../reports/SavedReports';
+import { TaxCard } from '../reports/TaxCard';
 import { averageWindow, buildReport, inRange, scaleCompare } from '../../domain/reports';
 import { diffDays, monthKey, shiftMonthKey } from '../../domain/dates';
 import { moneyFlow, type FlowNode } from '../../domain/flow';
@@ -30,10 +40,13 @@ import { useScopedTransactions, useView } from '../../kit/view';
 import { Money } from '../Money';
 import { href } from '../router';
 
-const KINDS: Array<{ value: PeriodKind; label: string }> = [
+type Kind = PeriodKind | 'relative';
+
+const KINDS: Array<{ value: Kind; label: string }> = [
   { value: 'month', label: 'Month' },
   { value: 'quarter', label: 'Quarter' },
   { value: 'fy', label: 'Financial year' },
+  { value: 'relative', label: 'Recent' },
   { value: 'custom', label: 'Custom' },
 ];
 
@@ -56,7 +69,7 @@ function Bars({
   rows,
   currency,
 }: {
-  rows: Array<{ key: string; label: string; value: number; note?: string }>;
+  rows: Array<{ key: string; label: string; value: number; note?: string; href?: string }>;
   currency: string;
 }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
@@ -64,7 +77,7 @@ function Bars({
     <ul className="hbars">
       {rows.map((r) => (
         <li key={r.key} className="hbar">
-          <span className="hbar-label">{r.label}</span>
+          <span className="hbar-label">{r.href ? <a href={r.href}>{r.label}</a> : r.label}</span>
           <Money minor={r.value} currency={currency} />
           {r.note && <span className="muted small hbar-note">{r.note}</span>}
           <span className="hbar-track" aria-hidden="true">
@@ -83,19 +96,44 @@ export function Reports() {
   const flows = useLedger((s) => s.flows);
   const openRecap = useUi((s) => s.openRecap);
   const [treeCat, setTreeCat] = useState<string | null>(null);
+  const [subsOf, setSubsOf] = useState<string | null>(null);
   const [flowCat, setFlowCat] = useState<string | null>(null);
   const currency = useLedger((s) => s.settings.currency);
   const fyStart = useLedger((s) => s.settings.fyStartMonth);
   const today = todayISO();
 
-  const [kind, setKind] = useState<PeriodKind>('month');
+  const [kind, setKind] = useState<Kind>('month');
+  const [relative, setRelative] = useState<RelativeRange>('last-3-months');
   const [offset, setOffset] = useState(0);
   const [from, setFrom] = useState(today.slice(0, 8) + '01');
   const [to, setTo] = useState(today);
   const [compareMode, setCompareMode] = useState<CompareMode>('previous');
 
   const period =
-    kind === 'custom' ? customPeriod(from, to) : periodFor(kind, today, fyStart, offset);
+    kind === 'custom'
+      ? customPeriod(from, to)
+      : kind === 'relative'
+        ? relativePeriod(relative, today)
+        : periodFor(kind, today, fyStart, offset);
+  const saved: Omit<SavedReport, 'id' | 'name' | 'createdAt'> = {
+    range:
+      kind === 'relative'
+        ? { kind, id: relative }
+        : kind === 'custom'
+          ? { kind, start: from, end: to }
+          : { kind, offset },
+    compare: compareMode,
+  };
+  const applySaved = (r: SavedReport) => {
+    const range = r.range;
+    setKind(range.kind);
+    if (range.kind === 'relative') setRelative(range.id);
+    else if (range.kind === 'custom') {
+      setFrom(range.start);
+      setTo(range.end);
+    } else setOffset(range.offset);
+    setCompareMode(r.compare);
+  };
   const comparePeriod =
     compareMode === 'lastYear' ? sameLastYear(period, fyStart) : previousPeriod(period, fyStart);
   const span = toDate(period, comparePeriod, today);
@@ -185,7 +223,23 @@ export function Reports() {
             </button>
           ))}
         </div>
-        {kind === 'custom' ? (
+        {kind === 'relative' ? (
+          <div className="field">
+            <label htmlFor="r-relative">Range</label>
+            <select
+              id="r-relative"
+              className="select input"
+              value={relative}
+              onChange={(e) => setRelative(e.target.value as RelativeRange)}
+            >
+              {RELATIVE_RANGES.map((r) => (
+                <option key={r} value={r}>
+                  {RELATIVE_LABEL[r]}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : kind === 'custom' ? (
           <div className="form-grid">
             <div className="field">
               <label htmlFor="r-from">From</label>
@@ -266,6 +320,7 @@ export function Reports() {
           >
             Year to date against last year
           </button>
+          <SavedReports current={saved} onApply={applySaved} />
           {kind === 'month' && (
             <button
               type="button"
@@ -384,29 +439,60 @@ export function Reports() {
                 <tbody>
                   {report.categories.map((r) => {
                     const c = categoryById(categories, r.categoryId);
+                    const hasSubs = (c?.subcategories?.length ?? 0) > 0;
+                    const open = subsOf === r.categoryId && c;
+                    const subRows = open
+                      ? subcategoryBreakdown(inRange(transactions, period.start, span.end), c)
+                      : [];
                     return (
-                      <tr key={r.categoryId} data-testid={`report-row-${r.categoryId}`}>
-                        <th scope="row">
-                          <span
-                            className="dot"
-                            style={{ background: c?.color ?? 'var(--faint)' }}
-                          />
-                          {name(r.categoryId)}
-                        </th>
-                        <td className="num">
-                          <Money minor={r.totalMinor} currency={currency} />
-                        </td>
-                        <td className="num">{Math.round(r.share * 100)}%</td>
-                        <td className="num">
-                          <Money minor={r.compareMinor} currency={currency} />
-                        </td>
-                        <td className="num">
-                          <Change pct={pctChange(r.totalMinor, r.compareMinor)} />
-                        </td>
-                        <td>
-                          <Sparkline values={r.series} color={c?.color} />
-                        </td>
-                      </tr>
+                      <Fragment key={r.categoryId}>
+                        <tr data-testid={`report-row-${r.categoryId}`}>
+                          <th scope="row">
+                            <span
+                              className="dot"
+                              style={{ background: c?.color ?? 'var(--faint)' }}
+                            />
+                            {name(r.categoryId)}
+                            {hasSubs && (
+                              <button
+                                type="button"
+                                className="link-button sub-toggle"
+                                aria-expanded={Boolean(open)}
+                                onClick={() => setSubsOf(open ? null : r.categoryId)}
+                              >
+                                {open ? 'Hide subcategories' : 'Subcategories'}
+                              </button>
+                            )}
+                          </th>
+                          <td className="num">
+                            <Money minor={r.totalMinor} currency={currency} />
+                          </td>
+                          <td className="num">{Math.round(r.share * 100)}%</td>
+                          <td className="num">
+                            <Money minor={r.compareMinor} currency={currency} />
+                          </td>
+                          <td className="num">
+                            <Change pct={pctChange(r.totalMinor, r.compareMinor)} />
+                          </td>
+                          <td>
+                            <Sparkline values={r.series} color={c?.color} />
+                          </td>
+                        </tr>
+                        {subRows.map((x) => (
+                          <tr key={x.id ?? 'none'} className="sub-tr" data-testid="report-sub-row">
+                            <th scope="row">{x.name}</th>
+                            <td className="num">
+                              <Money minor={x.totalMinor} currency={currency} />
+                            </td>
+                            <td className="num">
+                              {Math.round((x.totalMinor / Math.max(1, r.totalMinor)) * 100)}%
+                            </td>
+                            <td colSpan={3} className="muted small">
+                              {x.count === 1 ? '1 entry' : `${x.count} entries`}
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -462,6 +548,9 @@ export function Reports() {
                   label: m.merchant,
                   value: m.totalMinor,
                   note: m.count === 1 ? '1 entry' : `${m.count} entries`,
+                  href: href(
+                    `/merchant?key=${encodeURIComponent(normalizeMerchantKey(m.merchant) || 'untitled')}`,
+                  ),
                 }))}
               />
             </section>
@@ -478,6 +567,9 @@ export function Reports() {
               />
             </section>
           </div>
+
+          <NeedsWants transactions={transactions} start={period.start} end={span.end} />
+          <ForWhom transactions={transactions} start={period.start} end={span.end} />
 
           <section className="card" aria-labelledby="weekday-title">
             <h2 id="weekday-title">Average by weekday</h2>
@@ -509,6 +601,7 @@ export function Reports() {
           </section>
         </>
       )}
+      <TaxCard transactions={transactions} date={period.start} />
     </div>
   );
 }

@@ -27,6 +27,10 @@ import type { WaitDays, WishItem } from '../domain/wishlist';
 import type { Asset, AssetKind } from '../domain/networth';
 import type { ForeignAmount } from '../domain/fx';
 import { shouldLearn } from '../domain/learning';
+import { projectForDate, type Project } from '../domain/projects';
+import { applyRule, firstRule, moveRule, ruleExtras, type CustomRule } from '../domain/rules';
+import type { SavedReport } from '../domain/reports';
+import { makeSubcategory, subcategoryFits } from '../domain/subcategories';
 import {
   myShare,
   shareAmounts,
@@ -59,7 +63,7 @@ import {
   type TrashItem,
   type TxSource,
 } from '../domain/types';
-import { loadSettings, mergeDays, mergeFavourites, type BackupFile } from './backup';
+import { loadSettings, mergeById, mergeDays, mergeFavourites, type BackupFile } from './backup';
 import { CommandBus, purgeTrash } from './bus';
 import {
   addTransaction,
@@ -86,6 +90,9 @@ import {
   NO_SPEND_KEY,
   CLOSED_MONTHS_KEY,
   SETTLED_SPLITS_KEY,
+  CUSTOM_RULES_KEY,
+  SAVED_REPORTS_KEY,
+  NUDGES_DISMISSED_KEY,
   putRow,
   removeRow,
   putNote,
@@ -119,7 +126,15 @@ export interface EntryDraft {
   foreign?: ForeignAmount;
   /** Shared with people: amountMinor is then the whole bill, and the entry keeps your share. */
   split?: SplitDraft | null;
+  subcategoryId?: string;
+  /** A trip or project; null: none; missing: the one collecting entries on that date, if any. */
+  projectId?: string | null;
+  forWhom?: string;
+  taxSection?: string;
+  warrantyMonths?: number;
 }
+
+export type ProjectDraft = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
 
 /** A person in a split: someone known (personId), a new name, or you (personId null, no name). */
 export interface SplitPerson {
@@ -236,6 +251,11 @@ export interface LedgerState {
   closedMonths: string[];
   /** Split entries settled with "Mark all settled". */
   settledSplits: string[];
+  /** Drop 12. */
+  projects: Project[];
+  customRules: CustomRule[];
+  savedReports: SavedReport[];
+  nudgesDismissed: string[];
   settings: Settings;
   lock: LockConfig | null;
   /** True while the PIN screen is up. */
@@ -335,6 +355,21 @@ export interface LedgerState {
   reviewEntry: (id: string, categoryId?: CategoryId) => Promise<void>;
   /** Records your part of every open split as settled, as udhaar settle-ups, in one step. */
   settleSplits: () => Promise<void>;
+  /** Drop 12. */
+  saveProject: (draft: ProjectDraft, id?: string) => Promise<string>;
+  deleteProject: (id: string) => Promise<void>;
+  setEntriesProject: (ids: string[], projectId: string | null) => Promise<void>;
+  /** Adds or replaces a rule; `applyTo` lists past entries to change with it in the same step. */
+  saveCustomRule: (rule: CustomRule, applyTo?: string[]) => Promise<void>;
+  deleteCustomRule: (id: string) => Promise<void>;
+  moveCustomRule: (id: string, delta: -1 | 1) => Promise<void>;
+  saveReport: (report: SavedReport) => Promise<void>;
+  deleteReport: (id: string) => Promise<void>;
+  dismissNudge: (id: string) => Promise<void>;
+  /** Adds a subcategory (or renames one, with `id`); returns its id. */
+  saveSubcategory: (categoryId: string, name: string, id?: string) => Promise<string | null>;
+  deleteSubcategory: (categoryId: string, subId: string) => Promise<void>;
+  setCategoryNeed: (categoryId: string, need: 'need' | 'want') => Promise<void>;
   /** What the activity log holds about one entry, newest first. */
   getEntryHistory: (id: string) => Promise<AuditEvent[]>;
   editTransaction: (id: string, draft: EntryDraft, receipt?: ReceiptChange) => Promise<void>;
@@ -452,6 +487,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       if (closed.length !== get().closedMonths.length)
         out.push(
           setSettingsList(CLOSED_MONTHS_KEY, closed, get().closedMonths, 'Restored closed months'),
+        );
+      const rules = mergeById(get().customRules, file.data.customRules ?? []);
+      if (rules.length !== get().customRules.length)
+        out.push(setSettingsList(CUSTOM_RULES_KEY, rules, get().customRules, 'Restored rules'));
+      const reports = mergeById(get().savedReports, file.data.savedReports ?? []);
+      if (reports.length !== get().savedReports.length)
+        out.push(
+          setSettingsList(SAVED_REPORTS_KEY, reports, get().savedReports, 'Restored reports'),
         );
       const settled = mergeDays(get().settledSplits, file.data.settledSplits ?? []);
       if (settled.length !== get().settledSplits.length)
@@ -582,6 +625,36 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       );
     };
 
+    /** The trip or project collecting entries on this date, if any (Drop 12). */
+    const autoProject = (date: ISODate): string | undefined =>
+      projectForDate(get().projects, date)?.id;
+
+    /** A subcategory only stays when it belongs to the entry's category. */
+    const fitSub = <T extends Pick<Transaction, 'categoryId' | 'subcategoryId'>>(t: T): T =>
+      t.subcategoryId && !subcategoryFits(get().categories, t.categoryId, t.subcategoryId)
+        ? { ...t, subcategoryId: undefined }
+        : t;
+
+    /** A quick-add entry with what your rule sets, its subcategory and its trip (Drop 12). */
+    const fromParsed = (
+      tx: Transaction,
+      parsed: ParsedEntry,
+      categoryChosen: boolean,
+    ): Transaction => {
+      let out: Transaction = { ...tx, projectId: autoProject(tx.date) };
+      if (parsed.subcategoryId && !categoryChosen) out.subcategoryId = parsed.subcategoryId;
+      const rule = parsed.ruleId
+        ? get().customRules.find((r) => r.id === parsed.ruleId)
+        : undefined;
+      if (rule)
+        out = categoryChosen ? ruleExtras(out, rule) : applyRule(out, rule, get().categories);
+      return fitSub(out);
+    };
+
+    /** Settings lists changed through Commands (Drop 12). */
+    const putList = async <T>(key: string, next: T[], previous: T[], label: string) =>
+      get().run(setSettingsList(key, next, previous, label), label);
+
     /** Drop 9 rows a merged backup adds: accounts, money in and transfers, people, udhaar, loans. */
     const rowMerges = (file: BackupFile): Command[] => {
       const out: Command[] = [];
@@ -602,6 +675,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       add('goals', get().goals, file.data.goals);
       add('wishlist', get().wishlist, file.data.wishlist);
       add('assets', get().assets, file.data.assets);
+      add('projects', get().projects, file.data.projects);
       return out;
     };
 
@@ -631,6 +705,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         assets,
         closedMonths,
         settledSplits,
+        projects,
+        customRules,
+        savedReports,
+        nudgesDismissed,
       ] = await Promise.all([
         d.getAll('transactions'),
         d.getAll('categories'),
@@ -655,7 +733,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         d.getAll('assets'),
         d.get('settings', CLOSED_MONTHS_KEY),
         d.get('settings', SETTLED_SPLITS_KEY),
+        d.getAll('projects'),
+        d.get('settings', CUSTOM_RULES_KEY),
+        d.get('settings', SAVED_REPORTS_KEY),
+        d.get('settings', NUDGES_DISMISSED_KEY),
       ]);
+      projects.sort((a, b) => b.createdAt - a.createdAt);
       goals.sort((a, b) => a.createdAt - b.createdAt);
       wishlist.sort((a, b) => b.createdAt - a.createdAt);
       assets.sort((a, b) => a.createdAt - b.createdAt);
@@ -693,6 +776,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         assets,
         closedMonths: Array.isArray(closedMonths) ? (closedMonths as string[]) : [],
         settledSplits: Array.isArray(settledSplits) ? (settledSplits as string[]) : [],
+        projects,
+        customRules: Array.isArray(customRules) ? (customRules as CustomRule[]) : [],
+        savedReports: Array.isArray(savedReports) ? (savedReports as SavedReport[]) : [],
+        nudgesDismissed: Array.isArray(nudgesDismissed) ? (nudgesDismissed as string[]) : [],
         canUndo: bus?.canUndo ?? false,
         canRedo: bus?.canRedo ?? false,
         undoLabel: bus?.undoLabel ?? null,
@@ -727,6 +814,10 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       assets: [],
       closedMonths: [],
       settledSplits: [],
+      projects: [],
+      customRules: [],
+      savedReports: [],
+      nudgesDismissed: [],
       settings: DEFAULT_SETTINGS,
       lock: null,
       locked: false,
@@ -800,7 +891,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           createdAt: now,
           updatedAt: now,
         };
-        const commands: Command[] = [addTransaction(tx)];
+        const entry = fromParsed(
+          tx,
+          parsed,
+          categoryId !== undefined && categoryId !== parsed.categoryId,
+        );
+        const commands: Command[] = [addTransaction(entry)];
         const key = normalizeMerchantKey(parsed.merchant);
         if (key && categoryId !== undefined && categoryId !== parsed.categoryId) {
           const previous = rules[key];
@@ -822,20 +918,23 @@ export function createLedgerStore(dbName: string = DB_NAME) {
       addEntry: async (draft, receipt, source = 'form') => {
         const { settings, rules } = get();
         const now = Date.now();
-        const { split: splitDraft, ...fields } = draft;
+        const { split: splitDraft, projectId, ...fields } = draft;
         const plan = splitDraft ? planSplit(splitDraft, draft.amountMinor, draft, now) : null;
-        const tx: Transaction = {
+        let tx: Transaction = fitSub({
           id: newId(),
           ...fields,
           amountMinor: plan ? plan.shareMinor : draft.amountMinor,
           ...(plan ? { split: plan.split } : {}),
+          projectId: projectId === undefined ? autoProject(draft.date) : (projectId ?? undefined),
           currency: settings.currency,
           source,
           unsure: false,
           hasReceipt: receipt ? true : undefined,
           createdAt: now,
           updatedAt: now,
-        };
+        });
+        const rule = firstRule(get().customRules, tx);
+        if (rule) tx = ruleExtras(tx, rule);
         const steps: Command[] = [addTransaction(tx), ...(plan?.steps ?? [])];
         if (receipt) steps.push(setReceipt(tx.id, receipt));
         const key = normalizeMerchantKey(draft.merchant);
@@ -854,18 +953,19 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!before) return;
         const now = Date.now();
         const categoryChanged = draft.categoryId !== before.categoryId;
-        const { split: splitDraft, ...fields } = draft;
+        const { split: splitDraft, projectId, ...fields } = draft;
         // undefined keeps the split as it is; null removes it; a draft works it out again.
         const plan = splitDraft ? planSplit(splitDraft, draft.amountMinor, draft, now) : null;
-        const after: Transaction = {
+        const after: Transaction = fitSub({
           ...before,
           ...fields,
+          ...(projectId !== undefined ? { projectId: projectId ?? undefined } : {}),
           ...(plan ? { amountMinor: plan.shareMinor, split: plan.split } : {}),
           ...(splitDraft === null ? { split: undefined } : {}),
           unsure: before.unsure && !categoryChanged ? true : false,
           hasReceipt: receipt === undefined ? before.hasReceipt : receipt !== null || undefined,
           updatedAt: now,
-        };
+        });
         const steps: Command[] = [
           updateTransaction(before, after),
           ...(splitDraft !== undefined ? dropSplitRows(before) : []),
@@ -897,6 +997,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           tags: [...item.tags],
           source: 'repeat',
           unsure: false,
+          projectId: autoProject(date ?? todayISO()),
           createdAt: now,
           updatedAt: now,
         };
@@ -909,23 +1010,29 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (ok.length === 0) return 0;
         const now = Date.now();
         const steps = ok.map((p, i) =>
-          addTransaction({
-            id: newId(),
-            date: p.date,
-            amountMinor: p.amountMinor!,
-            currency: settings.currency,
-            merchant: p.merchant,
-            categoryId: p.categoryId,
-            method: p.method,
-            notes: '',
-            tags: [],
-            raw: p.raw,
-            source: 'quick',
-            unsure: p.unsure,
-            // Keeps the typed order within a day.
-            createdAt: now + i,
-            updatedAt: now + i,
-          }),
+          addTransaction(
+            fromParsed(
+              {
+                id: newId(),
+                date: p.date,
+                amountMinor: p.amountMinor!,
+                currency: settings.currency,
+                merchant: p.merchant,
+                categoryId: p.categoryId,
+                method: p.method,
+                notes: '',
+                tags: [],
+                raw: p.raw,
+                source: 'quick',
+                unsure: p.unsure,
+                // Keeps the typed order within a day.
+                createdAt: now + i,
+                updatedAt: now + i,
+              },
+              p,
+              false,
+            ),
+          ),
         );
         const label = `Added ${ok.length} ${ok.length === 1 ? 'entry' : 'entries'}`;
         await get().run(steps.length === 1 ? steps[0]! : composite(label, steps), label);
@@ -948,6 +1055,8 @@ export function createLedgerStore(dbName: string = DB_NAME) {
             recurringId: undefined,
             split: undefined,
             unsure: false,
+            projectId: autoProject(today),
+            warrantyMonths: undefined,
             createdAt: now + i,
             updatedAt: now + i,
           }),
@@ -1525,7 +1634,12 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         if (!before) return;
         const now = Date.now();
         const target = categoryId ?? before.categoryId;
-        const after: Transaction = { ...before, categoryId: target, unsure: false, updatedAt: now };
+        const after: Transaction = fitSub({
+          ...before,
+          categoryId: target,
+          unsure: false,
+          updatedAt: now,
+        });
         const steps: Command[] = [updateTransaction(before, after)];
         const learn = learnStep(after, now);
         if (learn) steps.push(learn);
@@ -1580,6 +1694,164 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         await get().run(composite(label, steps), label);
       },
 
+      saveProject: async (draft, id) => {
+        const previous = id ? get().projects.find((p) => p.id === id) : undefined;
+        const now = Date.now();
+        const next: Project = {
+          ...draft,
+          name: draft.name.trim(),
+          id: previous?.id ?? newId(),
+          createdAt: previous?.createdAt ?? now,
+          updatedAt: now,
+        };
+        const label = previous ? `Changed ${next.name}` : `Added ${next.name}`;
+        await get().run(putRow('projects', next, previous, label), label);
+        return next.id;
+      },
+
+      deleteProject: async (id) => {
+        const project = get().projects.find((p) => p.id === id);
+        if (!project) return;
+        const now = Date.now();
+        const label = `Deleted ${project.name}; its entries stay`;
+        const steps: Command[] = get()
+          .transactions.filter((t) => t.projectId === id)
+          .map((t) => updateTransaction(t, { ...t, projectId: undefined, updatedAt: now }));
+        steps.push(removeRow('projects', project, label));
+        await get().run(composite(label, steps), label);
+      },
+
+      setEntriesProject: async (ids, projectId) => {
+        const now = Date.now();
+        const target = projectId ?? undefined;
+        const list = get().transactions.filter((t) => ids.includes(t.id) && t.projectId !== target);
+        if (list.length === 0) return;
+        const name = get().projects.find((p) => p.id === projectId)?.name;
+        const n = `${list.length} ${list.length === 1 ? 'entry' : 'entries'}`;
+        const label = name ? `Added ${n} to ${name}` : `Took ${n} out of their trip or project`;
+        await get().run(
+          composite(
+            label,
+            list.map((t) => updateTransaction(t, { ...t, projectId: target, updatedAt: now })),
+          ),
+          label,
+        );
+      },
+
+      saveCustomRule: async (rule, applyTo = []) => {
+        const previous = get().customRules;
+        const exists = previous.some((r) => r.id === rule.id);
+        const next = exists
+          ? previous.map((r) => (r.id === rule.id ? rule : r))
+          : [...previous, rule];
+        const now = Date.now();
+        const changes = get()
+          .transactions.filter((t) => applyTo.includes(t.id))
+          .map((t) =>
+            updateTransaction(t, { ...applyRule(t, rule, get().categories), updatedAt: now }),
+          );
+        const base = exists ? `Changed the rule for ${rule.text}` : `Added a rule for ${rule.text}`;
+        const label =
+          changes.length > 0
+            ? `${base}, changed ${changes.length} ${changes.length === 1 ? 'entry' : 'entries'}`
+            : base;
+        await get().run(
+          composite(label, [setSettingsList(CUSTOM_RULES_KEY, next, previous, label), ...changes]),
+          label,
+        );
+      },
+
+      deleteCustomRule: async (id) => {
+        const previous = get().customRules;
+        const rule = previous.find((r) => r.id === id);
+        if (rule)
+          await putList(
+            CUSTOM_RULES_KEY,
+            previous.filter((r) => r.id !== id),
+            previous,
+            `Deleted the rule for ${rule.text}`,
+          );
+      },
+
+      moveCustomRule: async (id, delta) => {
+        const previous = get().customRules;
+        const next = moveRule(previous, id, delta);
+        if (next.every((r, i) => r === previous[i])) return;
+        await putList(CUSTOM_RULES_KEY, next, previous, 'Reordered rules');
+      },
+
+      saveReport: async (report) => {
+        const previous = get().savedReports;
+        const next = [...previous.filter((r) => r.id !== report.id), report];
+        await putList(SAVED_REPORTS_KEY, next, previous, `Saved report ${report.name}`);
+      },
+
+      deleteReport: async (id) => {
+        const previous = get().savedReports;
+        const report = previous.find((r) => r.id === id);
+        if (report)
+          await putList(
+            SAVED_REPORTS_KEY,
+            previous.filter((r) => r.id !== id),
+            previous,
+            `Deleted report ${report.name}`,
+          );
+      },
+
+      dismissNudge: async (id) => {
+        const previous = get().nudgesDismissed;
+        if (previous.includes(id)) return;
+        // Only the most recent few hundred are kept; older nudges no longer come up anyway.
+        await putList(
+          NUDGES_DISMISSED_KEY,
+          [...previous, id].slice(-300),
+          previous,
+          'Put away a nudge',
+        );
+      },
+
+      saveSubcategory: async (categoryId, name, id) => {
+        const before = get().categories.find((c) => c.id === categoryId);
+        if (!before || !name.trim()) return null;
+        const subs = before.subcategories ?? [];
+        const made = id ? null : makeSubcategory(name, before);
+        const next = made
+          ? [...subs, made]
+          : subs.map((x) => (x.id === id ? { ...x, name: name.trim() } : x));
+        const label = made ? `Added ${made.name} under ${before.name}` : `Renamed a subcategory`;
+        await get().run(
+          putCategories([before], [{ ...before, subcategories: next }], label),
+          label,
+        );
+        return made?.id ?? id ?? null;
+      },
+
+      deleteSubcategory: async (categoryId, subId) => {
+        const before = get().categories.find((c) => c.id === categoryId);
+        const sub = before?.subcategories?.find((x) => x.id === subId);
+        if (!before || !sub) return;
+        const now = Date.now();
+        const label = `Deleted ${sub.name}; its entries stay in ${before.name}`;
+        const steps: Command[] = [
+          putCategories(
+            [before],
+            [{ ...before, subcategories: before.subcategories!.filter((x) => x.id !== subId) }],
+            label,
+          ),
+          ...get()
+            .transactions.filter((t) => t.subcategoryId === subId)
+            .map((t) => updateTransaction(t, { ...t, subcategoryId: undefined, updatedAt: now })),
+        ];
+        await get().run(composite(label, steps), label);
+      },
+
+      setCategoryNeed: async (categoryId, need) => {
+        const before = get().categories.find((c) => c.id === categoryId);
+        if (!before) return;
+        const label = `${before.name} counts as a ${need}`;
+        await get().run(putCategories([before], [{ ...before, need }], label), label);
+      },
+
       getEntryHistory: async (id) => {
         const events = await requireDb().getAll('audit');
         return events
@@ -1612,7 +1884,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           composite(
             label,
             list.map((t) =>
-              updateTransaction(t, { ...t, categoryId, unsure: false, updatedAt: now }),
+              updateTransaction(t, fitSub({ ...t, categoryId, unsure: false, updatedAt: now })),
             ),
           ),
           label,
@@ -1806,7 +2078,13 @@ export function createLedgerStore(dbName: string = DB_NAME) {
         const steps: Command[] = [];
         for (const t of transactions.filter((x) => x.categoryId === id))
           steps.push(
-            updateTransaction(t, { ...t, categoryId: moveTo, unsure: false, updatedAt: now }),
+            updateTransaction(t, {
+              ...t,
+              categoryId: moveTo,
+              subcategoryId: undefined,
+              unsure: false,
+              updatedAt: now,
+            }),
           );
         for (const item of trash.filter((x) => x.tx.categoryId === id))
           steps.push(putTrashItem(item, { ...item, tx: { ...item.tx, categoryId: moveTo } }));
@@ -1893,6 +2171,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           goals: await d.getAll('goals'),
           wishlist: await d.getAll('wishlist'),
           assets: await d.getAll('assets'),
+          projects: await d.getAll('projects'),
         };
         const after = {
           transactions: file.data.transactions,
@@ -1908,6 +2187,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           goals: file.data.goals ?? [],
           wishlist: file.data.wishlist ?? [],
           assets: file.data.assets ?? [],
+          projects: file.data.projects ?? [],
         };
         // Notes and drawings are never removed by a restore; the backup's missing ones are added.
         const haveNotes = new Set(get().notes.map((n) => n.id));

@@ -330,13 +330,68 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   wry line about the month instead of a plain fact. Written in Ledger, no AI and no server.
 - New screens load on first use so start-up stays within the 170 KB budget.
 
+### Drop 12: insight (scope approved 22 Oct 2026; details written 22 Oct 2026)
+
+- **Plain-words search** (Transactions, and "Search entries for …" in the palette, `?q=`): a search box
+  above the list understands periods (today, yesterday, this or last week, month, year or financial
+  year, "last 3 months", "last 30 days", a month name with or without a year), amounts ("over 500",
+  "under 200", "between 200 and 500", a bare number for that exact amount; "1.5k" and "₹" work),
+  methods (upi, gpay, cash, card, bank and so on), categories and subcategories by name or by any word
+  of their name, tags ("#trip"), people ("for amma"), trips and projects by name, "80c" and other tax
+  sections, "tax", "warranty", "receipt", "split" and "unsure". Every other word must appear in the
+  merchant, notes, typed text or tags. Chips show what was understood; filters and pins still apply.
+- **Rules editor** (Settings > Rules): "When the merchant contains / starts with / is …", optionally
+  with an amount at least or at most and a method, then set the category (and subcategory), add a tag,
+  set who it was for, or set a tax section. While editing, it shows how many past entries match and
+  how many would change, with examples; saving can also apply it to those entries (one undoable step).
+  Your rules come first (top to bottom, first match wins), then learned categories, then built-in
+  words. Quick add, several at once and the form follow them; the learned list stays below.
+- **Saved reports with relative dates** (Reports): ranges "Last 30 days", "Last 3 months", "Last 6
+  months", "Last 12 months" and "This calendar year" beside Month, Quarter, Financial year and Custom.
+  "Save this report" keeps the range and the comparison under a name; a saved "last month" or "last 3
+  months" always means that range from today.
+- **Nudges** (Dashboard card "Worth a look"): an entry in the last 14 days at least twice a merchant's
+  usual amount (median of at least 3 earlier entries, and at least ₹200 more); two entries of the same
+  merchant and amount within a day of each other ("Delete the later one", undoable); a recurring
+  payment whose latest charge is higher than the one before, with the yearly difference ("Update the
+  recurring amount"); a warranty ending in the next 30 days. Each can be put away ("Fine"); it then
+  stays away.
+- **Merchant pages** (`#/merchant?key=`; from the palette, Reports' top merchants and the merchant
+  grouping in Transactions): total, this month, entries, average per entry, first and last visit, how
+  often, usual category and method, the last 12 months as bars, the rule that files it, "Pin to every
+  page", "Make a rule", and the full history with edit and delete.
+- **Trips, projects and festival funds** (Budgets > Trips): a name, a kind (trip, project or festival),
+  optional dates and budget. Entries join one from the form, from bulk actions, or, while one with
+  dates is on and set to collect them, automatically by date. Each shows spent against its budget,
+  per day for trips, by category and its entries. Deleting one keeps its entries.
+- **Weekly digest**: the Dashboard's weekly recap offer (Monday to Wednesday) becomes a digest card:
+  last week's total against the week before, top category, biggest expense, quiet days and the bills
+  due this week, with "Open the recap" and "Got it".
+- **50/30/20** (Reports, for the period): each category is a need or a want (defaults: Housing &
+  Utilities, Groceries, Health & Wellness, Transport & Travel, Education and Business are needs; the
+  rest are wants; changeable on the card). Needs, wants and what was left of the money in, against 50%,
+  30% and 20%; without money in, just the needs and wants split of spending.
+- **Subcategories** (Settings > Categories, one level): a category can have subcategories; an entry can
+  have one (form, rules, search; quick add picks one when a word of the entry is its name). Every chart,
+  budget and report counts subcategory spending in its category, because an entry keeps its category;
+  Reports' category table opens a category's subcategories. Moving an entry to another category clears
+  its subcategory; deleting a subcategory clears it from its entries (undoable).
+- **Tax summary** (Reports, for the financial year of the period): entries tagged with a section on the
+  form or by a rule (80C, 80CCD(1B), 80D, 80E, 80G, 24(b) home loan interest, Other), totals per section
+  with the usual old-regime limit where there is one, what is over a limit, and "Export CSV". It says
+  plainly that it is a guide, that most of these count only under the old regime, and that the
+  Income-tax Act, 2025 renumbers them from April 2026 (80C is section 123, 80D section 126).
+- **Spent for whom** (form "For", rules, search, Reports card): a name per entry (a family member, the
+  shop); untagged entries count as "You". Reports totals the period per name.
+- **Warranties** (form "Warranty, months"; Transactions > Warranties, linked from the toolbar when any
+  exist): ends on the purchase date plus the months; active ones soonest first with days left, whether
+  the receipt is kept (a button to view it, or a note to add one), and those ended in the last 90 days.
+- Start-up stays within 170 KB: the Add sheet's forms, the lock screen and the close-the-month card load
+  on first use, like Drop 11's screens. Schema v4 adds a `projects` store; rules, saved reports and
+  dismissed nudges are lists in settings; backups carry all of it.
+
 ### Later drops (scope agreed, details written when each starts)
 
-- **Drop 12, insight**: plain-words search; rules editor tested on history; saved reports with relative
-  dates; in-app nudges (unusual amount, likely duplicate, subscription price rise); merchant pages; trips,
-  projects and festival funds; weekly digest; 50/30/20 view; subcategories; tax summary (80C, 80D and other
-  deductions tagged and totalled for the financial year, exportable); spent for whom (per family member or
-  the shop); warranties (period on an entry, receipt kept, expiring soon list).
 - **Drop 13, reach and polish (v1.1.0)**: Personal and Shop spaces with a simple profit and loss; passkey
   unlock if it works in an iPhone home-screen app; one-tap backup to Files on iPhone and a weekly file
   backup on Chrome; password-protected backup files (encrypted on the device); app badge for bills due; Telugu and Hindi interface; accessibility and performance pass.

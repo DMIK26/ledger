@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'rea
 import { useLedger } from '../data/store';
 import { AddSheet } from './AddSheet';
 import { Icon, type IconName } from './icons';
-import { LockScreen } from './LockScreen';
+import { LockScreen } from './deferred';
 import { usePrivacy } from './Money';
 import { addPath, closeAddPath, href, navigate, type RoutePath } from './router';
 import { Toast } from './Toast';
@@ -45,7 +45,7 @@ export const NAV: NavItem[] = [
 const MORE: RoutePath[] = ['/money', '/budgets', '/recurring', '/settings'];
 
 export const titleFor = (path: RoutePath): string =>
-  NAV.find((n) => n.path === path)?.label ?? 'Ledger';
+  path === '/merchant' ? 'Merchant' : (NAV.find((n) => n.path === path)?.label ?? 'Ledger');
 
 export const AUTO_LOCK_MS = 30_000;
 
@@ -349,7 +349,12 @@ export function Layout({
     );
   }
 
-  if (locked) return <LockScreen />;
+  if (locked)
+    return (
+      <Suspense fallback={<main className="state" id="main" aria-busy="true" />}>
+        <LockScreen />
+      </Suspense>
+    );
 
   return (
     <div className="app">

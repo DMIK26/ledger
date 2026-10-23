@@ -100,8 +100,10 @@ describe('command palette', () => {
     const again = await screen.findByRole('combobox');
     await userEvent.clear(again);
     await userEvent.type(again, 'swig');
-    await userEvent.click(screen.getByRole('option', { name: /Entries from Swiggy \(2\)/ }));
-    await waitFor(() => expect(window.location.hash).toBe('#/transactions'));
+    // Drop 12: a merchant opens its page, where it can be pinned.
+    await userEvent.click(screen.getByRole('option', { name: /Swiggy, 2 entries/ }));
+    await waitFor(() => expect(window.location.hash).toBe('#/merchant?key=swiggy'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Pin to every page' }));
     expect(useView.getState().pins).toEqual([{ kind: 'merchant', id: 'swiggy', label: 'Swiggy' }]);
   });
 });
@@ -326,8 +328,10 @@ describe('the Dashboard', () => {
     );
     expect(useLedger.getState().settings.recapsSeen).toEqual(['month:2026-10']);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
-    // The month recap is put away; last week's is offered next.
-    expect(await screen.findByTestId('recap-offer')).toHaveTextContent('Your week, in a few cards');
+    // The month recap is put away; last week's is offered next, as the weekly digest (Drop 12).
+    expect(await screen.findByTestId('week-digest')).toHaveTextContent(
+      'Last week, 26 Oct 2026 to 1 Nov 2026',
+    );
   });
 });
 

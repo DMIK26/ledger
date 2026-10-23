@@ -44,4 +44,8 @@ export const MIGRATIONS: Migration[] = [
     db.createObjectStore('wishlist', { keyPath: 'id' });
     db.createObjectStore('assets', { keyPath: 'id' });
   },
+  // v4 (Drop 12): trips, projects and festival funds.
+  (db) => {
+    db.createObjectStore('projects', { keyPath: 'id' });
+  },
 ];

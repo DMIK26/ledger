@@ -10,3 +10,6 @@ export const Reports = lazy(() => import('./Reports').then((m) => ({ default: m.
 export const Recurring = lazy(() => import('./Recurring').then((m) => ({ default: m.Recurring })));
 export const Settings = lazy(() => import('./Settings').then((m) => ({ default: m.Settings })));
 export const MoneyPage = lazy(() => import('./Money').then((m) => ({ default: m.MoneyPage })));
+export const MerchantPage = lazy(() =>
+  import('./Merchant').then((m) => ({ default: m.MerchantPage })),
+);

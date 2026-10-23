@@ -16,6 +16,7 @@ import type { Loan } from '../domain/loans';
 import type { Goal } from '../domain/goals';
 import type { WishItem } from '../domain/wishlist';
 import type { Asset } from '../domain/networth';
+import type { Project } from '../domain/projects';
 import { MIGRATIONS } from './migrations';
 
 export interface LedgerDB extends DBSchema {
@@ -44,6 +45,8 @@ export interface LedgerDB extends DBSchema {
   goals: { key: string; value: Goal };
   wishlist: { key: string; value: WishItem };
   assets: { key: string; value: Asset };
+  /** Drop 12 (schema v4). */
+  projects: { key: string; value: Project };
 }
 
 export type Db = IDBPDatabase<LedgerDB>;

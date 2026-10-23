@@ -13,6 +13,7 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
   const uid = useId();
   const categories = useLedger((s) => s.categories);
   const rules = useLedger((s) => s.rules);
+  const customRules = useLedger((s) => s.customRules);
   const lastMethod = useLedger((s) => s.settings.lastMethod);
   const currency = useLedger((s) => s.settings.currency);
   const addMany = useLedger((s) => s.addMany);
@@ -28,14 +29,14 @@ export function Several({ initialDate, onDone }: { initialDate?: string; onDone:
         .map((l) => l.trim())
         .filter(Boolean)
         .slice(0, MAX_LINES)
-        .map((l) => parseQuickEntry(l, { today, lastMethod, rules }))
+        .map((l) => parseQuickEntry(l, { today, lastMethod, rules, customRules, categories }))
         // Opened for a day (from the check-in): lines without a date go on that day.
         .map((p) =>
           initialDate && parseISO(initialDate) && p.dateSource === 'today'
             ? { ...p, date: initialDate, upcoming: false }
             : p,
         ),
-    [text, today, lastMethod, rules, initialDate],
+    [text, today, lastMethod, rules, customRules, categories, initialDate],
   );
   const good = lines.filter((p) => p.ok);
   const tooMany = text.split('\n').filter((l) => l.trim()).length > MAX_LINES;

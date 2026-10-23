@@ -35,6 +35,16 @@ export interface Transaction {
   foreign?: ForeignAmount;
   /** Shared with people (Drop 11): amountMinor is your share; the split has the whole bill. */
   split?: Split;
+  /** One of its category's subcategories (Drop 12). Totals still count the entry in categoryId. */
+  subcategoryId?: string;
+  /** The trip, project or festival fund it belongs to (Drop 12). */
+  projectId?: string;
+  /** Who it was for, such as a family member or the shop; missing means you (Drop 12). */
+  forWhom?: string;
+  /** The income-tax deduction it counts towards, such as '80C' (Drop 12, see tax.ts). */
+  taxSection?: string;
+  /** Warranty in whole months from the entry's date (Drop 12). */
+  warrantyMonths?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -52,6 +62,16 @@ export interface Category {
   budgetKind?: BudgetKind;
   /** What is left of this category's budget, or what went over, carries into next month. */
   rollover?: boolean;
+  /** One level of subcategories (Drop 12). */
+  subcategories?: Subcategory[];
+  /** For the 50/30/20 view; missing means the default (see needOf in needs.ts). */
+  need?: 'need' | 'want';
+}
+
+/** A subcategory lives inside its category; its id is `${categoryId}/${slug}`. */
+export interface Subcategory {
+  id: string;
+  name: string;
 }
 
 export interface MerchantRule {

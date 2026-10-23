@@ -1,14 +1,20 @@
 import { Suspense } from 'react';
 import { Layout } from './Layout';
 import { Dashboard } from './pages/Dashboard';
-import { Budgets, MoneyPage, Recurring, Reports, Settings } from './pages/lazy';
+import { Budgets, MerchantPage, MoneyPage, Recurring, Reports, Settings } from './pages/lazy';
 import { filtersFromQuery, Transactions } from './pages/Transactions';
 import { useRoute, type RoutePath } from './router';
 
 function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
   switch (path) {
     case '/transactions':
-      return <Transactions view={query.get('view')} initialFilters={filtersFromQuery(query)} />;
+      return (
+        <Transactions
+          view={query.get('view')}
+          initialFilters={filtersFromQuery(query)}
+          initialSearch={query.get('q') ?? ''}
+        />
+      );
     case '/budgets':
       return <Budgets view={query.get('view')} />;
     case '/reports':
@@ -16,9 +22,11 @@ function Page({ path, query }: { path: RoutePath; query: URLSearchParams }) {
     case '/recurring':
       return <Recurring />;
     case '/settings':
-      return <Settings view={query.get('view')} />;
+      return <Settings view={query.get('view')} merchant={query.get('merchant')} />;
     case '/money':
       return <MoneyPage view={query.get('view')} />;
+    case '/merchant':
+      return <MerchantPage merchantKey={query.get('key') ?? ''} />;
     default:
       return <Dashboard />;
   }

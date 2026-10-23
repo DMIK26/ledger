@@ -17,7 +17,17 @@ import type { Loan } from '../domain/loans';
 import type { Goal } from '../domain/goals';
 import type { WishItem } from '../domain/wishlist';
 import type { Asset } from '../domain/networth';
-import { CLOSED_MONTHS_KEY, FAVOURITES_KEY, NO_SPEND_KEY, SETTLED_SPLITS_KEY } from './commands';
+import type { Project } from '../domain/projects';
+import type { CustomRule } from '../domain/rules';
+import type { SavedReport } from '../domain/reports';
+import {
+  CLOSED_MONTHS_KEY,
+  CUSTOM_RULES_KEY,
+  FAVOURITES_KEY,
+  NO_SPEND_KEY,
+  SAVED_REPORTS_KEY,
+  SETTLED_SPLITS_KEY,
+} from './commands';
 import { DB_VERSION, type Db } from './db';
 
 export interface BackupFile {
@@ -52,6 +62,10 @@ export interface BackupFile {
     closedMonths?: string[];
     /** Added in Drop 11. */
     settledSplits?: string[];
+    /** Added in Drop 12. */
+    projects?: Project[];
+    customRules?: CustomRule[];
+    savedReports?: SavedReport[];
   };
 }
 
@@ -68,6 +82,12 @@ export function mergeFavourites(have: Favourite[], extra: Favourite[]): Favourit
 
 export const mergeDays = (have: string[], extra: string[]): string[] =>
   [...new Set([...have, ...extra])].sort();
+
+/** Everything in `have`, then the rows of `extra` whose id is new (rules keep their order). */
+export const mergeById = <T extends { id: string }>(have: T[], extra: T[]): T[] => {
+  const ids = new Set(have.map((x) => x.id));
+  return [...have, ...extra.filter((x) => !ids.has(x.id))];
+};
 
 export async function loadSettings(db: Db): Promise<Settings> {
   const settings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
@@ -104,6 +124,9 @@ export async function exportBackup(db: Db): Promise<BackupFile> {
       assets: await db.getAll('assets'),
       closedMonths: await listOf<string>(db, CLOSED_MONTHS_KEY),
       settledSplits: await listOf<string>(db, SETTLED_SPLITS_KEY),
+      projects: await db.getAll('projects'),
+      customRules: await listOf<CustomRule>(db, CUSTOM_RULES_KEY),
+      savedReports: await listOf<SavedReport>(db, SAVED_REPORTS_KEY),
     },
   };
 }
@@ -218,7 +241,17 @@ export function validateBackup(json: unknown): BackupFile | null {
     !rowsOk(d.loans, true) ||
     !rowsOk(d.goals, true) ||
     !rowsOk(d.wishlist, true) ||
-    !rowsOk(d.assets, false)
+    !rowsOk(d.assets, false) ||
+    !rowsOk(d.projects, false)
+  )
+    return null;
+  // Drop 12 lists: rules carry their text and what they set; saved reports their range.
+  const listOk = (v: unknown, check: (x: Record<string, unknown>) => boolean): boolean =>
+    v === undefined ||
+    (Array.isArray(v) && v.every((x) => isObj(x) && typeof x.id === 'string' && check(x)));
+  if (
+    !listOk(d.customRules, (r) => typeof r.text === 'string' && isObj(r.set)) ||
+    !listOk(d.savedReports, (r) => typeof r.name === 'string' && isObj(r.range))
   )
     return null;
   // Drop 10: goal contributions and asset values carry money too.
@@ -272,6 +305,7 @@ export async function importBackup(
       'goals',
       'wishlist',
       'assets',
+      'projects',
     ],
     'readwrite',
   );
@@ -284,6 +318,7 @@ export async function importBackup(
     'goals',
     'wishlist',
     'assets',
+    'projects',
   ] as const) {
     if (mode === 'replace') await t.objectStore(name).clear();
     for (const row of (file.data[name] ?? []) as Array<{ id: string }>) {
@@ -346,6 +381,15 @@ export async function importBackup(
   await t
     .objectStore('settings')
     .put(mergeDays(closed ?? [], file.data.closedMonths ?? []), CLOSED_MONTHS_KEY);
+  for (const [key, extra] of [
+    [CUSTOM_RULES_KEY, file.data.customRules],
+    [SAVED_REPORTS_KEY, file.data.savedReports],
+  ] as const) {
+    const have = (await t.objectStore('settings').get(key)) as Array<{ id: string }> | undefined;
+    const list =
+      mode === 'replace' ? [...(extra ?? [])] : mergeById(have ?? [], [...(extra ?? [])]);
+    await t.objectStore('settings').put(list, key);
+  }
   if (mode === 'replace') {
     for (const [key, value] of Object.entries(file.data.settings)) {
       await t.objectStore('settings').put(value, key);

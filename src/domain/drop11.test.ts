@@ -470,6 +470,7 @@ describe('dashboard layout', () => {
       'budget',
       'risk',
       'cards',
+      'nudges',
       'insights',
       'day',
       'charts',

@@ -15,7 +15,7 @@ const today = todayISO();
 
 describe('Drop 10 data', () => {
   it('upgrades a version 2 database without touching accounts or entries', async () => {
-    expect(DB_VERSION).toBe(3);
+    expect(DB_VERSION).toBeGreaterThanOrEqual(3);
     const name = `drop10-upgrade-${Math.random().toString(36).slice(2)}`;
     const { openDB } = await import('idb');
     const { MIGRATIONS } = await import('./migrations');

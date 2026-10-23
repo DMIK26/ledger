@@ -116,3 +116,46 @@ export function toDate(
     partial: true,
   };
 }
+
+/** Ranges that move with today (Drop 12), for Reports and saved reports. */
+export const RELATIVE_RANGES = [
+  'last-30-days',
+  'last-3-months',
+  'last-6-months',
+  'last-12-months',
+  'this-year',
+] as const;
+export type RelativeRange = (typeof RELATIVE_RANGES)[number];
+
+export const RELATIVE_LABEL: Record<RelativeRange, string> = {
+  'last-30-days': 'Last 30 days',
+  'last-3-months': 'Last 3 months',
+  'last-6-months': 'Last 6 months',
+  'last-12-months': 'Last 12 months',
+  'this-year': 'This calendar year',
+};
+
+/**
+ * The days of a relative range up to today: the last N days, or this month and the N-1 months before
+ * it (whole months, following the month start day), or 1 January to today.
+ */
+export function lastDays(n: number, today: ISODate): { start: ISODate; end: ISODate } {
+  return { start: addDays(today, -(n - 1)), end: today };
+}
+
+export function lastMonthsRange(n: number, today: ISODate): { start: ISODate; end: ISODate } {
+  return { start: monthBounds(shiftMonthKey(monthKey(today), -(n - 1))).start, end: today };
+}
+
+export function relativePeriod(id: RelativeRange, today: ISODate): Period {
+  const range =
+    id === 'last-30-days'
+      ? lastDays(30, today)
+      : id === 'this-year'
+        ? { start: isoFromYMD(parseISO(today)!.y, 1, 1), end: today }
+        : lastMonthsRange(id === 'last-3-months' ? 3 : id === 'last-6-months' ? 6 : 12, today);
+  return { kind: 'custom', start: range.start, end: range.end, label: RELATIVE_LABEL[id] };
+}
+
+export const isRelativeRange = (v: unknown): v is RelativeRange =>
+  (RELATIVE_RANGES as readonly unknown[]).includes(v);

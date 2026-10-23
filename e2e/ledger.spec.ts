@@ -102,6 +102,7 @@ test('filters, faceted counts, no matches and clear', async ({ page }) => {
 });
 
 test('privacy hides every amount on every page', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('./#/transactions');
   await quickAdd(page, 'shawarma 1234.56 on 18th oct upi');
   await quickAdd(page, 'gone 7654.32 upi');
@@ -155,6 +156,23 @@ test('privacy hides every amount on every page', async ({ page }) => {
   await add.getByLabel('Person 1').fill('Rahul');
   await add.getByRole('button', { name: 'Save' }).click();
   await expect(add).toBeHidden();
+  // Drop 12: a trip with a budget, and an entry for someone, with a tax section and a warranty.
+  await page.goto('./#/budgets?view=trips');
+  await page.getByRole('button', { name: 'Add one' }).click();
+  await page.getByLabel('Name').fill('Goa');
+  await page.getByLabel('Budget (optional)').fill('7654.32');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByTestId('project-card')).toBeVisible();
+  await page.goto('./#/?action=add');
+  await add.getByLabel('Amount').fill('1234.56');
+  await add.getByLabel('What for').fill('Fridge');
+  await add.getByLabel('Trip or project').selectOption({ label: 'Goa' });
+  await add.getByText('Who it was for, tax and warranty').click();
+  await add.getByLabel('For', { exact: true }).fill('Amma');
+  await add.getByLabel('Tax deduction').selectOption('80C');
+  await add.getByLabel('Warranty, months').fill('12');
+  await add.getByRole('button', { name: 'Save' }).click();
+  await expect(add).toBeHidden();
   await page.getByRole('button', { name: 'Privacy mode' }).click();
 
   const routes = [
@@ -173,6 +191,11 @@ test('privacy hides every amount on every page', async ({ page }) => {
     '#/money?view=udhaar',
     '#/money?view=loans',
     '#/transactions?action=add',
+    '#/budgets?view=trips',
+    '#/transactions?view=warranties',
+    '#/merchant?key=fridge',
+    '#/transactions?q=fridge%20over%201000',
+    '#/settings?view=rules',
   ];
   for (const r of routes) {
     await page.goto(`./${r}`);
@@ -187,6 +210,8 @@ test('privacy hides every amount on every page', async ({ page }) => {
     if (r === '#/money?view=udhaar') await page.getByRole('button', { name: /^Rahul/ }).click();
     if (r === '#/money?view=loans') await page.locator('summary', { hasText: 'Schedule' }).click();
     if (r === '#/transactions') await page.getByRole('button', { name: /^Edit Shawarma/ }).click();
+    if (r === '#/budgets?view=trips')
+      await page.getByRole('button', { name: 'Show entries' }).click();
     const all = await page.evaluate(() => {
       const attrs = [...document.querySelectorAll('*')]
         .flatMap((el) => [...el.attributes].map((a) => a.value))

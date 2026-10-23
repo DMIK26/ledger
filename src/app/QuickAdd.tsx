@@ -32,6 +32,7 @@ export function QuickAdd({
 }) {
   const categories = useLedger((s) => s.categories);
   const rules = useLedger((s) => s.rules);
+  const customRules = useLedger((s) => s.customRules);
   const transactions = useLedger((s) => s.transactions);
   const lastMethod = useLedger((s) => s.settings.lastMethod);
   const currency = useLedger((s) => s.settings.currency);
@@ -68,8 +69,11 @@ export function QuickAdd({
 
   const today = todayISO();
   const parsed = useMemo(
-    () => (text.trim() ? parseQuickEntry(text, { today, lastMethod, rules }) : null),
-    [text, today, lastMethod, rules],
+    () =>
+      text.trim()
+        ? parseQuickEntry(text, { today, lastMethod, rules, customRules, categories })
+        : null,
+    [text, today, lastMethod, rules, customRules, categories],
   );
   const segments = useMemo(() => (parsed ? highlightSegments(parsed) : []), [parsed]);
   const chips = useMemo(

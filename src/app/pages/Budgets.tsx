@@ -28,6 +28,7 @@ import {
   type EffectiveBudget,
 } from '../../domain/plan';
 import { usePins, useScopedTransactions, useViewMonth } from '../../kit/view';
+import { TripsView } from '../plan/Trips';
 import type { BudgetKind, Category } from '../../domain/types';
 import { AmountInput } from '../AmountInput';
 import { Money, usePrivacy } from '../Money';
@@ -211,12 +212,14 @@ const VIEWS = [
   { id: 'budgets', label: 'Budgets' },
   { id: 'goals', label: 'Goals' },
   { id: 'wishlist', label: 'Wishlist' },
+  { id: 'trips', label: 'Trips' },
 ] as const;
 type View = (typeof VIEWS)[number]['id'];
 
 /** Budgets, goals and funds, and the wishlist (Drop 10): planning ahead in one place. */
 export function Budgets({ view }: { view?: string | null }) {
-  const current: View = view === 'goals' || view === 'wishlist' ? view : 'budgets';
+  const current: View =
+    view === 'goals' || view === 'wishlist' || view === 'trips' ? view : 'budgets';
   return (
     <>
       <div className="segmented page-views" role="group" aria-label="Show">
@@ -234,6 +237,7 @@ export function Budgets({ view }: { view?: string | null }) {
       {current === 'budgets' && <BudgetPlan />}
       {current === 'goals' && <GoalsView />}
       {current === 'wishlist' && <WishlistView />}
+      {current === 'trips' && <TripsView />}
     </>
   );
 }
