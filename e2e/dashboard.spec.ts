@@ -88,6 +88,8 @@ test('allocation divider drags budget between neighbours with the total fixed', 
     'aria-valuetext',
     /Housing & Utilities ₹8,000.00, Food & Dining ₹2,000.00/,
   );
+  // Hover first so Playwright waits until the divider is stable and actually receives the pointer.
+  await divider.hover();
   const bar = (await page.locator('.alloc-bar').first().boundingBox())!;
   const d = (await divider.boundingBox())!;
   await page.mouse.move(d.x + d.width / 2, d.y + d.height / 2);
