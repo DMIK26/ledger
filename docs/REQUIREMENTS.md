@@ -422,6 +422,11 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   first use and stay available offline.
 - **Polish**: start-up JavaScript back under 160 KB; precache budget for the two languages; axe, phone-size
   and privacy sweeps run on the new screens and in Telugu and Hindi; version 1.1.0 and a v1.1.0 tag.
+- **Sample data for every feature** (asked 24 Oct 2026): loading the sample also adds a bank account,
+  cash and a credit card, three months of salary and transfers, a card fee, udhaar with two friends, a
+  bike loan, a goal and a yearly fund, two wishlist items, gold and an FD, a weekend trip with its
+  entries, and entries with a tax deduction, a warranty, someone they were for and an unsure category.
+  Removing the sample removes exactly these too (one undo).
 
 ### Later (not scheduled)
 

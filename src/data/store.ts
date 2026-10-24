@@ -115,6 +115,7 @@ import {
   SKETCH_LABEL,
   loadSample as loadSampleCommand,
   removeSample as removeSampleCommand,
+  ROW_STORES,
   SAMPLE_KEY,
   type SampleMarker,
   updateTransaction,
@@ -2574,6 +2575,14 @@ export function createLedgerStore(dbName: string = DB_NAME) {
               }
             : null);
         if (!marker) return;
+        // The sample's accounts, money in, udhaar, loan, goals, wishes, assets and trip (Drop 13).
+        const all = get().everything as unknown as Record<RowStore, Array<{ id: string }>>;
+        const rows = Object.fromEntries(
+          ROW_STORES.map((store) => {
+            const ids = new Set(marker.rows?.[store] ?? []);
+            return [store, (all[store] ?? []).filter((x) => ids.has(x.id) || isSampleId(x.id))];
+          }),
+        );
         const txIds = new Set(marker.transactionIds);
         const recIds = new Set(marker.recurringIds);
         const removed = {
@@ -2583,6 +2592,7 @@ export function createLedgerStore(dbName: string = DB_NAME) {
           budgets: get().budgets.filter((b) =>
             marker.budgets.some((m) => m.id === b.id && m.amountMinor === b.amountMinor),
           ),
+          rows,
         };
         await get().run(removeSampleCommand(marker, removed), tl('Removed the sample data'));
       },

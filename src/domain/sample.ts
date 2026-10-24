@@ -1,6 +1,13 @@
 import { budgetsForMonth, toBudgetRows, type MonthBudgets } from './budgets';
 import { addDays, parseISO, shiftMonth } from './dates';
 import type { RecurringItem } from './recurring';
+import type { Account, Flow } from './accounts';
+import type { Goal } from './goals';
+import type { Loan } from './loans';
+import type { Asset } from './networth';
+import type { Project } from './projects';
+import type { Person, UdhaarEntry } from './udhaar';
+import type { WishItem } from './wishlist';
 import type { Budget, ISODate, PaymentMethod, Transaction } from './types';
 
 /**
@@ -15,6 +22,20 @@ export interface SampleData {
   recurring: RecurringItem[];
   /** Budgets for months that have none yet (real budgets are never replaced). */
   budgets: Budget[];
+  /** One of everything else (Drop 13): accounts, money in, udhaar, a loan, goals, a wish, assets, a trip. */
+  rows: SampleRows;
+}
+
+export interface SampleRows {
+  accounts: Account[];
+  flows: Flow[];
+  people: Person[];
+  udhaar: UdhaarEntry[];
+  loans: Loan[];
+  goals: Goal[];
+  wishlist: WishItem[];
+  assets: Asset[];
+  projects: Project[];
 }
 
 export const isSampleId = (id: string): boolean => id.startsWith(SAMPLE_PREFIX);
@@ -206,5 +227,257 @@ export function buildSample(today: ISODate, existingBudgets: readonly Budget[] =
     budgets.push(...toBudgetRows(month, SAMPLE_BUDGET));
   }
 
-  return { transactions, recurring, budgets };
+  // A weekend trip three weeks ago, with its own entries and budget.
+  const tripStart = addDays(today, -24);
+  const tripEnd = addDays(tripStart, 2);
+  const tripId = `${SAMPLE_PREFIX}project-1`;
+  const tripEntries: Array<[number, string, string, PaymentMethod, number]> = [
+    [0, 'Bus to Gokarna', 'transport', 'UPI', 1_450_00],
+    [0, 'Beach shack', 'food', 'Cash', 860_00],
+    [1, 'Homestay', 'housing', 'Card', 3_200_00],
+    [2, 'Scooter hire', 'transport', 'Cash', 700_00],
+  ];
+  for (const [day, merchant, categoryId, method, amountMinor] of tripEntries) {
+    add(addDays(tripStart, day), { merchant, categoryId, method }, amountMinor);
+    transactions[transactions.length - 1]!.projectId = tripId;
+  }
+  // Entries that show the extra fields: for someone, a tax deduction and a warranty.
+  add(
+    addDays(today, -40),
+    { merchant: 'Star Health', categoryId: 'health', method: 'Bank transfer' },
+    18_500_00,
+  );
+  Object.assign(transactions[transactions.length - 1]!, { taxSection: '80D', forWhom: 'Amma' });
+  add(
+    addDays(today, -50),
+    { merchant: 'Croma', categoryId: 'shopping', method: 'Card' },
+    14_990_00,
+  );
+  Object.assign(transactions[transactions.length - 1]!, {
+    warrantyMonths: 12,
+    notes: 'Mixer grinder',
+  });
+  add(
+    addDays(today, -9),
+    { merchant: 'School fees', categoryId: 'education', method: 'UPI' },
+    4_500_00,
+  );
+  Object.assign(transactions[transactions.length - 1]!, { forWhom: 'Riya' });
+  // One the categoriser was not sure of, for the Review screen.
+  add(addDays(today, -2), { merchant: 'Ravi Stores', categoryId: 'other', method: 'UPI' }, 340_00);
+  transactions[transactions.length - 1]!.unsure = true;
+
+  const id = (kind: string, i = 1) => `${SAMPLE_PREFIX}${kind}-${i}`;
+  const stamp = { createdAt: 0, updatedAt: 0 };
+  const accounts: Account[] = [
+    {
+      id: id('account', 1),
+      name: 'SBI savings',
+      kind: 'bank',
+      openingMinor: 85_000_00,
+      openingDate: first,
+      methods: ['UPI', 'Bank transfer'],
+      order: 0,
+      ...stamp,
+    },
+    {
+      id: id('account', 2),
+      name: 'Cash in hand',
+      kind: 'cash',
+      openingMinor: 3_000_00,
+      openingDate: first,
+      methods: ['Cash'],
+      order: 1,
+      ...stamp,
+    },
+    {
+      id: id('account', 3),
+      name: 'HDFC credit card',
+      kind: 'card',
+      openingMinor: 0,
+      openingDate: first,
+      methods: ['Card'],
+      order: 2,
+      statementDay: 15,
+      dueDay: 5,
+      limitMinor: 1_50_000_00,
+      ...stamp,
+    },
+  ];
+  const flows: Flow[] = [];
+  for (let k = 2; k >= 0; k -= 1) {
+    const m = shiftMonth(p.y, p.m, -k);
+    const date = `${m.y}-${pad(m.m)}-01`;
+    if (date > today) continue;
+    flows.push({
+      id: id('flow', flows.length + 1),
+      kind: 'income',
+      date,
+      amountMinor: 75_000_00,
+      label: 'Salary',
+      incomeKind: 'salary',
+      accountId: accounts[0]!.id,
+      ...stamp,
+    });
+    flows.push({
+      id: id('flow', flows.length + 1),
+      kind: 'transfer',
+      date: addDays(date, 2),
+      amountMinor: 5_000_00,
+      label: 'ATM withdrawal',
+      accountId: accounts[0]!.id,
+      toAccountId: accounts[1]!.id,
+      ...stamp,
+    });
+  }
+  flows.push({
+    id: id('flow', flows.length + 1),
+    kind: 'fee',
+    date: addDays(today, -20),
+    amountMinor: 236_00,
+    label: 'Late fee',
+    accountId: accounts[2]!.id,
+    ...stamp,
+  });
+
+  const people: Person[] = [
+    { id: id('person', 1), name: 'Rahul', createdAt: 0 },
+    { id: id('person', 2), name: 'Priya', createdAt: 0 },
+  ];
+  const udhaar: UdhaarEntry[] = [
+    {
+      id: id('udhaar', 1),
+      personId: people[0]!.id,
+      kind: 'lent',
+      date: addDays(today, -30),
+      amountMinor: 5_000_00,
+      note: 'Laptop repair',
+      ...stamp,
+    },
+    {
+      id: id('udhaar', 2),
+      personId: people[0]!.id,
+      kind: 'got-back',
+      date: addDays(today, -10),
+      amountMinor: 2_000_00,
+      note: 'Part payment',
+      ...stamp,
+    },
+    {
+      id: id('udhaar', 3),
+      personId: people[1]!.id,
+      kind: 'borrowed',
+      date: addDays(today, -6),
+      amountMinor: 1_200_00,
+      note: 'Concert tickets',
+      ...stamp,
+    },
+  ];
+  const loanStart = shiftMonth(p.y, p.m, -8);
+  const loans: Loan[] = [
+    {
+      id: id('loan'),
+      name: 'Bike loan',
+      lender: 'HDFC Bank',
+      principalMinor: 90_000_00,
+      rateBp: 1050,
+      months: 24,
+      firstDate: `${loanStart.y}-${pad(loanStart.m)}-05`,
+      ...stamp,
+    },
+  ];
+  const yearStart = shiftMonth(p.y, p.m, -3);
+  const yearOn = shiftMonth(p.y, p.m, 9);
+  const goals: Goal[] = [
+    {
+      id: id('goal', 1),
+      name: 'New phone',
+      kind: 'goal',
+      targetMinor: 40_000_00,
+      startDate: `${yearStart.y}-${pad(yearStart.m)}-01`,
+      dueDate: `${yearOn.y}-${pad(yearOn.m)}-01`,
+      contributions: [
+        { id: id('contribution', 1), date: addDays(today, -60), amountMinor: 6_000_00 },
+        { id: id('contribution', 2), date: addDays(today, -25), amountMinor: 4_000_00 },
+      ],
+      snoozed: [],
+      ...stamp,
+    },
+    {
+      id: id('goal', 2),
+      name: 'Car insurance',
+      kind: 'fund',
+      targetMinor: 18_000_00,
+      startDate: `${yearStart.y}-${pad(yearStart.m)}-01`,
+      dueDate: `${yearOn.y}-${pad(yearOn.m)}-15`,
+      contributions: [
+        { id: id('contribution', 3), date: addDays(today, -15), amountMinor: 3_000_00 },
+      ],
+      snoozed: [],
+      yearly: true,
+      ...stamp,
+    },
+  ];
+  const wishlist: WishItem[] = [
+    {
+      id: id('wish', 1),
+      name: 'Headphones',
+      priceMinor: 3_499_00,
+      categoryId: 'shopping',
+      addedOn: addDays(today, -9),
+      waitDays: 7,
+      note: 'For the commute',
+      status: 'waiting',
+      ...stamp,
+    },
+    {
+      id: id('wish', 2),
+      name: 'Smartwatch',
+      priceMinor: 8_999_00,
+      categoryId: 'shopping',
+      addedOn: addDays(today, -3),
+      waitDays: 30,
+      note: '',
+      status: 'waiting',
+      ...stamp,
+    },
+  ];
+  const assets: Asset[] = [
+    {
+      id: id('asset', 1),
+      name: 'Gold coins',
+      kind: 'gold',
+      values: [
+        { date: first, valueMinor: 1_20_000_00 },
+        { date: addDays(today, -5), valueMinor: 1_32_000_00 },
+      ],
+      ...stamp,
+    },
+    {
+      id: id('asset', 2),
+      name: 'SBI FD',
+      kind: 'fd',
+      values: [{ date: first, valueMinor: 2_00_000_00 }],
+      ...stamp,
+    },
+  ];
+  const projects: Project[] = [
+    {
+      id: tripId,
+      name: 'Gokarna weekend',
+      kind: 'trip',
+      start: tripStart,
+      end: tripEnd,
+      budgetMinor: 8_000_00,
+      collect: false,
+      ...stamp,
+    },
+  ];
+
+  return {
+    transactions,
+    recurring,
+    budgets,
+    rows: { accounts, flows, people, udhaar, loans, goals, wishlist, assets, projects },
+  };
 }

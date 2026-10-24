@@ -160,3 +160,36 @@ describe('spaces', () => {
     }
   });
 });
+
+describe('sample data for every feature', () => {
+  it('loads an example into every list and removes exactly that again', async () => {
+    const s = await fresh();
+    await s.getState().addEntry(draft({ merchant: 'Mine' }));
+    await s.getState().loadSampleData();
+    const st = s.getState();
+    for (const list of [
+      st.accounts,
+      st.flows,
+      st.people,
+      st.udhaar,
+      st.loans,
+      st.goals,
+      st.wishlist,
+      st.assets,
+      st.projects,
+    ])
+      expect(list.length).toBeGreaterThan(0);
+    expect(st.transactions.some((t) => t.projectId === 'sample-project-1')).toBe(true);
+    expect(st.transactions.some((t) => t.taxSection === '80D')).toBe(true);
+    expect(st.transactions.some((t) => t.warrantyMonths)).toBe(true);
+    expect(st.transactions.some((t) => t.unsure)).toBe(true);
+
+    await s.getState().removeSampleData();
+    const after = s.getState();
+    expect(after.transactions.map((t) => t.merchant)).toEqual(['Mine']);
+    for (const list of [after.accounts, after.flows, after.people, after.loans, after.projects])
+      expect(list).toEqual([]);
+    await s.getState().undo();
+    expect(s.getState().accounts.length).toBe(3);
+  });
+});

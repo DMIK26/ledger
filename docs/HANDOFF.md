@@ -72,6 +72,11 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   the category colour button overlapped the name on phones; short month names are whole words; "1st"
   is a plain number in Telugu and Hindi. Version 1.1.0.
 
+- **Sample data for every feature** (24 Oct 2026, after the v1.1.0 tag): the sample now fills Money
+  (accounts, salary, transfers, a card fee), Udhaar, Loans, Goals, Wishlist, net worth assets, Trips,
+  Review and Warranties; the sample marker lists the extra rows by store (`SampleMarker.rows`).
+  The nav peek no longer sits under the page or stays open after a click.
+
 Verified: lint, typecheck, 501 unit tests (49 files, including the translation coverage test and a
 passkey signature test), build with budgets, Playwright 115 passed and 21 skipped with `CI=1` (new
 `e2e/drop13.spec.ts`: Shop ledger, profit and loss and privacy in Both; a protected backup round trip;

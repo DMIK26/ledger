@@ -288,6 +288,17 @@ export type RowStore =
   | 'assets'
   | 'projects';
 type RowOf<S extends RowStore> = LedgerDB[S]['value'];
+export const ROW_STORES: readonly RowStore[] = [
+  'accounts',
+  'flows',
+  'people',
+  'udhaar',
+  'loans',
+  'goals',
+  'wishlist',
+  'assets',
+  'projects',
+];
 
 /**
  * Adds or replaces one row; undo puts back the previous version (or removes a new row). A new row goes
@@ -476,32 +487,52 @@ export interface SampleMarker {
   transactionIds: string[];
   recurringIds: string[];
   budgets: Budget[];
+  /** Ids of the sample's other rows, by store (Drop 13; missing in older markers). */
+  rows?: Partial<Record<RowStore, string[]>>;
 }
+
+type SampleRowLists = Partial<{ [S in RowStore]: RowOf<S>[] }>;
+const SAMPLE_STORES = ['transactions', 'recurring', 'budgets', 'settings', ...ROW_STORES] as const;
 
 /** Adds the sample (entries, recurring payments, budgets for empty months) as one undoable step. */
 export const loadSample = (
-  data: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
+  data: {
+    transactions: Transaction[];
+    recurring: RecurringItem[];
+    budgets: Budget[];
+    rows?: SampleRowLists;
+  },
   previousMarker: SampleMarker | undefined,
 ): Command => ({
   label: tl('Loaded sample data'),
   apply: async (db) => {
-    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    const t = db.transaction([...SAMPLE_STORES], 'readwrite');
     for (const x of data.transactions) void t.objectStore('transactions').put(x);
     for (const x of data.recurring) void t.objectStore('recurring').put(x);
     for (const x of data.budgets) void t.objectStore('budgets').put(x);
+    const rows: Partial<Record<RowStore, string[]>> = {};
+    for (const store of ROW_STORES) {
+      const list = (data.rows?.[store] ?? []) as Array<{ id: string }>;
+      for (const x of list) void t.objectStore(store).put(x as never);
+      if (list.length) rows[store] = list.map((x) => x.id);
+    }
     const marker: SampleMarker = {
       transactionIds: data.transactions.map((x) => x.id),
       recurringIds: data.recurring.map((x) => x.id),
       budgets: data.budgets,
+      rows,
     };
     void t.objectStore('settings').put(marker, SAMPLE_KEY);
     await t.done;
   },
   revert: async (db) => {
-    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    const t = db.transaction([...SAMPLE_STORES], 'readwrite');
     for (const x of data.transactions) void t.objectStore('transactions').delete(x.id);
     for (const x of data.recurring) void t.objectStore('recurring').delete(x.id);
     for (const x of data.budgets) void t.objectStore('budgets').delete(x.id);
+    for (const store of ROW_STORES)
+      for (const x of (data.rows?.[store] ?? []) as Array<{ id: string }>)
+        void t.objectStore(store).delete(x.id);
     if (previousMarker) void t.objectStore('settings').put(previousMarker, SAMPLE_KEY);
     else void t.objectStore('settings').delete(SAMPLE_KEY);
     await t.done;
@@ -514,22 +545,33 @@ export const loadSample = (
  */
 export const removeSample = (
   marker: SampleMarker,
-  removed: { transactions: Transaction[]; recurring: RecurringItem[]; budgets: Budget[] },
+  removed: {
+    transactions: Transaction[];
+    recurring: RecurringItem[];
+    budgets: Budget[];
+    rows?: SampleRowLists;
+  },
 ): Command => ({
   label: tl('Removed sample data'),
   apply: async (db) => {
-    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    const t = db.transaction([...SAMPLE_STORES], 'readwrite');
     for (const x of removed.transactions) void t.objectStore('transactions').delete(x.id);
     for (const x of removed.recurring) void t.objectStore('recurring').delete(x.id);
     for (const x of removed.budgets) void t.objectStore('budgets').delete(x.id);
+    for (const store of ROW_STORES)
+      for (const x of (removed.rows?.[store] ?? []) as Array<{ id: string }>)
+        void t.objectStore(store).delete(x.id);
     void t.objectStore('settings').delete(SAMPLE_KEY);
     await t.done;
   },
   revert: async (db) => {
-    const t = db.transaction(['transactions', 'recurring', 'budgets', 'settings'], 'readwrite');
+    const t = db.transaction([...SAMPLE_STORES], 'readwrite');
     for (const x of removed.transactions) void t.objectStore('transactions').put(x);
     for (const x of removed.recurring) void t.objectStore('recurring').put(x);
     for (const x of removed.budgets) void t.objectStore('budgets').put(x);
+    for (const store of ROW_STORES)
+      for (const x of (removed.rows?.[store] ?? []) as Array<{ id: string }>)
+        void t.objectStore(store).put(x as never);
     void t.objectStore('settings').put(marker, SAMPLE_KEY);
     await t.done;
   },

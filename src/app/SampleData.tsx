@@ -32,7 +32,7 @@ export function SampleBanner() {
     >
       <p>
         {tl(
-          'You are looking at sample data: three months of made-up spending, five recurring payments and budgets. Try pinning, drilling into the charts and asking the pencil. Your own entries stay when you remove it.',
+          'You are looking at sample data: three months of made-up spending with salary, accounts and a credit card, recurring payments, budgets, udhaar with friends, a bike loan, savings goals, a wishlist, gold and an FD, and a weekend trip. Look around every page; your own entries stay when you remove it.',
         )}
       </p>
       <button type="button" className="btn" onClick={() => void remove()}>
@@ -52,10 +52,10 @@ export function SampleCard() {
       <p className="muted small">
         {has
           ? tl(
-              'Sample data is loaded. Removing it deletes only the sample entries, recurring payments and the budgets it added (unless you changed them).',
+              'Sample data is loaded. Removing it deletes only what the sample added: its entries, recurring payments, accounts, money in, udhaar, loan, goals, wishes, assets and trip, and its budgets unless you changed them.',
             )
           : tl(
-              'See how Ledger works with three months of made-up spending, recurring payments and budgets. It sits alongside your own entries and comes out again in one tap.',
+              'See how every part of Ledger works with three months of made-up spending, salary, accounts, budgets, udhaar, a loan, goals, a wishlist, assets and a trip. It sits alongside your own entries and comes out again in one tap.',
             )}
       </p>
       <div className="btn-row">
