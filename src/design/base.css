@@ -193,6 +193,8 @@ svg {
     height: 100dvh;
     padding: var(--s6) var(--s4);
     border-right: 1px solid var(--border);
+    /* Above the page, so a nav peek is never covered by a card. */
+    z-index: 30;
   }
 
   .main {
@@ -2378,7 +2380,8 @@ dialog::backdrop {
   }
 }
 
-.nav-item:focus-within .peek {
+/* Keyboard focus only: after a click the link keeps focus, and the peek would stay over the page. */
+.nav-item:has(.nav-link:focus-visible) .peek {
   opacity: 1;
   transform: translate(0, -50%);
 }
