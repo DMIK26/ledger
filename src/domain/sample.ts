@@ -198,10 +198,16 @@ export function buildSample(today: ISODate, existingBudgets: readonly Budget[] =
     });
   };
 
+  // The last amount and date per habit, so chance never makes an accidental repeat (the one below is on purpose).
+  const lastOf = new Map<string, { date: ISODate; rupees: number }>();
   for (let date = first; date <= today; date = addDays(date, 1)) {
     for (const h of HABITS) {
       if (random() >= h.daily) continue;
-      const rupees = h.min + Math.round((random() * (h.max - h.min)) / 10) * 10;
+      let rupees = h.min + Math.round((random() * (h.max - h.min)) / 10) * 10;
+      const last = lastOf.get(h.merchant);
+      if (last && last.rupees === rupees && addDays(last.date, 1) >= date)
+        rupees += rupees + 5 <= h.max ? 5 : -5;
+      lastOf.set(h.merchant, { date, rupees });
       add(date, h, rupees * 100);
     }
     const d = parseISO(date)!.d;
@@ -241,6 +247,10 @@ export function buildSample(today: ISODate, existingBudgets: readonly Budget[] =
     add(addDays(tripStart, day), { merchant, categoryId, method }, amountMinor);
     transactions[transactions.length - 1]!.projectId = tripId;
   }
+  // One repeat on purpose, so "Worth a look" has something to show.
+  const swiggy = HABITS.find((h) => h.merchant === 'Swiggy')!;
+  add(addDays(today, -2), swiggy, 425_00);
+  add(addDays(today, -2), swiggy, 425_00);
   // Entries that show the extra fields: for someone, a tax deduction and a warranty.
   add(
     addDays(today, -40),

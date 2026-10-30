@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildSample, isSampleId } from './sample';
 import { budgetId } from './budgets';
+import { findNudges } from './nudges';
 
 describe('sample data', () => {
   const s = buildSample('2026-10-19');
@@ -39,5 +40,18 @@ describe('sample data', () => {
     const t = buildSample('2026-10-19', mine);
     expect(t.budgets.some((b) => b.month === '2026-10')).toBe(false);
     expect(t.budgets.some((b) => b.month === '2026-09')).toBe(true);
+  });
+
+  it('shows exactly one repeat to look at, whatever the day', () => {
+    for (const today of ['2026-10-19', '2026-10-30', '2026-12-03', '2027-03-15']) {
+      const x = buildSample(today);
+      const dups = findNudges({
+        transactions: x.transactions,
+        recurring: x.recurring,
+        today,
+        dismissed: [],
+      }).filter((n) => n.kind === 'duplicate');
+      expect(dups.map((d) => d.second.merchant), today).toEqual(['Swiggy']);
+    }
   });
 });

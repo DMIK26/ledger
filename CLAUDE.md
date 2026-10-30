@@ -36,6 +36,15 @@ npm run e2e          # Playwright (builds, previews on :4173). Needs: npx playwr
 7. Sentence-case copy, no all-caps labels, no emoji, no gradients, no shadows. Respect reduced motion.
 8. Add nothing that is not in `docs/REQUIREMENTS.md` without asking.
 
+## UI/UX skills
+
+Taste, a11y, bans, voice, and icon library for this project live in `.ux-profile.md`.
+Run `setup-ui-ux-skills` again only to change those defaults.
+Before UI or microcopy work, read `.ux-profile.md`, then the matching domain skill (page-patterns, viewports, forms, surfaces, loaders, empty-states, copy, motion).
+Before creating a new page, read `page-patterns` and name the pattern. Do not write page markup until the pattern is named.
+Layouts must pass `viewports` at 375px and 1280px.
+Before finishing UI, run `ux-audit`.
+
 ## Safety
 
 Work only inside this folder. Never ask for, store or paste GitHub tokens or passwords; Dhaarmik commits and
