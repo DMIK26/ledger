@@ -1593,8 +1593,13 @@ dialog::backdrop {
 }
 
 .budget-row .meter,
+.budget-row .meter-wrap,
 .budget-row .ghost-chip {
   grid-column: 1 / -1;
+}
+
+.budget-extra:empty {
+  display: none;
 }
 
 .budget-name {

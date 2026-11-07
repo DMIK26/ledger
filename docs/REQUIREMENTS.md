@@ -444,6 +444,9 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   Warranties and Trash in a quieter group to the right (a two-column grid on a phone).
 - **Two-line rows on a phone** (Drop 14): each entry shows what and how much, then category, date and
   method on one line (cut short with an ellipsis); the typed text shows only on wider screens.
+- **Calmer Budgets** (Drop 14): each category shows its name, spent, left, budget box and a full-width
+  meter; the budget type and roll over sit behind "Change types and roll over" (with the explanation of
+  the three types), since they are set once in a while.
 
 ### Later (not scheduled)
 

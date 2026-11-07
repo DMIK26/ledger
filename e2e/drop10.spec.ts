@@ -29,6 +29,7 @@ test('budget types, pace, budgets at risk and safe to spend', async ({ page }) =
     page.getByTestId('budget-group-fixed').getByTestId('budget-row-housing'),
   ).toBeVisible();
   await expect(page.getByTestId('risk-food')).toContainText('Heading for ₹4,111.58 of ₹3,000.00');
+  await page.getByRole('button', { name: 'Change types and roll over' }).click();
   await page.getByLabel('Type of Food & Dining').selectOption('fixed');
   await expect(page.getByTestId('budget-group-fixed').getByTestId('budget-row-food')).toBeVisible();
   await expect(page.getByTestId('risk-food')).toHaveCount(0);

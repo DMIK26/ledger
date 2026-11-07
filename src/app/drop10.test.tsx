@@ -188,6 +188,7 @@ describe('the Budgets page', () => {
     expect(
       within(screen.getByTestId('budget-group-non-monthly')).getByTestId('budget-row-education'),
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Change types and roll over' }));
     await userEvent.selectOptions(screen.getByLabelText('Type of Groceries'), 'fixed');
     await waitFor(() =>
       expect(

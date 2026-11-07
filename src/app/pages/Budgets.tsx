@@ -315,6 +315,7 @@ function BudgetPlan() {
   const setMonthBudgets = useLedger((s) => s.setMonthBudgets);
   const clearMonthBudgets = useLedger((s) => s.clearMonthBudgets);
   const setCategoryPlan = useLedger((s) => s.setCategoryPlan);
+  const [arranging, setArranging] = useState(false);
   const [proposal, setProposal] = useState<{
     kind: 'suggest' | 'copy';
     budgets: MonthBudgets;
@@ -520,12 +521,25 @@ function BudgetPlan() {
       </section>
 
       <section className="card" aria-labelledby="cats-title">
-        <h2 id="cats-title">{tl('Categories')}</h2>
-        <p className="muted small">
-          {tl(
-            'Fixed costs stay about the same each month, flexible spending changes day to day, and non-monthly costs come now and then. The forecast only stretches flexible spending over the month.',
-          )}
-        </p>
+        <div className="card-head">
+          <h2 id="cats-title">{tl('Categories')}</h2>
+          {/* Types and roll over are set once in a while, so they wait behind this (Drop 14). */}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            aria-pressed={arranging}
+            onClick={() => setArranging((a) => !a)}
+          >
+            {arranging ? tl('Done') : tl('Change types and roll over')}
+          </button>
+        </div>
+        {arranging && (
+          <p className="muted small">
+            {tl(
+              'Fixed costs stay about the same each month, flexible spending changes day to day, and non-monthly costs come now and then. The forecast only stretches flexible spending over the month.',
+            )}
+          </p>
+        )}
         {BUDGET_KINDS.map((kind) => {
           const group = categories.filter((c) => budgetKindOf(c.id, allCategories) === kind);
           if (group.length === 0) return null;
@@ -543,7 +557,9 @@ function BudgetPlan() {
                   )}
                 </span>
               </div>
-              <p className="muted small budget-group-hint">{BUDGET_KIND_HINT[kind]}</p>
+              {arranging && (
+                <p className="muted small budget-group-hint">{BUDGET_KIND_HINT[kind]}</p>
+              )}
               <ul className="budget-list">
                 {group.map((c) => (
                   <BudgetRow
@@ -556,6 +572,7 @@ function BudgetPlan() {
                     risk={riskOf(c.id)}
                     proposal={proposal}
                     currency={currency}
+                    arranging={arranging}
                     onSave={(v) =>
                       save(
                         { ...mine, categories: { ...mine.categories, [c.id]: v } },
@@ -587,7 +604,10 @@ function BudgetRow({
   onSave,
   onKind,
   onRollover,
+  arranging,
 }: {
+  /** Shows the type and roll over controls. */
+  arranging: boolean;
   category: Category;
   kind: BudgetKind;
   budget: number | null;
@@ -623,26 +643,30 @@ function BudgetRow({
       />
       <Meter spent={used} budget={total} anchor={`budget:${c.id}`} />
       <div className="budget-extra">
-        <select
-          className="input input-small"
-          aria-label={tl('Type of {0}', c.name)}
-          value={kind}
-          onChange={(e) => onKind(e.target.value as BudgetKind)}
-        >
-          {BUDGET_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {BUDGET_KIND_LABEL[k]}
-            </option>
-          ))}
-        </select>
-        <label className="check small">
-          <input
-            type="checkbox"
-            checked={!!c.rollover}
-            onChange={(e) => onRollover(e.target.checked)}
-          />
-          {tl('Roll over')}
-        </label>
+        {arranging && (
+          <>
+            <select
+              className="input input-small"
+              aria-label={tl('Type of {0}', c.name)}
+              value={kind}
+              onChange={(e) => onKind(e.target.value as BudgetKind)}
+            >
+              {BUDGET_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {BUDGET_KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+            <label className="check small">
+              <input
+                type="checkbox"
+                checked={!!c.rollover}
+                onChange={(e) => onRollover(e.target.checked)}
+              />
+              {tl('Roll over')}
+            </label>
+          </>
+        )}
         {effective && <CarryText effective={effective} currency={currency} />}
         {risk?.kind === 'at-risk' && (
           <span className="small risk-chip" data-testid={`risk-${c.id}`}>
