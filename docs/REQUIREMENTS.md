@@ -447,6 +447,9 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
 - **Calmer Budgets** (Drop 14): each category shows its name, spent, left, budget box and a full-width
   meter; the budget type and roll over sit behind "Change types and roll over" (with the explanation of
   the three types), since they are set once in a while.
+- **Cash flow without empty months** (Drop 14): the bars start at the first month with any money in or
+  out, and each month shows what was left at the end of its bars (hidden in privacy mode like every
+  amount).
 
 ### Later (not scheduled)
 

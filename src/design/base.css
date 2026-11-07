@@ -3913,14 +3913,14 @@ g.mood-face {
 .cashflow-bars {
   display: grid;
   gap: 6px;
-  margin: 0;
+  margin: var(--s4) 0 0;
   padding: 0;
   list-style: none;
 }
 
 .cashflow-bars li {
   display: grid;
-  grid-template-columns: 3em 1fr;
+  grid-template-columns: 3em minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s2);
 }
@@ -3928,6 +3928,13 @@ g.mood-face {
 .cashflow-month {
   color: var(--muted);
   font-size: 13px;
+}
+
+/* What was left that month, at the end of its bars. */
+.cashflow-net {
+  min-width: 7em;
+  font-size: 13px;
+  text-align: right;
 }
 
 .cashflow-pair {

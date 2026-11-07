@@ -25,10 +25,16 @@ export function CashFlowCard({ today }: { today: string }) {
   );
   const series = useMemo(
     () =>
-      lastMonths(asOf, 6).map((m) => {
-        const e = monthBounds(m).end;
-        return cashFlow(transactions, flows, m, e < asOf ? e : asOf);
-      }),
+      lastMonths(asOf, 6)
+        .map((m) => {
+          const e = monthBounds(m).end;
+          return cashFlow(transactions, flows, m, e < asOf ? e : asOf);
+        })
+        // Months before anything was logged are left out rather than drawn as empty rows (Drop 14).
+        .filter(
+          (_p, i, all) =>
+            all.slice(0, i + 1).some((q) => q.inMinor || q.outMinor) || i === all.length - 1,
+        ),
     [transactions, flows, asOf],
   );
   const max = Math.max(1, ...series.flatMap((p) => [p.inMinor, p.outMinor]));
@@ -81,7 +87,7 @@ export function CashFlowCard({ today }: { today: string }) {
           )}
         </p>
       )}
-      <ul className="cashflow-bars" aria-label={tl('Six months of money in and out')}>
+      <ul className="cashflow-bars" aria-label={tl('Money in and out by month')}>
         {series.map((p) => (
           <li key={p.month} aria-label={describe(p)}>
             <span className="cashflow-month" aria-hidden="true">
@@ -96,6 +102,12 @@ export function CashFlowCard({ today }: { today: string }) {
                 className="cashflow-bar cashflow-out"
                 style={{ width: `${(p.outMinor / max) * 100}%` }}
               />
+            </span>
+            <span
+              className={`cashflow-net${p.leftMinor < 0 ? ' status-over' : ''}`}
+              aria-hidden="true"
+            >
+              <Money minor={p.leftMinor} currency={currency} signed />
             </span>
           </li>
         ))}
