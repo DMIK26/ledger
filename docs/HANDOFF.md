@@ -76,6 +76,15 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   (accounts, salary, transfers, a card fee), Udhaar, Loans, Goals, Wishlist, net worth assets, Trips,
   Review and Warranties; the sample marker lists the extra rows by store (`SampleMarker.rows`).
   The nav peek no longer sits under the page or stays open after a click.
+- **Dashboard reshape, Drop 14 start** (30 Oct 2026): `month` replaces the `safe`, `kpis` and `budget`
+  cards (`dashboardOrder` maps old saved ids; `dashboardHidden` hides it only if all three were
+  hidden). `BudgetCard` and `SafeToSpendCard` take `inline`. Styles are under "The month card" at the
+  end of `base.css`. `.ux-profile.md` holds the UI rules from the VectorLab UX skills setup. The flaky
+  budget-divider e2e and the privacy check in `drop6.test.tsx` now wait properly.
+- **Drop 14, step 2** (7 Nov 2026): `src/app/dash/Notices.tsx` stacks the Dashboard notes (it counts the
+  ones that rendered with a MutationObserver; CSS hides all but the first). Drop 14's steps are in
+  `docs/PLAN.md`; Tailwind and shadcn were ruled out there. Three tests read the real date and broke
+  when November came (`drop5.test.tsx` hover, `sample.spec.ts`, `stability.spec.ts`); they now fix it.
 
 Verified: lint, typecheck, 501 unit tests (49 files, including the translation coverage test and a
 passkey signature test), build with budgets, Playwright 115 passed and 21 skipped with `CI=1` (new

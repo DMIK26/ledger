@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 test('a new user can load sample data, explore it and remove it without losing their own entry', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date('2026-10-22T10:00:00'));
   await page.goto('./#/');
   await page.getByRole('button', { name: 'Load sample data' }).click();
   await expect(page.getByTestId('sample-banner')).toBeVisible();

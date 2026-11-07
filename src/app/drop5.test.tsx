@@ -201,7 +201,10 @@ describe('undo history chips', () => {
 
 describe('entity highlighting', () => {
   it('dims everything that is not the hovered category, and shows a hover card', async () => {
+    // Real timers for the hover delay, but the same fixed date: with today's real date the seeded
+    // month would no longer be the current one and the donut would be empty.
     vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date'], now: NOW, shouldAdvanceTime: true });
     await go('#/');
     const slice = screen.getByTestId('slice-food');
     fireEvent.pointerOver(slice, { pointerType: 'mouse', clientX: 10, clientY: 10 });

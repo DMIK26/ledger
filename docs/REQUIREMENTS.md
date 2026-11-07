@@ -426,7 +426,17 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   cash and a credit card, three months of salary and transfers, a card fee, udhaar with two friends, a
   bike loan, a goal and a yearly fund, two wishlist items, gold and an FD, a weekend trip with its
   entries, and entries with a tax deduction, a warranty, someone they were for and an unsure category.
-  Removing the sample removes exactly these too (one undo).
+  Removing the sample removes exactly these too (one undo). Chance never makes two equal entries a day
+  apart; one Swiggy order is logged twice on purpose so "Worth a look" has one example.
+- **A friendlier Dashboard** (asked 30 Oct 2026, "reshape existing UI to more user friendly and
+  interactive"): safe to spend, the four figures and the budget become one "This month" card. What is
+  spent leads in large type and opens the breakdown when tapped; under it the budget status, a ruler
+  with today's even-pace tick and where the month is heading, the what-if slider, today's safe amount
+  (₹0 when the month is already over, instead of saying "over by" twice) and three figures (one row
+  each on a phone). Saved layouts move the three old cards into the new one.
+- **One note at a time** (Drop 14, 7 Nov 2026): the Dashboard's time-limited notes sit under quick add
+  and show one at a time, in this order: sample data, close the month, missed-day check-in, recap,
+  backup reminder, install. "N more notes" shows the rest.
 
 ### Later (not scheduled)
 

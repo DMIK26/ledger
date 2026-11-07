@@ -159,7 +159,8 @@ describe('sketch mode and notes', () => {
     await act(async () => {
       await useLedger.getState().setSetting('privacy', true);
     });
-    expect(list).toHaveTextContent('chai is ••• now');
+    // The mask lands on the next render, which can lag behind under a busy test run.
+    await waitFor(() => expect(list).toHaveTextContent('chai is ••• now'));
     expect(list).not.toHaveTextContent('1,200');
   });
 

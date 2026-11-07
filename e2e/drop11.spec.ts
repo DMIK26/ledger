@@ -102,6 +102,8 @@ test('recap with a guess, shared as an image, and Reports’ new views', async (
   await quick(page, 'zomato 300 6th oct upi');
   await page.clock.setFixedTime(new Date('2026-11-03T10:00:00'));
   await page.reload();
+  // Closing the month comes first in the notes; the recap waits behind "more notes".
+  await page.getByRole('button', { name: /more notes?$/ }).click();
   await page.getByTestId('recap-offer').getByRole('button', { name: 'Open the recap' }).click();
   const recap = page.getByRole('dialog', { name: 'October 2026' });
   await recap.getByLabel('Your guess').fill('1500000');
@@ -180,7 +182,7 @@ test('phones: swipe a row away, drag the sheet, long-press to customise', async 
   await page.goto('./#/');
   await touch(
     page,
-    '.safe-card',
+    '#month-title',
     [
       [0, 0],
       [0, 0],

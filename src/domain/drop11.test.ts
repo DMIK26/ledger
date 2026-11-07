@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Account, Flow } from './accounts';
 import { calendarWeeks, sketchbookDays } from './calendar';
 import { DEFAULT_CATEGORIES } from './categories';
-import { dashboardOrder, DASHBOARD_CARDS, moveCard } from './dashboard';
+import { dashboardHidden, dashboardOrder, DASHBOARD_CARDS, moveCard } from './dashboard';
 import { moneyFlow } from './flow';
 import { shouldLearn } from './learning';
 import { merchantMatches, rankItems } from './palette';
@@ -463,11 +463,9 @@ describe('story recap', () => {
 describe('dashboard layout', () => {
   it('keeps the saved order and adds new cards in their default place', () => {
     expect(dashboardOrder([])).toEqual([...DASHBOARD_CARDS]);
-    expect(dashboardOrder(['recent', 'safe', 'bogus'])).toEqual([
+    expect(dashboardOrder(['recent', 'month', 'bogus'])).toEqual([
       'recent',
-      'safe',
-      'kpis',
-      'budget',
+      'month',
       'risk',
       'cards',
       'nudges',
@@ -476,8 +474,18 @@ describe('dashboard layout', () => {
       'charts',
       'sketchbook',
     ]);
-    expect(moveCard(dashboardOrder([]), 'safe', -1)[0]).toBe('safe');
-    expect(moveCard(dashboardOrder([]), 'kpis', -1).slice(0, 2)).toEqual(['kpis', 'safe']);
+    expect(moveCard(dashboardOrder([]), 'month', -1)[0]).toBe('month');
+    expect(moveCard(dashboardOrder([]), 'risk', -1).slice(0, 2)).toEqual(['risk', 'month']);
+  });
+
+  it('turns the three old top cards into the one month card', () => {
+    expect(dashboardOrder(['recent', 'kpis', 'safe', 'budget']).slice(0, 3)).toEqual([
+      'recent',
+      'month',
+      'risk',
+    ]);
+    expect(dashboardHidden(['safe', 'budget'])).toEqual([]);
+    expect(dashboardHidden(['safe', 'kpis', 'budget', 'recent'])).toEqual(['recent', 'month']);
   });
 });
 

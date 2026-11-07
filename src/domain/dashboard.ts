@@ -5,9 +5,7 @@ import { tl } from './i18n';
  */
 
 export const DASHBOARD_CARDS = [
-  'safe',
-  'kpis',
-  'budget',
+  'month',
   'risk',
   'cards',
   'nudges',
@@ -21,14 +19,8 @@ export const DASHBOARD_CARDS = [
 export type DashboardCard = (typeof DASHBOARD_CARDS)[number];
 
 export const DASHBOARD_CARD_LABEL: Record<DashboardCard, string> = {
-  get safe() {
-    return tl('Safe to spend today');
-  },
-  get kpis() {
-    return tl('This month at a glance');
-  },
-  get budget() {
-    return tl('Budget');
+  get month() {
+    return tl('This month');
   },
   get risk() {
     return tl('Budgets to watch');
@@ -59,9 +51,14 @@ export const DASHBOARD_CARD_LABEL: Record<DashboardCard, string> = {
 const isCard = (id: string): id is DashboardCard =>
   (DASHBOARD_CARDS as readonly string[]).includes(id);
 
+/** Safe to spend, the four figures and the budget were three cards until they became one (Drop 14). */
+const MERGED_INTO_MONTH = ['safe', 'kpis', 'budget'];
+const upgrade = (saved: readonly string[]): string[] =>
+  saved.map((id) => (MERGED_INTO_MONTH.includes(id) ? 'month' : id));
+
 /** The saved order with unknown ids dropped and any card it does not mention added in its default place. */
 export function dashboardOrder(saved: readonly string[]): DashboardCard[] {
-  const known = saved.filter(isCard);
+  const known = upgrade(saved).filter(isCard);
   const out = [...new Set(known)];
   DASHBOARD_CARDS.forEach((id, i) => {
     if (out.includes(id)) return;
@@ -85,5 +82,13 @@ export function moveCard(
   if (i < 0 || j < 0 || j >= order.length) return [...order];
   const out = [...order];
   [out[i], out[j]] = [out[j]!, out[i]!];
+  return out;
+}
+
+/** The hidden cards; the month card counts as hidden only if all three cards it replaced were. */
+export function dashboardHidden(saved: readonly string[]): DashboardCard[] {
+  const out = saved.filter(isCard);
+  if (MERGED_INTO_MONTH.every((id) => saved.includes(id)) && !out.includes('month'))
+    out.push('month');
   return out;
 }

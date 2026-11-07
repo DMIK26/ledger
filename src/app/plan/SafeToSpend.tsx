@@ -10,7 +10,11 @@ import { tr } from '../tr';
  * Safe to spend today (Drop 10): the month's plan shared over the days left, after bills and goals.
  * Underspending one day raises the next days' amount by itself; overspending lowers it.
  */
-export function SafeToSpendCard({ today }: { today: string }) {
+export function SafeToSpendCard({ today, inline = false }: { today: string; inline?: boolean }) {
+  // Inline, it is one row of the month card on the Dashboard rather than a card of its own.
+  const Box = inline ? 'div' : 'section';
+  const H = inline ? 'h3' : 'h2';
+  const box = inline ? 'hero-safe' : 'card safe-card';
   const transactions = useLedger((s) => s.transactions);
   const flows = useLedger((s) => s.flows);
   const budgets = useLedger((s) => s.budgets);
@@ -25,34 +29,35 @@ export function SafeToSpendCard({ today }: { today: string }) {
 
   if (s.source === 'none') {
     return (
-      <section className="card safe-card" aria-labelledby="safe-title">
-        <h2 id="safe-title">{tl('Safe to spend today')}</h2>
+      <Box className={box} role={inline ? 'group' : undefined} aria-labelledby="safe-title">
+        <H id="safe-title">{tl('Safe to spend today')}</H>
         <p className="muted small" data-testid="safe-start">
           {tr(
             '{0}, or log money in (type “salary 40k” above), and Ledger works out what you can spend each day and still end the month on plan.',
             <a href={href('/budgets')}>{tl('Set a monthly budget')}</a>,
           )}
         </p>
-      </section>
+      </Box>
     );
   }
 
-  const over = s.todayLeftMinor < 0;
+  // In the month card the budget line already says by how much the month is over, so say ₹0 here.
+  const over = s.todayLeftMinor < 0 && !(inline && s.availableMinor <= 0);
   return (
-    <section className="card safe-card" aria-labelledby="safe-title">
+    <Box className={box} role={inline ? 'group' : undefined} aria-labelledby="safe-title">
       <div className="card-head">
-        <h2 id="safe-title">{tl('Safe to spend today')}</h2>
+        <H id="safe-title">{tl('Safe to spend today')}</H>
         <span className="muted small">
           {s.daysLeft === 1 ? tl('Last day of the month') : tl('{0} days left', s.daysLeft)}
         </span>
       </div>
-      <p className="big-figure" data-testid="safe-today">
+      <p className={inline ? 'hero-safe-figure' : 'big-figure'} data-testid="safe-today">
         {over ? (
           <span className="status-over">
             {tr('Over by {0}', <Money minor={-s.todayLeftMinor} currency={currency} />)}
           </span>
         ) : (
-          <Money minor={s.todayLeftMinor} currency={currency} />
+          <Money minor={Math.max(0, s.todayLeftMinor)} currency={currency} />
         )}
       </p>
       <p className="muted small" data-testid="safe-line">
@@ -125,6 +130,6 @@ export function SafeToSpendCard({ today }: { today: string }) {
           </div>
         </dl>
       </details>
-    </section>
+    </Box>
   );
 }
