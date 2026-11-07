@@ -91,6 +91,9 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   Settings opens with a row of its sections, each tap scrolling to that card and moving focus to its
   heading (`src/app/settings/SectionIndex.tsx` reads the cards' own headings). The notes button now says
   "Show 2 more notes". Step buttons have tooltips. `ux-audit` run: hard gate clean (see the chat).
+- **Test waits** (7 Nov 2026): CI #34 ("Docs: v1.2.0 published") failed on a `drop6.test.tsx` privacy check
+  that waited only one second. `src/test/setup.ts` now gives every `findBy` and `waitFor` five seconds,
+  which also covers the other timing-sensitive tests.
 - **CI runner pinned** (7 Nov 2026): GitHub moved `ubuntu-latest` to Ubuntu 26.04, where Playwright 1.56.1
   cannot install Chromium, so CI #27's browser job failed before any test ran. Both workflows now use
   `ubuntu-24.04`. Upgrading Playwright is the longer-term fix; do it as its own change.

@@ -161,8 +161,12 @@ describe('sketch mode and notes', () => {
       await useLedger.getState().setSetting('privacy', true);
     });
     // The mask lands on the next render, which can lag behind under a busy test run.
-    await waitFor(() => expect(list).toHaveTextContent('chai is ••• now'));
-    expect(list).not.toHaveTextContent('1,200');
+    // CI machines can be slow, so give it up to five seconds and read the list afresh each time.
+    await waitFor(
+      () => expect(screen.getByTestId('notes-list')).toHaveTextContent('chai is ••• now'),
+      { timeout: 5000 },
+    );
+    expect(screen.getByTestId('notes-list')).not.toHaveTextContent('1,200');
   });
 
   it('deleting a note from the list can be undone', async () => {
