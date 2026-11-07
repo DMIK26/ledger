@@ -85,6 +85,9 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   ones that rendered with a MutationObserver; CSS hides all but the first). Drop 14's steps are in
   `docs/PLAN.md`; Tailwind and shadcn were ruled out there. Three tests read the real date and broke
   when November came (`drop5.test.tsx` hover, `sample.spec.ts`, `stability.spec.ts`); they now fix it.
+- **CI runner pinned** (7 Nov 2026): GitHub moved `ubuntu-latest` to Ubuntu 26.04, where Playwright 1.56.1
+  cannot install Chromium, so CI #27's browser job failed before any test ran. Both workflows now use
+  `ubuntu-24.04`. Upgrading Playwright is the longer-term fix; do it as its own change.
 
 Verified: lint, typecheck, 501 unit tests (49 files, including the translation coverage test and a
 passkey signature test), build with budgets, Playwright 115 passed and 21 skipped with `CI=1` (new
