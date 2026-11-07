@@ -1,8 +1,9 @@
 # Handoff: where the build stands
 
-Updated 7 Nov 2026. **Drops 1 to 13 are published** at https://dmik26.github.io/ledger/, tagged
-**v1.1.0** (v1.0.0 was tagged after Drop 7). **Drop 14, a friendlier UI, is built and versioned 1.2.0**;
-Dhaarmik pushes it in one go and tags `v1.2.0` (see "Drop 14" below and `docs/PUBLISHING.md`).
+Updated 7 Nov 2026. **Drops 1 to 14 are complete and published** at
+https://dmik26.github.io/ledger/, tagged **v1.2.0** (v1.0.0 after Drop 7, v1.1.0 after Drop 13). The live
+site was checked after the push: CI and the deploy are green, the update toast offered the new version,
+and after Reload it reports 1.2.0 with the Settings section row in place.
 Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified at 1.0 (Drop 7)
@@ -84,7 +85,7 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   ones that rendered with a MutationObserver; CSS hides all but the first). Drop 14's steps are in
   `docs/PLAN.md`; Tailwind and shadcn were ruled out there. Three tests read the real date and broke
   when November came (`drop5.test.tsx` hover, `sample.spec.ts`, `stability.spec.ts`); they now fix it.
-- **Drop 14 finished, v1.2.0** (7 Nov 2026, not yet pushed): Reports' period stepper is the same joined
+- **Drop 14 finished, v1.2.0** (7 Nov 2026, published and tagged): Reports' period stepper is the same joined
   control as the month switcher; on a phone, rows of choices (period, compare with, theme, motion and so
   on) scroll sideways instead of stacking, and the category table keeps names on one or two lines;
   Settings opens with a row of its sections, each tap scrolling to that card and moving focus to its
