@@ -291,7 +291,11 @@ export function QuickAdd({
         </p>
       )}
       {!parsed && (
-        <p id="quick-add-help" className="muted small">
+        // Once someone has logged a few entries the hint stays for screen readers only (Drop 14).
+        <p
+          id="quick-add-help"
+          className={transactions.length >= 10 ? 'visually-hidden' : 'muted small'}
+        >
           {tl('Type what, how much and when. Press Enter to save, Escape to clear.')}
         </p>
       )}

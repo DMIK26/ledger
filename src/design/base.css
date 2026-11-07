@@ -792,6 +792,56 @@ svg {
   width: auto;
 }
 
+.toolbar-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin-left: auto;
+}
+
+.toolbar-tools .btn {
+  padding-inline: var(--s2);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.toolbar-tools .btn:hover {
+  color: var(--text);
+}
+
+/* On a phone the tools are their own quiet row under the filters. (No sideways scroll: it would clip
+   the Columns panel.) */
+@media (max-width: 719px) {
+  .toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar > .btn,
+  .toolbar > .select {
+    width: 100%;
+  }
+
+  .toolbar > .saved-views,
+  .toolbar-tools {
+    grid-column: 1 / -1;
+  }
+
+  .toolbar > .saved-views {
+    flex-wrap: nowrap;
+  }
+
+  .toolbar > .saved-views .select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .toolbar-tools {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+}
+
 .filter-panel fieldset {
   margin: 0;
   padding: 0;
@@ -2175,17 +2225,60 @@ dialog::backdrop {
   }
 }
 
+/* One joined control: step back, the month (opens the list), step forward. */
 .month-switcher {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--s1);
+  display: inline-flex;
+  align-items: stretch;
+  width: max-content;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card);
+}
+
+.month-step {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.month-step:hover:not(:disabled) {
+  background: var(--fill);
+  color: var(--text);
+}
+
+.month-step:disabled {
+  color: var(--faint);
+  cursor: default;
 }
 
 .month-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 150px;
+  min-height: 44px;
+  padding: 0 var(--s4);
+  border: 0;
+  border-inline: 1px solid var(--border);
+  background: none;
+  color: var(--text);
   font-family: var(--font-serif);
   font-size: 17px;
   font-weight: 400;
+  cursor: pointer;
+}
+
+.month-button:hover,
+.month-button[aria-expanded='true'] {
+  background: var(--fill);
 }
 
 /* With a month start day other than 1: the dates under the month's name. */
@@ -3552,6 +3645,24 @@ g.mood-face {
 @media (pointer: coarse) {
   .repeat-chip {
     min-height: 44px;
+  }
+}
+
+/* On a phone the chips are one row that scrolls sideways, not a block of three rows (Drop 14). */
+@media (max-width: 719px) {
+  .repeat-chips {
+    flex-wrap: nowrap;
+    margin-inline: calc(-1 * var(--s5));
+    padding-inline: var(--s5);
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: var(--s5);
+  }
+
+  .repeat-chips > li {
+    flex: none;
+    scroll-snap-align: start;
   }
 }
 

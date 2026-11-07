@@ -437,6 +437,11 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
 - **One note at a time** (Drop 14, 7 Nov 2026): the Dashboard's time-limited notes sit under quick add
   and show one at a time, in this order: sample data, close the month, missed-day check-in, recap,
   backup reminder, install. "N more notes" shows the rest.
+- **Tidier controls everywhere** (Drop 14, 7 Nov 2026, "make it more good looking and professional"):
+  the month switcher is one joined control with arrow icons; quick add's hint hides (stays for screen
+  readers) once there are 10 entries, and on a phone its repeat chips are one sideways row; the
+  Transactions toolbar keeps Filters, sort, grouping and saved views together and puts Export, Columns,
+  Warranties and Trash in a quieter group to the right (a two-column grid on a phone).
 
 ### Later (not scheduled)
 

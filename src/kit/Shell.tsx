@@ -4,7 +4,15 @@ import { Money, usePrivacy } from '../app/Money';
 import { useLedger } from '../data/store';
 import { lastMonths, monthSeries } from '../domain/aggregates';
 import { budgetsForMonth, budgetStatus } from '../domain/budgets';
-import { fmtDate, monthKey, monthLabel, monthRangeLabel, monthShortLabel, shiftMonthKey, todayISO } from '../domain/dates';
+import {
+  fmtDate,
+  monthKey,
+  monthLabel,
+  monthRangeLabel,
+  monthShortLabel,
+  shiftMonthKey,
+  todayISO,
+} from '../domain/dates';
 import { fmtMoney } from '../domain/money';
 import { navSummary } from '../domain/navSummary';
 import { cardsDueSoon, cashFlow } from '../domain/accounts';
@@ -69,34 +77,32 @@ export function MonthSwitcher() {
     <div className="month-switcher" ref={root}>
       <button
         type="button"
-        className="btn btn-ghost btn-icon"
+        className="month-step"
         aria-label={tl('Previous month')}
         disabled={month <= months[0]!}
         onClick={() => go(shift(month, -1))}
       >
-        <span aria-hidden="true">‹</span>
+        <Icon name="back" />
       </button>
       <button
         type="button"
-        className="btn month-button"
+        className="month-button"
         aria-haspopup="true"
         aria-expanded={open}
         data-testid="month-switcher"
         onClick={() => setOpen((o) => !o)}
       >
         {monthLabel(month)}
-        {monthRangeLabel(month) && (
-          <span className="month-range">{monthRangeLabel(month)}</span>
-        )}
+        {monthRangeLabel(month) && <span className="month-range">{monthRangeLabel(month)}</span>}
       </button>
       <button
         type="button"
-        className="btn btn-ghost btn-icon"
+        className="month-step"
         aria-label={tl('Next month')}
         disabled={month >= thisMonth}
         onClick={() => go(shift(month, 1))}
       >
-        <span aria-hidden="true">›</span>
+        <Icon name="forward" />
       </button>
       {open && (
         <div className="popover month-pop" role="group" aria-label={tl('Choose a month')}>
@@ -133,7 +139,8 @@ export function MonthSwitcher() {
           </ul>
           {month !== thisMonth && (
             <button type="button" className="btn btn-ghost" onClick={() => go(thisMonth)}>
-              {tl('Back to this month')}</button>
+              {tl('Back to this month')}
+            </button>
           )}
         </div>
       )}
@@ -173,7 +180,8 @@ export function PinBar() {
         <Money minor={total} currency={currency} />
       </span>
       <button type="button" className="btn btn-ghost" onClick={clearPins}>
-        {tl('Clear')}</button>
+        {tl('Clear')}
+      </button>
     </div>
   );
 }
@@ -295,25 +303,39 @@ export function useNavInfo() {
         s.overCategories > 0
           ? { count: s.overCategories, text: tl('{0} over budget', s.overCategories) }
           : null,
-      '/recurring': s.dueSoon > 0 ? { count: s.dueSoon, text: tl('{0} due this week', s.dueSoon) } : null,
+      '/recurring':
+        s.dueSoon > 0 ? { count: s.dueSoon, text: tl('{0} due this week', s.dueSoon) } : null,
       '/money':
         cardsDue > 0
-          ? { count: cardsDue, text: tl('{0} card {1} due', cardsDue, cardsDue === 1 ? 'payment' : 'payments') }
+          ? {
+              count: cardsDue,
+              text: tl('{0} card {1} due', cardsDue, cardsDue === 1 ? 'payment' : 'payments'),
+            }
           : null,
     } as Record<string, { count: number; text: string } | null>,
     peeks: {
       '/': tl('{0} spent in {1} so far', money(s.monthMinor), label),
-      '/transactions': tl('{0} in {1}{2}', s.entries === 1 ? tl('1 entry') : tl('{0} entries', s.entries), label, s.unsure > 0 ? tl(', {0} with a guessed category', s.unsure) : ''),
+      '/transactions': tl(
+        '{0} in {1}{2}',
+        s.entries === 1 ? tl('1 entry') : tl('{0} entries', s.entries),
+        label,
+        s.unsure > 0 ? tl(', {0} with a guessed category', s.unsure) : '',
+      ),
       '/budgets':
         s.budgetLeftMinor === null
           ? tl('No budget for {0}', label)
           : s.budgetLeftMinor >= 0
-            ? tl('{0} left of this month\'s budget', money(s.budgetLeftMinor))
-            : tl('Over this month\'s budget by {0}', money(-s.budgetLeftMinor)),
+            ? tl("{0} left of this month's budget", money(s.budgetLeftMinor))
+            : tl("Over this month's budget by {0}", money(-s.budgetLeftMinor)),
       '/reports': tl('{0} so far: {1}', label, money(s.monthMinor)),
       '/money': tl('{0} in, {1} out in {2}', money(flow.inMinor), money(flow.outMinor), label),
       '/recurring': s.next
-        ? tl('Next: {0}, {1} on {2}', s.next.merchant, money(s.next.amountMinor), fmtDate(s.next.date))
+        ? tl(
+            'Next: {0}, {1} on {2}',
+            s.next.merchant,
+            money(s.next.amountMinor),
+            fmtDate(s.next.date),
+          )
         : tl('Nothing due in the next week'),
       '/settings':
         lastBackupAt > 0

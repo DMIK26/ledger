@@ -962,33 +962,36 @@ function Ledger({
             setPanelKey((k) => k + 1);
           }}
         />
-        <ExportButton
-          label={tl('Export CSV')}
-          className="btn btn-ghost"
-          disabled={filtered.length === 0}
-          build={() =>
-            csvFile(
-              `ledger-transactions-${todayISO()}.csv`,
-              toCsv(
-                exportRows(
-                  filtered,
-                  categories,
-                  safeText,
-                  (CURRENCIES[currency] ?? CURRENCIES.INR!).symbol,
+        {/* Less used tools sit apart, to the right (Drop 14). */}
+        <div className="toolbar-tools">
+          <ExportButton
+            label={tl('Export CSV')}
+            className="btn btn-ghost"
+            disabled={filtered.length === 0}
+            build={() =>
+              csvFile(
+                `ledger-transactions-${todayISO()}.csv`,
+                toCsv(
+                  exportRows(
+                    filtered,
+                    categories,
+                    safeText,
+                    (CURRENCIES[currency] ?? CURRENCIES.INR!).symbol,
+                  ),
                 ),
-              ),
-            )
-          }
-        />
-        <ColumnsMenu />
-        {warrantyCount > 0 && (
-          <a className="btn btn-ghost" href={href('/transactions?view=warranties')}>
-            {tl('Warranties ({0})', warrantyCount)}
+              )
+            }
+          />
+          <ColumnsMenu />
+          {warrantyCount > 0 && (
+            <a className="btn btn-ghost" href={href('/transactions?view=warranties')}>
+              {tl('Warranties ({0})', warrantyCount)}
+            </a>
+          )}
+          <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
+            {trashCount > 0 ? tl('Trash ({0})', trashCount) : tl('Trash')}
           </a>
-        )}
-        <a className="btn btn-ghost" href={href('/transactions?view=trash')}>
-          {trashCount > 0 ? tl('Trash ({0})', trashCount) : tl('Trash')}
-        </a>
+        </div>
       </div>
       {filtersOpen && (
         <div id="filter-panel">

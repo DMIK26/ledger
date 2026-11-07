@@ -92,6 +92,8 @@ const PATHS = {
       <path d="M8.5 4v4M15.5 4v4" />
     </>
   ),
+  back: <path d="M14.5 6 8.5 12l6 6" />,
+  forward: <path d="M9.5 6l6 6-6 6" />,
   share: (
     <>
       <path d="M12 15V4M8 7.5 12 3.5l4 4" />
