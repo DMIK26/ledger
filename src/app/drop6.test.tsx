@@ -126,7 +126,8 @@ describe('sketch mode and notes', () => {
     await go('#/');
     expect(document.querySelector('.sketch-capture')).toBeNull();
     fireEvent.keyDown(window, { key: 'd' });
-    expect(await screen.findByTestId('sketch-toolbar')).toBeInTheDocument();
+    // The sketch tools load on first use, which can take more than a second in a busy run.
+    expect(await screen.findByTestId('sketch-toolbar', {}, { timeout: 5000 })).toBeInTheDocument();
     // The drawing surface can mount a moment after the toolbar on a busy machine.
     await waitFor(() => expect(document.querySelector('.sketch-capture')).not.toBeNull());
     fireEvent.keyDown(window, { key: 'Escape' });

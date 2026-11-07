@@ -659,6 +659,29 @@ svg {
 
 .tx-mobile-meta {
   display: inline;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On a phone the row is two lines: what and how much, then category, date and method. The typed text
+   is left for wider screens (Drop 14). */
+@media (max-width: 719px) {
+  .tx-raw:not(.tx-extra) {
+    display: none;
+  }
+
+  .tx-cat {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .tx-cat > .chip {
+    flex: none;
+    padding-inline: 0;
+    background: none;
+  }
 }
 
 .tx-amount {

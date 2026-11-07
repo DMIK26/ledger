@@ -442,6 +442,8 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
   readers) once there are 10 entries, and on a phone its repeat chips are one sideways row; the
   Transactions toolbar keeps Filters, sort, grouping and saved views together and puts Export, Columns,
   Warranties and Trash in a quieter group to the right (a two-column grid on a phone).
+- **Two-line rows on a phone** (Drop 14): each entry shows what and how much, then category, date and
+  method on one line (cut short with an ellipsis); the typed text shows only on wider screens.
 
 ### Later (not scheduled)
 
