@@ -4,7 +4,7 @@ A private, offline-first expense tracker. Your data stays on your device (Indexe
 cloud and no analytics. It installs on iPhone and Android as a PWA and is published free on GitHub Pages at
 https://dmik26.github.io/ledger/.
 
-**Status:** version 1.1.0. All thirteen drops are built and tested. See `docs/HANDOFF.md`.
+**Status:** version 1.2.0. All fourteen drops are built and tested; Drop 14 reworked the interface. See `docs/HANDOFF.md`.
 
 What works now: quick add with live highlighting and editable chips; an Add sheet (bottom sheet on phones)
 with amount, merchant, date, category, method, tags, notes and a receipt photo; Transactions with filters

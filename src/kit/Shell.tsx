@@ -79,6 +79,7 @@ export function MonthSwitcher() {
         type="button"
         className="month-step"
         aria-label={tl('Previous month')}
+        title={tl('Previous month')}
         disabled={month <= months[0]!}
         onClick={() => go(shift(month, -1))}
       >
@@ -99,6 +100,7 @@ export function MonthSwitcher() {
         type="button"
         className="month-step"
         aria-label={tl('Next month')}
+        title={tl('Next month')}
         disabled={month >= thisMonth}
         onClick={() => go(shift(month, 1))}
       >

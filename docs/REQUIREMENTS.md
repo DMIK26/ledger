@@ -450,6 +450,9 @@ reference matching or icon shortcuts). Everything stays on the device with no ne
 - **Cash flow without empty months** (Drop 14): the bars start at the first month with any money in or
   out, and each month shows what was left at the end of its bars (hidden in privacy mode like every
   amount).
+- **Reports and Settings** (Drop 14): Reports steps through periods with the same joined control as
+  the month switcher; on a phone every row of choices is one sideways row. Settings starts with a row
+  of its sections; a tap scrolls to that card. Version 1.2.0, tag v1.2.0.
 
 ### Later (not scheduled)
 

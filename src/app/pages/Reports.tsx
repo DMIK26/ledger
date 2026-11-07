@@ -1,4 +1,5 @@
 import { EmptyDoodle } from '../../doodle/bits';
+import { Icon } from '../icons';
 import { Fragment, useMemo, useState } from 'react';
 import { Heatmap } from '../../charts/Heatmap';
 import { Sparkline } from '../../charts/Sparkline';
@@ -295,20 +296,31 @@ export function Reports() {
           </div>
         ) : (
           <div className="period-nav">
-            <button type="button" className="btn" onClick={() => setOffset((o) => o - 1)}>
-              {tl('Previous')}
-            </button>
-            <span className="period-label" aria-live="polite">
-              {period.label}
-            </span>
-            <button
-              type="button"
-              className="btn"
-              disabled={offset >= 0}
-              onClick={() => setOffset((o) => o + 1)}
-            >
-              {tl('Next')}
-            </button>
+            {/* The same joined control as the month switcher (Drop 14). */}
+            <div className="month-switcher">
+              <button
+                type="button"
+                className="month-step"
+                aria-label={tl('Previous')}
+                title={tl('Previous')}
+                onClick={() => setOffset((o) => o - 1)}
+              >
+                <Icon name="back" />
+              </button>
+              <span className="month-button period-label" aria-live="polite">
+                {period.label}
+              </span>
+              <button
+                type="button"
+                className="month-step"
+                aria-label={tl('Next')}
+                title={tl('Next')}
+                disabled={offset >= 0}
+                onClick={() => setOffset((o) => o + 1)}
+              >
+                <Icon name="forward" />
+              </button>
+            </div>
           </div>
         )}
         <div className="field-row">

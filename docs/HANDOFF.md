@@ -1,9 +1,8 @@
 # Handoff: where the build stands
 
-Updated 23 Oct 2026. **Drops 1 to 13 are complete and published** at
-https://dmik26.github.io/ledger/, tagged **v1.1.0** (v1.0.0 was tagged after Drop 7). The live site
-was checked after the push: it reports 1.1.0, offers the language picker, Spaces and protected backups,
-and switches to Telugu and back. No further drop is planned.
+Updated 7 Nov 2026. **Drops 1 to 13 are published** at https://dmik26.github.io/ledger/, tagged
+**v1.1.0** (v1.0.0 was tagged after Drop 7). **Drop 14, a friendlier UI, is built and versioned 1.2.0**;
+Dhaarmik pushes it in one go and tags `v1.2.0` (see "Drop 14" below and `docs/PUBLISHING.md`).
 Read `CLAUDE.md`, then `docs/REQUIREMENTS.md`, `docs/ARCHITECTURE.md` and `docs/PLAN.md`, then this file.
 
 ## Verified at 1.0 (Drop 7)
@@ -85,6 +84,12 @@ CI (`.github/workflows/ci.yml`) runs `check` and `e2e` on every push and pull re
   ones that rendered with a MutationObserver; CSS hides all but the first). Drop 14's steps are in
   `docs/PLAN.md`; Tailwind and shadcn were ruled out there. Three tests read the real date and broke
   when November came (`drop5.test.tsx` hover, `sample.spec.ts`, `stability.spec.ts`); they now fix it.
+- **Drop 14 finished, v1.2.0** (7 Nov 2026, not yet pushed): Reports' period stepper is the same joined
+  control as the month switcher; on a phone, rows of choices (period, compare with, theme, motion and so
+  on) scroll sideways instead of stacking, and the category table keeps names on one or two lines;
+  Settings opens with a row of its sections, each tap scrolling to that card and moving focus to its
+  heading (`src/app/settings/SectionIndex.tsx` reads the cards' own headings). The notes button now says
+  "Show 2 more notes". Step buttons have tooltips. `ux-audit` run: hard gate clean (see the chat).
 - **CI runner pinned** (7 Nov 2026): GitHub moved `ubuntu-latest` to Ubuntu 26.04, where Playwright 1.56.1
   cannot install Chromium, so CI #27's browser job failed before any test ran. Both workflows now use
   `ubuntu-24.04`. Upgrading Playwright is the longer-term fix; do it as its own change.

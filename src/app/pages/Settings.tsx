@@ -1,4 +1,5 @@
 import { SampleCard } from '../SampleData';
+import { SectionIndex } from '../settings/SectionIndex';
 import { InstallButton, InstallText } from '../InstallBanner';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLedger } from '../../data/store';
@@ -736,6 +737,7 @@ export function Settings({ view, merchant }: { view?: string | null; merchant?: 
     );
   return (
     <>
+      <SectionIndex />
       <Appearance />
       <Privacy />
       <Experience />

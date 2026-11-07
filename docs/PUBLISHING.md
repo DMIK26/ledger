@@ -38,14 +38,14 @@ GitHub website. The repository must be **public** (Pages on a Free account needs
 Change files, open GitHub Desktop, write a short summary, Commit to main, then Push origin. The deploy runs
 by itself. Installed apps show an "Update ready" toast; tap Reload.
 
-## Tag a release (v1.0.0, v1.1.0)
+## Tag a release (v1.0.0, v1.1.0, v1.2.0)
 
 After the release commit is pushed and the deploy is green (v1.0.0 was "Drop 7: mobile and release";
-v1.1.0 is "Drop 13: reach and polish"):
+v1.1.0 is "Drop 13: reach and polish"; v1.2.0 is the Drop 14 push, a friendlier UI):
 
 1. In GitHub Desktop open the **History** tab.
 2. Right-click the release commit and choose **Create Tag…**.
-3. Name it (`v1.1.0` for Drop 13) and click **Create Tag**.
+3. Name it (`v1.2.0` for Drop 14) and click **Create Tag**.
 4. Click **Push origin** (it now says it will push the tag too).
 5. Optional: on github.com open the repo, **Releases**, **Draft a new release**, choose the tag, title it
    "Ledger 1.0" or "Ledger 1.1" and paste the matching list from `docs/HANDOFF.md` ("What is in 1.0", or

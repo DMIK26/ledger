@@ -38,8 +38,8 @@ export function Notices({ children }: { children: ReactNode }) {
           {open
             ? tl('Show fewer notes')
             : more === 1
-              ? tl('1 more note')
-              : tl('{0} more notes', more)}
+              ? tl('Show 1 more note')
+              : tl('Show {0} more notes', more)}
         </button>
       )}
     </div>

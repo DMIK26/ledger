@@ -423,6 +423,23 @@ svg {
   max-width: 100%;
 }
 
+/* On a phone a long set of choices is one row that scrolls sideways, not a stack (Drop 14). */
+@media (max-width: 719px) {
+  .segmented {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .segmented button {
+    flex: none;
+  }
+
+  .report-table tbody th {
+    min-width: 9em;
+  }
+}
+
 .segmented button {
   white-space: nowrap;
   min-height: 38px;
@@ -1725,10 +1742,22 @@ dialog::backdrop {
 }
 
 .period-nav {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: var(--s3);
+}
+
+.period-nav .month-switcher {
+  max-width: 100%;
+}
+
+.period-nav .month-button {
+  min-width: 0;
+  cursor: default;
+}
+
+.period-nav .month-button:hover {
+  background: none;
 }
 
 .period-label {
@@ -5723,4 +5752,50 @@ button.tree-item:hover {
 
 .notices:has(.notices-list:empty) {
   display: none;
+}
+
+/* Settings: the sections at the top, one tap to each (Drop 14). */
+.section-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.section-index:empty {
+  display: none;
+}
+
+.section-link {
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.section-link:hover {
+  background: var(--fill);
+}
+
+@media (max-width: 719px) {
+  .section-index {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .section-link {
+    flex: none;
+    min-height: 44px;
+  }
+}
+
+/* Cards land below the sticky header, not under it. */
+main section.card {
+  scroll-margin-top: 88px;
 }
